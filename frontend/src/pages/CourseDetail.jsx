@@ -1,0 +1,243 @@
+/**
+ * CourseDetail.jsx — Full course detail page.
+ *
+ * Shows: course info, instructor, curriculum (sections/lessons),
+ * reviews, and enroll button for learners.
+ */
+
+import { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import api from '../api/axios';
+import useAuth from '../hooks/useAuth';
+import StarRating from '../components/StarRating';
+import ProgressBar from '../components/ProgressBar';
+import LoadingSpinner from '../components/LoadingSpinner';
+import './CourseDetail.css';
+
+export default function CourseDetail() {
+  const { courseId } = useParams();
+  const navigate = useNavigate();
+  const { primaryRole } = useAuth();
+
+  const [course, setCourse] = useState(null);
+  const [sections, setSections] = useState([]);
+  const [reviews, setReviews] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [enrolling, setEnrolling] = useState(false);
+  const [enrolled, setEnrolled] = useState(false);
+  const [expandedSections, setExpandedSections] = useState({});
+
+  useEffect(() => {
+    api.get(`/public/courses/${courseId}`)
+      .then((res) => {
+        setCourse(res.data.course);
+        setSections(res.data.sections);
+        setReviews(res.data.reviews);
+      })
+      .catch(console.error)
+      .finally(() => setLoading(false));
+
+    // Check if the learner is already enrolled
+    if (primaryRole === 'learner') {
+      api.get('/learner/courses')
+        .then((res) => {
+          const isEnrolled = res.data.some((e) => e.course_id === courseId);
+          setEnrolled(isEnrolled);
+        })
+        .catch(() => {});
+    }
+  }, [courseId, primaryRole]);
+
+  const handleEnroll = async () => {
+    setEnrolling(true);
+    try {
+      await api.post(`/learner/enroll/${courseId}`);
+      setEnrolled(true);
+    } catch (err) {
+      alert(err.response?.data?.detail || 'Enrollment failed');
+    } finally {
+      setEnrolling(false);
+    }
+  };
+
+  const toggleSection = (sectionId) => {
+    setExpandedSections((prev) => ({
+      ...prev,
+      [sectionId]: !prev[sectionId],
+    }));
+  };
+
+  if (loading) return <div className="page-wrapper"><LoadingSpinner /></div>;
+  if (!course) return <div className="page-wrapper container"><div className="empty-state"><h3>Course not found</h3></div></div>;
+
+  const totalLessons = sections.reduce((acc, s) => acc + (s.lessons?.length || 0), 0);
+  const totalDuration = sections.reduce(
+    (acc, s) => acc + (s.lessons?.reduce((a, l) => a + (l.duration || 0), 0) || 0),
+    0
+  );
+
+  return (
+    <div className="page-wrapper">
+      <div className="container">
+        <div className="course-detail-layout animate-fade-in">
+          {/* ── Main Content ──────────────────────────────────────── */}
+          <div className="course-detail-main">
+            {/* Header */}
+            <div className="course-detail-header">
+              <span className="badge badge-primary">{course.category}</span>
+              <h1 className="course-detail-title">{course.title}</h1>
+              <div className="course-detail-meta">
+                <div className="course-meta-item">
+                  <StarRating rating={course.avg_rating || 0} />
+                  <span>{(course.avg_rating || 0).toFixed(1)} ({reviews.length} reviews)</span>
+                </div>
+                <span className="meta-divider">•</span>
+                <span>{totalLessons} lessons</span>
+                <span className="meta-divider">•</span>
+                <span>{totalDuration} min total</span>
+              </div>
+              <p className="course-detail-desc">{course.description}</p>
+            </div>
+
+            {/* Curriculum */}
+            <div className="course-curriculum">
+              <h2>Curriculum</h2>
+              {sections.length === 0 ? (
+                <p style={{ color: 'var(--color-text-muted)' }}>No content yet.</p>
+              ) : (
+                <div className="curriculum-list">
+                  {sections.map((section) => (
+                    <div key={section.id} className="curriculum-section card-glass">
+                      <div
+                        className="section-header-row"
+                        onClick={() => toggleSection(section.id)}
+                      >
+                        <div className="section-title-row">
+                          <span className="section-toggle">
+                            {expandedSections[section.id] ? '▾' : '▸'}
+                          </span>
+                          <h4>{section.title}</h4>
+                        </div>
+                        <span className="section-lesson-count">
+                          {section.lessons?.length || 0} lessons
+                        </span>
+                      </div>
+                      {expandedSections[section.id] && (
+                        <div className="section-lessons">
+                          {section.lessons?.map((lesson) => (
+                            <div key={lesson.id} className="lesson-row">
+                              <span className="lesson-icon">📄</span>
+                              <span className="lesson-title">{lesson.title}</span>
+                              {lesson.duration > 0 && (
+                                <span className="lesson-duration">{lesson.duration} min</span>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Reviews */}
+            <div className="course-reviews">
+              <h2>Reviews</h2>
+              {reviews.length === 0 ? (
+                <p style={{ color: 'var(--color-text-muted)' }}>No reviews yet.</p>
+              ) : (
+                <div className="reviews-list">
+                  {reviews.map((review) => (
+                    <div key={review.id} className="review-card card-glass">
+                      <div className="review-header">
+                        <div className="review-author">
+                          <div className="review-avatar">
+                            {review.learner_name?.charAt(0) || '?'}
+                          </div>
+                          <div>
+                            <strong>{review.learner_name || 'Anonymous'}</strong>
+                            <StarRating rating={review.rating} size="small" />
+                          </div>
+                        </div>
+                        <span className="review-date">
+                          {new Date(review.created_at).toLocaleDateString()}
+                        </span>
+                      </div>
+                      {review.comment && <p className="review-comment">{review.comment}</p>}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* ── Sidebar ───────────────────────────────────────────── */}
+          <aside className="course-detail-sidebar">
+            <div className="sidebar-card card">
+              {course.thumbnail_url ? (
+                <img src={course.thumbnail_url} alt={course.title} className="sidebar-thumb" />
+              ) : (
+                <div className="sidebar-thumb-placeholder">📚</div>
+              )}
+
+              <div className="sidebar-price">
+                {course.price > 0 ? `$${course.price.toFixed(2)}` : 'Free'}
+              </div>
+
+              {primaryRole === 'learner' && (
+                enrolled ? (
+                  <button
+                    className="btn btn-success"
+                    style={{ width: '100%' }}
+                    onClick={() => navigate('/learner')}
+                  >
+                    ✓ Enrolled — Go to Dashboard
+                  </button>
+                ) : (
+                  <button
+                    className="btn btn-primary"
+                    style={{ width: '100%' }}
+                    onClick={handleEnroll}
+                    disabled={enrolling}
+                    id="enroll-button"
+                  >
+                    {enrolling ? 'Enrolling...' : 'Enroll Now'}
+                  </button>
+                )
+              )}
+
+              <div className="sidebar-stats">
+                <div className="sidebar-stat">
+                  <span>📚</span> {totalLessons} Lessons
+                </div>
+                <div className="sidebar-stat">
+                  <span>⏱️</span> {totalDuration} Minutes
+                </div>
+                <div className="sidebar-stat">
+                  <span>📂</span> {sections.length} Sections
+                </div>
+                <div className="sidebar-stat">
+                  <span>⭐</span> {(course.avg_rating || 0).toFixed(1)} Rating
+                </div>
+              </div>
+
+              {/* Instructor Info */}
+              {course.instructor && (
+                <div className="sidebar-instructor">
+                  <h4>Instructor</h4>
+                  <div className="instructor-info">
+                    <div className="instructor-avatar">
+                      {course.instructor.name?.charAt(0) || '?'}
+                    </div>
+                    <span>{course.instructor.name}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          </aside>
+        </div>
+      </div>
+    </div>
+  );
+}

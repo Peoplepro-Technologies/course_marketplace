@@ -1,0 +1,126 @@
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import AuthProvider from './auth/AuthProvider';
+import Navbar from './components/Navbar';
+import ProtectedRoute from './components/ProtectedRoute';
+
+// Public Pages
+import HomePage from './pages/HomePage';
+import CourseDetail from './pages/CourseDetail';
+
+// Learner Pages
+import LearnerDashboard from './pages/learner/LearnerDashboard';
+import LessonViewer from './pages/learner/LessonViewer';
+
+// Instructor Pages
+import InstructorDashboard from './pages/instructor/InstructorDashboard';
+import CourseForm from './pages/instructor/CourseForm';
+import SectionManager from './pages/instructor/SectionManager';
+
+// Admin Pages
+import AdminDashboard from './pages/admin/AdminDashboard';
+import UserManagement from './pages/admin/UserManagement';
+import CourseModeration from './pages/admin/CourseModeration';
+import ReviewModeration from './pages/admin/ReviewModeration';
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <BrowserRouter>
+        <Navbar />
+        <main style={{ flex: 1 }}>
+          <Routes>
+            {/* ── Public Routes ──────────────────────────────────────── */}
+            <Route path="/" element={<HomePage />} />
+            <Route path="/course/:courseId" element={<CourseDetail />} />
+
+            {/* ── Learner Routes ─────────────────────────────────────── */}
+            <Route 
+              path="/learner" 
+              element={
+                <ProtectedRoute role="learner">
+                  <LearnerDashboard />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/learner/course/:courseId/learn" 
+              element={
+                <ProtectedRoute role="learner">
+                  <LessonViewer />
+                </ProtectedRoute>
+              } 
+            />
+
+            {/* ── Instructor Routes ──────────────────────────────────── */}
+            <Route 
+              path="/instructor" 
+              element={
+                <ProtectedRoute role="instructor">
+                  <InstructorDashboard />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/instructor/course/new" 
+              element={
+                <ProtectedRoute role="instructor">
+                  <CourseForm />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/instructor/course/:courseId/edit" 
+              element={
+                <ProtectedRoute role="instructor">
+                  <CourseForm />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/instructor/course/:courseId/curriculum" 
+              element={
+                <ProtectedRoute role="instructor">
+                  <SectionManager />
+                </ProtectedRoute>
+              } 
+            />
+
+            {/* ── Admin Routes ───────────────────────────────────────── */}
+            <Route 
+              path="/admin" 
+              element={
+                <ProtectedRoute role="admin">
+                  <AdminDashboard />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/admin/users" 
+              element={
+                <ProtectedRoute role="admin">
+                  <UserManagement />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/admin/courses" 
+              element={
+                <ProtectedRoute role="admin">
+                  <CourseModeration />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/admin/reviews" 
+              element={
+                <ProtectedRoute role="admin">
+                  <ReviewModeration />
+                </ProtectedRoute>
+              } 
+            />
+          </Routes>
+        </main>
+      </BrowserRouter>
+    </AuthProvider>
+  );
+}

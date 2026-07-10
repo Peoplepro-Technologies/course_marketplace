@@ -1,0 +1,39 @@
+"""
+models/lesson.py — Lesson model (individual piece of content).
+
+Lessons belong to a section and contain text/markdown content,
+plus a duration estimate in minutes.
+"""
+
+import uuid
+from sqlalchemy import Column, String, Text, Integer, ForeignKey
+from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import relationship
+
+from app.database import Base
+
+
+class Lesson(Base):
+    __tablename__ = "lessons"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    section_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("sections.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    title = Column(String(500), nullable=False)
+    content = Column(Text, nullable=True)  # Markdown / rich text content
+    order_index = Column(Integer, nullable=False, default=0)
+    duration = Column(Integer, nullable=True, default=0)  # Duration in minutes
+
+    # ── Relationships ─────────────────────────────────────────────────
+    section = relationship("Section", back_populates="lessons")
+    progress_records = relationship(
+        "Progress",
+        back_populates="lesson",
+        cascade="all, delete-orphan",
+    )
+
+    def __repr__(self):
+        return f"<Lesson {self.title}>"

@@ -1,0 +1,124 @@
+/* Lesson Viewer Styles */
+
+.lesson-viewer-layout {
+  display: flex;
+  height: calc(100vh - var(--navbar-height));
+  margin-top: var(--navbar-height);
+  overflow: hidden;
+}
+
+.lesson-sidebar {
+  width: 320px;
+  background: var(--color-bg-secondary);
+  border-right: 1px solid var(--color-border);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  overflow-y: auto;
+}
+
+.sidebar-header {
+  padding: var(--space-lg);
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-bg-tertiary);
+}
+
+.sidebar-sections {
+  flex: 1;
+}
+
+.sidebar-section {
+  border-bottom: 1px solid var(--color-border);
+}
+
+.section-title {
+  padding: var(--space-md);
+  font-weight: 600;
+  font-size: var(--text-sm);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.sidebar-lesson {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md) var(--space-sm) var(--space-xl);
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.sidebar-lesson:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--color-text-primary);
+}
+
+.sidebar-lesson.active {
+  background: rgba(124, 58, 237, 0.1);
+  color: var(--color-accent-tertiary);
+  border-left: 3px solid var(--color-accent-primary);
+}
+
+.sidebar-lesson.completed {
+  color: var(--color-success);
+}
+
+.status-icon {
+  font-size: 1rem;
+  line-height: 1.4;
+}
+
+.lesson-name {
+  line-height: 1.4;
+}
+
+.lesson-content-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  background: var(--color-bg-primary);
+  padding: var(--space-xl);
+}
+
+.content-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-xl);
+  flex-wrap: wrap;
+  gap: var(--space-md);
+}
+
+.header-actions {
+  display: flex;
+  gap: var(--space-sm);
+}
+
+.content-body {
+  flex: 1;
+  padding: var(--space-2xl);
+  max-width: 900px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.lesson-text-content {
+  font-size: var(--text-lg);
+  line-height: 1.8;
+  color: var(--color-text-primary);
+}
+
+@media (max-width: 768px) {
+  .lesson-viewer-layout {
+    flex-direction: column;
+  }
+  
+  .lesson-sidebar {
+    width: 100%;
+    height: 40vh;
+    border-right: none;
+    border-bottom: 1px solid var(--color-border);
+  }
+}

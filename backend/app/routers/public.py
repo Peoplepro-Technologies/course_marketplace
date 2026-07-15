@@ -103,7 +103,7 @@ def get_course_detail(course_id: str, db: Session = Depends(get_db)):
             joinedload(Course.instructor),
             joinedload(Course.sections).joinedload(Section.lessons),
         )
-        .filter(Course.id == course_id)
+        .filter(Course.id == course_id, Course.status == "published")
         .first()
     )
 

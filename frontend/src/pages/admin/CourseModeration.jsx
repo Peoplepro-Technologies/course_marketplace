@@ -28,9 +28,16 @@ export default function CourseModeration() {
   }, [data.page, data.page_size, statusFilter]);
 
   const handleModerate = async (courseId, action) => {
-    if (!window.confirm(`Are you sure you want to ${action} this course?`)) return;
+    let payload = { action };
+    if (action === 'reject') {
+      const reason = window.prompt('Enter rejection reason:');
+      if (reason === null) return;
+      payload.rejection_reason = reason;
+    } else {
+      if (!window.confirm(`Are you sure you want to ${action} this course?`)) return;
+    }
     try {
-      await api.put(`/admin/courses/${courseId}/moderate`, { action });
+      await api.put(`/admin/courses/${courseId}/moderate`, payload);
       fetchCourses();
     } catch (err) {
       alert('Moderation failed');
@@ -51,7 +58,9 @@ export default function CourseModeration() {
         <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} style={{ width: '200px' }}>
           <option value="">All Statuses</option>
           <option value="draft">Draft</option>
+          <option value="pending_review">Pending Review</option>
           <option value="published">Published</option>
+          <option value="rejected">Rejected</option>
           <option value="flagged">Flagged</option>
           <option value="removed">Removed</option>
         </select>
@@ -76,8 +85,13 @@ export default function CourseModeration() {
                   </div>
                 </td>
                 <td>
-                  <span className={`badge badge-${course.status === 'published' ? 'success' : course.status === 'flagged' ? 'danger' : 'warning'}`}>
-                    {course.status}
+                  <span className={`badge badge-${
+                    course.status === 'published' ? 'success' : 
+                    course.status === 'rejected' ? 'danger' :
+                    course.status === 'pending_review' ? 'primary' :
+                    course.status === 'flagged' || course.status === 'removed' ? 'danger' : 'warning'
+                  }`}>
+                    {course.status.replace('_', ' ')}
                   </span>
                 </td>
                 <td style={{ textAlign: 'right' }}>
@@ -85,6 +99,9 @@ export default function CourseModeration() {
                     <Link to={`/course/${course.id}`} className="btn btn-secondary btn-sm">View</Link>
                     {course.status !== 'published' && (
                       <button className="btn btn-success btn-sm" onClick={() => handleModerate(course.id, 'approve')}>Approve</button>
+                    )}
+                    {course.status === 'pending_review' && (
+                      <button className="btn btn-danger btn-sm" onClick={() => handleModerate(course.id, 'reject')}>Reject</button>
                     )}
                     {course.status !== 'flagged' && (
                       <button className="btn btn-warning btn-sm" onClick={() => handleModerate(course.id, 'flag')}>Flag</button>

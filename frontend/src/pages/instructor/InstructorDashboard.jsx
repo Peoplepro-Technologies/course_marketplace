@@ -92,9 +92,18 @@ export default function InstructorDashboard() {
                   <td>{course.category}</td>
                   <td>{course.price > 0 ? `$${course.price.toFixed(2)}` : 'Free'}</td>
                   <td>
-                    <span className={`badge badge-${course.status === 'published' ? 'success' : 'warning'}`}>
-                      {course.status}
+                    <span className={`badge badge-${
+                      course.status === 'published' ? 'success' : 
+                      course.status === 'rejected' ? 'danger' : 
+                      course.status === 'pending_review' ? 'primary' : 'warning'
+                    }`}>
+                      {course.status.replace('_', ' ')}
                     </span>
+                    {course.status === 'rejected' && course.rejection_reason && (
+                      <div style={{ marginTop: '0.25rem', fontSize: '0.75rem', color: 'var(--color-danger)' }}>
+                        Reason: {course.rejection_reason}
+                      </div>
+                    )}
                   </td>
                   <td style={{ textAlign: 'right' }}>
                     <div className="flex" style={{ gap: '0.5rem', justifyContent: 'flex-end' }}>
@@ -104,13 +113,21 @@ export default function InstructorDashboard() {
                       <Link to={`/instructor/course/${course.id}/curriculum`} className="btn btn-secondary btn-sm">
                         Curriculum
                       </Link>
-                      <button 
-                        className={`btn ${course.status === 'published' ? 'btn-warning' : 'btn-success'} btn-sm`}
-                        onClick={() => togglePublish(course.id)}
-                      >
-                        {course.status === 'published' ? 'Unpublish' : 'Publish'}
-                      </button>
-                      {course.status !== 'published' && (
+                      {course.status === 'pending_review' ? (
+                        <button className="btn btn-secondary btn-sm" disabled>
+                          Pending
+                        </button>
+                      ) : (
+                        <button 
+                          className={`btn ${course.status === 'published' ? 'btn-warning' : 'btn-success'} btn-sm`}
+                          onClick={() => togglePublish(course.id)}
+                        >
+                          {course.status === 'published' ? 'Unpublish' : 
+                           course.status === 'rejected' ? 'Resubmit for Review' : 
+                           'Submit for Review'}
+                        </button>
+                      )}
+                      {course.status !== 'published' && course.status !== 'pending_review' && (
                         <button className="btn btn-danger btn-sm" onClick={() => deleteCourse(course.id)}>
                           Delete
                         </button>

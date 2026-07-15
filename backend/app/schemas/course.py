@@ -46,6 +46,7 @@ class CourseRead(CourseBase):
     id: UUID
     instructor_id: UUID
     status: str
+    rejection_reason: Optional[str] = None
     avg_rating: Optional[float] = 0.0
     created_at: datetime
     instructor: Optional[InstructorInfo] = None
@@ -64,4 +65,5 @@ class CourseListRead(BaseModel):
 
 class CourseModerateAction(BaseModel):
     """Admin action to moderate a course."""
-    action: str  # "approve" | "flag" | "remove"
+    action: str  # "approve" | "flag" | "remove" | "reject"
+    rejection_reason: Optional[str] = None

@@ -5,7 +5,12 @@ Provides full CRUD for courses, sections, and lessons.
 Instructors can only manage their own courses.
 """
 
-from fastapi import APIRouter, Depends, HTTPException
+import os
+import shutil
+import subprocess
+import uuid as uuid_lib
+
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from sqlalchemy.orm import Session, joinedload
 
 from app.database import get_db
@@ -20,6 +25,15 @@ from app.schemas.lesson import LessonCreate, LessonUpdate, LessonRead
 from app.redis_client import invalidate_cache
 
 router = APIRouter(prefix="/api/v1/instructor", tags=["Instructor"])
+
+# ── Media paths (mirrors main.py resolution) ──────────────────────────
+_HERE = os.path.dirname(os.path.abspath(__file__))
+_MEDIA_ROOT = os.path.normpath(os.path.join(_HERE, "..", "media"))
+_VIDEOS_DIR = os.path.join(_MEDIA_ROOT, "videos")
+_THUMBS_DIR = os.path.join(_MEDIA_ROOT, "thumbnails")
+os.makedirs(_VIDEOS_DIR, exist_ok=True)
+os.makedirs(_THUMBS_DIR, exist_ok=True)
+
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -61,6 +75,34 @@ async def create_course(
     db.commit()
     db.refresh(course)
     return CourseRead.model_validate(course)
+
+
+@router.get("/courses/{course_id}")
+def get_course_detail(
+    course_id: str,
+    current_user: User = Depends(require_role("instructor")),
+    db: Session = Depends(get_db)
+):
+    """Get full details for a single course owned by the instructor."""
+    course = (
+        db.query(Course)
+        .options(
+            joinedload(Course.instructor),
+            joinedload(Course.sections).joinedload(Section.lessons),
+        )
+        .filter(Course.id == course_id, Course.instructor_id == current_user.id)
+        .first()
+    )
+
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found")
+
+    sections_data = [SectionRead.model_validate(s) for s in course.sections]
+
+    return {
+        "course": CourseRead.model_validate(course),
+        "sections": sections_data,
+    }
 
 
 @router.put("/courses/{course_id}", response_model=CourseRead)
@@ -131,9 +173,10 @@ async def toggle_publish(
     if not course:
         raise HTTPException(status_code=404, detail="Course not found")
 
-    if course.status == "draft":
-        course.status = "published"
-    elif course.status == "published":
+    if course.status in ["draft", "rejected"]:
+        course.status = "pending_review"
+        course.rejection_reason = None
+    elif course.status in ["published", "pending_review"]:
         course.status = "draft"
     else:
         raise HTTPException(
@@ -308,3 +351,150 @@ async def delete_lesson(
     db.delete(lesson)
     db.commit()
     return {"message": "Lesson deleted"}
+
+
+def run_ffmpeg_sync(cmd, timeout=120):
+    import subprocess
+    result = subprocess.run(cmd, capture_output=True, timeout=timeout)
+    return result.returncode, result.stdout, result.stderr
+
+
+@router.post("/lessons/{lesson_id}/upload-video", response_model=LessonRead)
+async def upload_lesson_video(
+    lesson_id: str,
+    video: UploadFile = File(...),
+    current_user: User = Depends(require_role("instructor")),
+    db: Session = Depends(get_db),
+):
+    """
+    Upload a video file for a lesson.
+
+    - Accepts any video format supported by ffmpeg.
+    - Transcodes to H.264 MP4 for web compatibility.
+    - Generates a JPEG thumbnail at the 1-second mark.
+    - Updates lesson.video_url and lesson.thumbnail_url.
+    - Returns the updated lesson.
+    """
+    print(f"\n[VIDEO UPLOAD] Started for lesson_id={lesson_id}")
+    # ── Verify the lesson belongs to this instructor ───────────────────
+    lesson = (
+        db.query(Lesson)
+        .join(Section)
+        .join(Course)
+        .filter(Lesson.id == lesson_id, Course.instructor_id == current_user.id)
+        .first()
+    )
+    if not lesson:
+        print(f"[VIDEO UPLOAD] Failed: Lesson {lesson_id} not found or unauthorized.")
+        raise HTTPException(status_code=404, detail="Lesson not found")
+
+    # ── Check ffmpeg is available ──────────────────────────────────────
+    if shutil.which("ffmpeg") is None:
+        print("[VIDEO UPLOAD] Failed: ffmpeg not found on PATH.")
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "ffmpeg is not installed or not on PATH. "
+                "Install it with: winget install ffmpeg — then restart the server."
+            ),
+        )
+
+    # ── Save the raw upload to a temp file ────────────────────────────
+    unique_id = str(uuid_lib.uuid4())
+    raw_ext = os.path.splitext(video.filename or "upload.mp4")[1] or ".mp4"
+    raw_path = os.path.join(_VIDEOS_DIR, f"{unique_id}_raw{raw_ext}")
+    out_path = os.path.join(_VIDEOS_DIR, f"{lesson_id}.mp4")
+    thumb_path = os.path.join(_THUMBS_DIR, f"{lesson_id}.jpg")
+
+    print(f"[VIDEO UPLOAD] Receiving file: {video.filename}")
+
+    try:
+        with open(raw_path, "wb") as f:
+            content = await video.read()
+            f.write(content)
+        
+        file_size_mb = os.path.getsize(raw_path) / (1024 * 1024)
+        print(f"[VIDEO UPLOAD] File saved to {raw_path} (Size: {file_size_mb:.2f} MB)")
+
+        # ── Transcode to H.264 MP4 ────────────────────────────────────
+        import asyncio
+        import subprocess
+        ffmpeg_cmd = [
+            "ffmpeg", "-y",            # overwrite output
+            "-i", raw_path,            # input
+            "-c:v", "libx264",         # H.264 video codec
+            "-preset", "fast",         # encoding speed
+            "-crf", "23",              # quality
+            "-c:a", "aac",             # AAC audio
+            "-movflags", "+faststart", # web-optimised: moov atom at front
+            "-fflags", "+genpts",      # Handle missing PTS for phone videos
+            "-max_muxing_queue_size", "1024", # Handle complex multiplexing
+            out_path
+        ]
+        print(f"[VIDEO UPLOAD] Running ffmpeg: {' '.join(ffmpeg_cmd)}")
+
+        loop = asyncio.get_event_loop()
+        try:
+            returncode, stdout, stderr = await loop.run_in_executor(
+                None, run_ffmpeg_sync, ffmpeg_cmd, 120
+            )
+        except subprocess.TimeoutExpired:
+            print("[VIDEO UPLOAD] Failed: ffmpeg timed out after 120 seconds")
+            raise HTTPException(status_code=500, detail="ffmpeg transcoding timed out after 120 seconds")
+
+        print(f"[VIDEO UPLOAD] ffmpeg exit code: {returncode}")
+        if returncode != 0:
+            stderr_decoded = stderr.decode(errors='replace') if stderr else ""
+            print(f"[VIDEO UPLOAD] ffmpeg STDERR:\n{stderr_decoded}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"ffmpeg transcoding failed. Check server logs."
+            )
+
+        # ── Extract thumbnail at 1 second ─────────────────────────────
+        thumb_cmd = [
+            "ffmpeg", "-y",
+            "-i", out_path,
+            "-ss", "00:00:01",   # seek to 1 second
+            "-vframes", "1",     # grab exactly one frame
+            "-q:v", "2",         # JPEG quality
+            thumb_path
+        ]
+        
+        try:
+            thumb_rc, thumb_out, thumb_err = await loop.run_in_executor(
+                None, run_ffmpeg_sync, thumb_cmd, 30
+            )
+            thumb_ok = thumb_rc == 0
+        except subprocess.TimeoutExpired:
+            thumb_ok = False
+
+        if thumb_ok:
+            print("[VIDEO UPLOAD] Thumbnail generated successfully.")
+        else:
+            print("[VIDEO UPLOAD] Warning: Thumbnail generation failed.")
+
+        # ── Update the lesson record ───────────────────────────────────────
+        lesson.video_url = f"/media/videos/{lesson_id}.mp4"
+        if thumb_ok:
+            lesson.thumbnail_url = f"/media/thumbnails/{lesson_id}.jpg"
+
+        db.commit()
+        db.refresh(lesson)
+        print(f"[VIDEO UPLOAD] DB commit successful. lesson_id={lesson_id}")
+        return LessonRead.model_validate(lesson)
+
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception as e:
+        db.rollback()
+        import traceback
+        print(f"[VIDEO UPLOAD] Unexpected error: {e}")
+        print(traceback.format_exc())
+        raise HTTPException(status_code=500, detail="An unexpected error occurred during upload.")
+    finally:
+        # Always remove the raw upload to save disk space
+        if os.path.exists(raw_path):
+            os.remove(raw_path)
+            print(f"[VIDEO UPLOAD] Cleaned up raw file: {raw_path}")

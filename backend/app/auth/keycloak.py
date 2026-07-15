@@ -7,6 +7,7 @@ This module:
   3. Extracts the user's "sub" claim and realm_access.roles.
   4. Auto-creates a local User row on first authenticated request.
 """
+from __future__ import annotations
 
 import httpx
 from fastapi import Depends, HTTPException, status

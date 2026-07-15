@@ -25,7 +25,7 @@ export default function CourseForm() {
 
   useEffect(() => {
     if (isEditing) {
-      api.get(`/public/courses/${courseId}`)
+      api.get(`/instructor/courses/${courseId}`)
         .then(res => {
           const c = res.data.course;
           setFormData({

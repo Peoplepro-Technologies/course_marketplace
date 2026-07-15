@@ -2,7 +2,8 @@
 models/lesson.py — Lesson model (individual piece of content).
 
 Lessons belong to a section and contain text/markdown content,
-plus a duration estimate in minutes.
+plus a duration estimate in minutes. Optionally, a lesson may also
+have a transcoded MP4 video stored at video_url.
 """
 
 import uuid
@@ -24,6 +25,8 @@ class Lesson(Base):
     )
     title = Column(String(500), nullable=False)
     content = Column(Text, nullable=True)  # Markdown / rich text content
+    video_url = Column(String(1000), nullable=True)  # Relative URL to processed MP4
+    thumbnail_url = Column(String(1000), nullable=True)  # Relative URL to video thumbnail
     order_index = Column(Integer, nullable=False, default=0)
     duration = Column(Integer, nullable=True, default=0)  # Duration in minutes
 

@@ -4,17 +4,27 @@ main.py — FastAPI application entry point.
 Sets up:
   - CORS middleware (allows the Vite frontend at localhost:5173)
   - All API routers (public, learner, instructor, admin)
+  - Static file serving for uploaded media (videos, thumbnails)
   - Database table creation on startup
   - Auto-generated OpenAPI docs at /docs
 """
 
+import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from app.database import engine, Base
 from app.models import *  # noqa: F401, F403 — ensures all models are registered
 from app.routers import public, learner, instructor, admin
+
+# ── Media directory paths ─────────────────────────────────────────────
+# Resolve relative to this file so it works from any working directory.
+_HERE = os.path.dirname(os.path.abspath(__file__))
+MEDIA_ROOT = os.path.join(_HERE, "media")
+os.makedirs(os.path.join(MEDIA_ROOT, "videos"), exist_ok=True)
+os.makedirs(os.path.join(MEDIA_ROOT, "thumbnails"), exist_ok=True)
 
 
 # ── Lifespan: runs on startup / shutdown ──────────────────────────────
@@ -25,11 +35,11 @@ async def lifespan(app: FastAPI):
     In production you'd rely solely on Alembic, but this is
     convenient for local development.
     """
-    print("🚀 Starting Course Marketplace API...")
+    print("Starting Course Marketplace API...")
     Base.metadata.create_all(bind=engine)
-    print("✅ Database tables verified/created.")
+    print("Database tables verified/created.")
     yield
-    print("👋 Shutting down Course Marketplace API.")
+    print("Shutting down Course Marketplace API.")
 
 
 # ── FastAPI App ───────────────────────────────────────────────────────
@@ -56,6 +66,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# ── Static file serving for uploaded media ────────────────────────────
+# Videos and thumbnails are served at /media/videos/ and /media/thumbnails/
+app.mount("/media", StaticFiles(directory=MEDIA_ROOT), name="media")
 
 # ── Routers ───────────────────────────────────────────────────────────
 app.include_router(public.router)

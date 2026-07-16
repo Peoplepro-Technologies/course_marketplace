@@ -23,7 +23,7 @@ export default function SectionManager() {
   const [lessonModal, setLessonModal] = useState({ isOpen: false, sectionId: null, lesson: null });
 
   const fetchCurriculum = () => {
-    api.get(`/public/courses/${courseId}`)
+    api.get(`/instructor/courses/${courseId}`)
       .then(res => {
         setCourse(res.data.course);
         setSections(res.data.sections);

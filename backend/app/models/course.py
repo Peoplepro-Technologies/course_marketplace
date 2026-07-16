@@ -31,8 +31,9 @@ class Course(Base):
     status = Column(
         String(20),
         nullable=False,
-        default="draft",  # draft | published | flagged | removed
+        default="draft",  # draft | pending_review | published | rejected | flagged | removed
     )
+    rejection_reason = Column(Text, nullable=True)
     avg_rating = Column(Float, nullable=True, default=0.0)
     created_at = Column(
         DateTime(timezone=True),

@@ -8,6 +8,7 @@ import api from '../../api/axios';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import Modal from '../../components/Modal';
 import ReviewForm from './ReviewForm';
+import VideoPlayer from '../../components/VideoPlayer';
 import './LessonViewer.css';
 
 export default function LessonViewer() {
@@ -122,8 +123,14 @@ export default function LessonViewer() {
         <div className="content-body card-glass">
           {activeLesson ? (
             <div className="lesson-text-content">
-              {/* In a real app, you'd render markdown here */}
-              <p style={{ whiteSpace: 'pre-wrap' }}>{activeLesson.content || 'No content provided for this lesson.'}</p>
+              {/* Video player — shown above text when lesson has a video */}
+              {activeLesson.video_url && (
+                <VideoPlayer
+                  src={`http://localhost:8000${activeLesson.video_url}`}
+                />
+              )}
+              {/* Text / markdown content */}
+              <p style={{ whiteSpace: 'pre-wrap' }}>{activeLesson.content || (activeLesson.video_url ? '' : 'No content provided for this lesson.')}</p>
             </div>
           ) : (
             <div className="empty-state">

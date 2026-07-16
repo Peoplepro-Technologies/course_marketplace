@@ -125,6 +125,7 @@ async def moderate_course(
 
     action_map = {
         "approve": "published",
+        "reject": "rejected",
         "flag": "flagged",
         "remove": "removed",
     }
@@ -133,10 +134,12 @@ async def moderate_course(
     if not new_status:
         raise HTTPException(
             status_code=400,
-            detail=f"Invalid action '{data.action}'. Use: approve, flag, remove",
+            detail=f"Invalid action '{data.action}'. Use: approve, reject, flag, remove",
         )
 
     course.status = new_status
+    if data.action == "reject" and data.rejection_reason:
+        course.rejection_reason = data.rejection_reason
     db.commit()
 
     # Invalidate catalog cache

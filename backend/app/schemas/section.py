@@ -30,7 +30,9 @@ class LessonInSection(BaseModel):
     title: str
     order_index: int
     duration: Optional[int] = 0
-
+    content: Optional[str] = None
+    video_url: Optional[str] = None
+    thumbnail_url: Optional[str] = None
     class Config:
         from_attributes = True
 

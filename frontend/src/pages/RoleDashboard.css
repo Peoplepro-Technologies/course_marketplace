@@ -1,0 +1,244 @@
+/* ═══════════════════════════════════════════════════════════════════════
+   RoleDashboard.css — Shared sidebar layout for role-based dashboards.
+   Reuses design tokens from variables.css.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+.role-dashboard {
+  display: flex;
+  min-height: 100vh;
+  padding-top: var(--navbar-height);
+}
+
+/* ── Sidebar ──────────────────────────────────────────────────────────── */
+.role-sidebar {
+  width: var(--sidebar-width);
+  min-width: var(--sidebar-width);
+  background: var(--gradient-card);
+  border-right: 1px solid var(--color-border);
+  backdrop-filter: blur(20px);
+  padding: var(--space-xl) 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  position: fixed;
+  top: var(--navbar-height);
+  left: 0;
+  bottom: 0;
+  overflow-y: auto;
+  z-index: 10;
+  animation: slideInLeft 0.4s ease forwards;
+}
+
+@keyframes slideInLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.role-sidebar-header {
+  padding: 0 var(--space-lg) var(--space-lg);
+  border-bottom: 1px solid var(--color-border);
+  margin-bottom: var(--space-sm);
+}
+
+.role-sidebar-header h3 {
+  font-family: var(--font-heading);
+  font-size: var(--text-lg);
+  font-weight: 700;
+  background: var(--gradient-primary);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: var(--space-xs);
+}
+
+.role-sidebar-header p {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.sidebar-nav {
+  list-style: none;
+  padding: 0 var(--space-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sidebar-nav-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: 0.625rem var(--space-md);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  position: relative;
+  user-select: none;
+}
+
+.sidebar-nav-item:hover {
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--color-text-primary);
+}
+
+.sidebar-nav-item.active {
+  background: rgba(124, 58, 237, 0.12);
+  color: var(--color-accent-tertiary);
+  font-weight: 600;
+}
+
+.sidebar-nav-item.active::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 60%;
+  background: var(--gradient-primary);
+  border-radius: var(--radius-full);
+}
+
+.sidebar-nav-icon {
+  font-size: 1.1rem;
+  width: 24px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.sidebar-coming-soon {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  background: rgba(255, 255, 255, 0.04);
+  padding: 0.125rem 0.375rem;
+  border-radius: var(--radius-sm);
+  margin-left: auto;
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+}
+
+.sidebar-nav-item:hover .sidebar-coming-soon {
+  opacity: 1;
+}
+
+/* ── Main Content ─────────────────────────────────────────────────────── */
+.role-main {
+  flex: 1;
+  margin-left: var(--sidebar-width);
+  padding: var(--space-2xl) var(--space-2xl) var(--space-3xl);
+  animation: fadeIn 0.5s ease forwards;
+}
+
+.role-welcome {
+  margin-bottom: var(--space-2xl);
+}
+
+.role-welcome h1 {
+  font-family: var(--font-heading);
+  font-size: var(--text-3xl);
+  font-weight: 800;
+  margin-bottom: var(--space-sm);
+}
+
+.role-welcome h1 span {
+  background: var(--gradient-primary);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.role-welcome p {
+  font-size: var(--text-lg);
+  color: var(--color-text-secondary);
+}
+
+/* ── Placeholder cards grid ───────────────────────────────────────────── */
+.role-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: var(--space-lg);
+}
+
+.role-placeholder-card {
+  background: var(--gradient-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-xl);
+  backdrop-filter: blur(20px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: var(--space-sm);
+  min-height: 140px;
+  transition: all var(--transition-base);
+  opacity: 0;
+  animation: fadeInUp 0.5s ease forwards;
+}
+
+.role-placeholder-card:nth-child(1) { animation-delay: 0.05s; }
+.role-placeholder-card:nth-child(2) { animation-delay: 0.10s; }
+.role-placeholder-card:nth-child(3) { animation-delay: 0.15s; }
+.role-placeholder-card:nth-child(4) { animation-delay: 0.20s; }
+.role-placeholder-card:nth-child(5) { animation-delay: 0.25s; }
+.role-placeholder-card:nth-child(6) { animation-delay: 0.30s; }
+
+.role-placeholder-card:hover {
+  border-color: var(--color-border-hover);
+  box-shadow: var(--shadow-glow);
+  transform: translateY(-3px);
+}
+
+.role-placeholder-card .card-icon {
+  font-size: 2rem;
+}
+
+.role-placeholder-card h4 {
+  font-size: var(--text-base);
+  font-weight: 600;
+}
+
+.role-placeholder-card p {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+/* ── Responsive ───────────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .role-dashboard {
+    flex-direction: column;
+  }
+
+  .role-sidebar {
+    width: 100%;
+    min-width: 100%;
+    position: relative;
+    top: auto;
+    left: auto;
+    bottom: auto;
+    border-right: none;
+    border-bottom: 1px solid var(--color-border);
+    padding: var(--space-md) 0;
+  }
+
+  .role-main {
+    margin-left: 0;
+    padding: var(--space-lg);
+  }
+
+  .role-cards-grid {
+    grid-template-columns: 1fr;
+  }
+}

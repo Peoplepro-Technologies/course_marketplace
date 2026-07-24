@@ -62,6 +62,42 @@ export default function Navbar() {
               Admin Panel
             </Link>
           )}
+
+          {primaryRole === 'super_admin' && (
+            <Link
+              to="/super-admin"
+              className={`nav-link ${isActive('/super-admin') ? 'active' : ''}`}
+            >
+              Super Admin
+            </Link>
+          )}
+
+          {primaryRole === 'sub_admin' && (
+            <Link
+              to="/sub-admin"
+              className={`nav-link ${isActive('/sub-admin') ? 'active' : ''}`}
+            >
+              Sub Admin
+            </Link>
+          )}
+
+          {primaryRole === 'course_coordinator' && (
+            <Link
+              to="/coordinator"
+              className={`nav-link ${isActive('/coordinator') ? 'active' : ''}`}
+            >
+              Coordinator
+            </Link>
+          )}
+
+          {primaryRole === 'accounts' && (
+            <Link
+              to="/accounts"
+              className={`nav-link ${isActive('/accounts') ? 'active' : ''}`}
+            >
+              Accounts
+            </Link>
+          )}
         </div>
 
         {/* ── User Info & Logout ────────────────────────────────────── */}
@@ -72,8 +108,18 @@ export default function Navbar() {
             </span>
             <div className="user-details">
               <span className="user-name">{user?.name || 'User'}</span>
-              <span className={`badge badge-${primaryRole === 'admin' ? 'danger' : primaryRole === 'instructor' ? 'warning' : 'primary'}`}>
-                {primaryRole}
+              <span className={`badge badge-${
+                primaryRole === 'admin' || primaryRole === 'super_admin' ? 'danger'
+                : primaryRole === 'sub_admin' ? 'warning'
+                : primaryRole === 'instructor' ? 'warning'
+                : primaryRole === 'course_coordinator' ? 'success'
+                : primaryRole === 'accounts' ? 'primary'
+                : 'primary'
+              }`}>
+                {primaryRole === 'super_admin' ? 'super admin'
+                  : primaryRole === 'sub_admin' ? 'sub admin'
+                  : primaryRole === 'course_coordinator' ? 'coordinator'
+                  : primaryRole}
               </span>
             </div>
           </div>

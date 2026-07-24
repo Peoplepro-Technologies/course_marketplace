@@ -22,6 +22,12 @@ import UserManagement from './pages/admin/UserManagement';
 import CourseModeration from './pages/admin/CourseModeration';
 import ReviewModeration from './pages/admin/ReviewModeration';
 
+// New Role Dashboards
+import SuperAdminDashboard from './pages/superadmin/SuperAdminDashboard';
+import SubAdminDashboard from './pages/subadmin/SubAdminDashboard';
+import CoordinatorDashboard from './pages/coordinator/CoordinatorDashboard';
+import AccountsDashboard from './pages/accounts/AccountsDashboard';
+
 export default function App() {
   return (
     <AuthProvider>
@@ -118,9 +124,50 @@ export default function App() {
                 </ProtectedRoute>
               } 
             />
+
+            {/* ── Super Admin Routes ─────────────────────────────────── */}
+            <Route 
+              path="/super-admin" 
+              element={
+                <ProtectedRoute role="super_admin">
+                  <SuperAdminDashboard />
+                </ProtectedRoute>
+              } 
+            />
+
+            {/* ── Sub Admin Routes ───────────────────────────────────── */}
+            <Route 
+              path="/sub-admin" 
+              element={
+                <ProtectedRoute role="sub_admin">
+                  <SubAdminDashboard />
+                </ProtectedRoute>
+              } 
+            />
+
+            {/* ── Course Coordinator Routes ──────────────────────────── */}
+            <Route 
+              path="/coordinator" 
+              element={
+                <ProtectedRoute role="course_coordinator">
+                  <CoordinatorDashboard />
+                </ProtectedRoute>
+              } 
+            />
+
+            {/* ── Accounts Routes ────────────────────────────────────── */}
+            <Route 
+              path="/accounts" 
+              element={
+                <ProtectedRoute role="accounts">
+                  <AccountsDashboard />
+                </ProtectedRoute>
+              } 
+            />
           </Routes>
         </main>
       </BrowserRouter>
     </AuthProvider>
   );
 }
+

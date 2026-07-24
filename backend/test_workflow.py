@@ -123,6 +123,141 @@ def test_workflow():
     assert c["rejection_reason"] == "Needs more content"
     print("Rejection reason successfully stored and retrieved.")
     
+    # ── Test New Role System (Task 2 Backend) ──────────────────────────
+    print("\n--- Testing New Role System (Task 2 Backend) ---")
+    from fastapi import Depends
+    from app.auth.roles import require_role
+
+    # Define test endpoints dynamically on the main app
+    @app.get("/api/test/super-admin", dependencies=[Depends(require_role("super_admin"))])
+    def super_admin_test_route():
+        return {"role": "super_admin"}
+
+    @app.get("/api/test/sub-admin", dependencies=[Depends(require_role("sub_admin"))])
+    def sub_admin_test_route():
+        return {"role": "sub_admin"}
+
+    @app.get("/api/test/coordinator", dependencies=[Depends(require_role("course_coordinator"))])
+    def coordinator_test_route():
+        return {"role": "course_coordinator"}
+
+    @app.get("/api/test/accounts", dependencies=[Depends(require_role("accounts"))])
+    def accounts_test_route():
+        return {"role": "accounts"}
+
+    @app.get("/api/test/admin-generic", dependencies=[Depends(require_role("admin"))])
+    def admin_generic_test_route():
+        return {"role": "admin"}
+
+    # Set up overrides and mock tokens
+    def get_user_with_roles(roles_list):
+        def _override():
+            db = next(get_db())
+            # Use get_current_user logic manually to build/retrieve user
+            # Mocking payload parts
+            sub = "mock_sub_" + "_".join(roles_list)
+            email = "_".join(roles_list) + "@test.com"
+            name = "Test " + " ".join(roles_list)
+            
+            # Determine the highest-priority role for this user.
+            roles = roles_list
+            if "super_admin" in roles:
+                role = "admin"
+                if "admin" not in roles:
+                    roles = list(roles) + ["admin"]
+            elif "admin" in roles:
+                role = "admin"
+            elif "sub_admin" in roles:
+                role = "sub_admin"
+            elif "course_coordinator" in roles:
+                role = "course_coordinator"
+            elif "accounts" in roles:
+                role = "accounts"
+            elif "instructor" in roles:
+                role = "instructor"
+            else:
+                role = "learner"
+
+            user = db.query(User).filter(User.keycloak_sub == sub).first()
+            if user is None:
+                user = User(
+                    keycloak_sub=sub,
+                    name=name,
+                    email=email,
+                    role=role,
+                )
+                db.add(user)
+                db.commit()
+                db.refresh(user)
+            else:
+                if user.role != role:
+                    user.role = role
+                    db.commit()
+                    db.refresh(user)
+            user._realm_roles = roles
+            return user
+        return _override
+
+    # Test Super Admin Access and Admin Equivalence
+    app.dependency_overrides[get_current_user] = get_user_with_roles(["super_admin"])
+    
+    # 1. Super Admin route allows super_admin
+    resp = client.get("/api/test/super-admin")
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["role"] == "super_admin"
+    print("OK: require_role('super_admin') allowed access for super_admin user")
+
+    # 2. Admin route allows super_admin (Admin equivalence)
+    resp = client.get("/api/test/admin-generic")
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["role"] == "admin"
+    print("OK: require_role('admin') allowed access for super_admin user (Admin Equivalence)")
+
+    # 3. Sub Admin route denies super_admin
+    resp = client.get("/api/test/sub-admin")
+    assert resp.status_code == 403, resp.text
+    print("OK: require_role('sub_admin') denied access for super_admin user")
+
+    # Test Sub Admin Access
+    app.dependency_overrides[get_current_user] = get_user_with_roles(["sub_admin"])
+    
+    resp = client.get("/api/test/sub-admin")
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["role"] == "sub_admin"
+    print("OK: require_role('sub_admin') allowed access for sub_admin user")
+
+    resp = client.get("/api/test/super-admin")
+    assert resp.status_code == 403, resp.text
+    print("OK: require_role('super_admin') denied access for sub_admin user")
+
+    # Test Course Coordinator Access
+    app.dependency_overrides[get_current_user] = get_user_with_roles(["course_coordinator"])
+    
+    resp = client.get("/api/test/coordinator")
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["role"] == "course_coordinator"
+    print("OK: require_role('course_coordinator') allowed access for coordinator user")
+
+    resp = client.get("/api/test/sub-admin")
+    assert resp.status_code == 403, resp.text
+    print("OK: require_role('sub_admin') denied access for coordinator user")
+
+    # Test Accounts Access
+    app.dependency_overrides[get_current_user] = get_user_with_roles(["accounts"])
+    
+    resp = client.get("/api/test/accounts")
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["role"] == "accounts"
+    print("OK: require_role('accounts') allowed access for accounts user")
+
+    resp = client.get("/api/test/coordinator")
+    assert resp.status_code == 403, resp.text
+    print("OK: require_role('course_coordinator') denied access for accounts user")
+
+    # Cleanup overrides
+    app.dependency_overrides.clear()
+    print("--- New Role System Tests Passed! ---\n")
+    
     print("ALL TESTS PASSED!")
 
 if __name__ == "__main__":

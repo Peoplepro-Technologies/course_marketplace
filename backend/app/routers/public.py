@@ -19,7 +19,9 @@ from app.models.course import Course
 from app.models.section import Section
 from app.models.lesson import Lesson
 from app.models.review import Review
+from app.models.review import Review
 from app.models.user import User
+from app.models.category import Category
 from app.schemas.course import CourseRead, CourseListRead
 from app.schemas.section import SectionRead
 from app.schemas.review import ReviewRead
@@ -138,11 +140,6 @@ def get_course_detail(course_id: str, db: Session = Depends(get_db)):
 
 @router.get("/categories")
 def list_categories(db: Session = Depends(get_db)):
-    """Return a list of all distinct course categories."""
-    categories = (
-        db.query(Course.category)
-        .filter(Course.status == "published")
-        .distinct()
-        .all()
-    )
+    """Return a list of all distinct course categories from the categories table."""
+    categories = db.query(Category.name).order_by(Category.name.asc()).all()
     return [c[0] for c in categories if c[0]]

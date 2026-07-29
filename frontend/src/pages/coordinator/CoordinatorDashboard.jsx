@@ -1,25 +1,27 @@
 /**
- * CoordinatorDashboard.jsx — Placeholder dashboard for the course_coordinator role.
+ * CoordinatorDashboard.jsx — Placeholder dashboard for the coursecoordinator role.
  *
  * Displays a welcome header and a sidebar with 7 menu items (non-functional).
  * Reuses the shared RoleDashboard layout and existing design system.
  */
 
+import { Link, useLocation } from 'react-router-dom';
 import useAuth from '../../hooks/useAuth';
 import '../RoleDashboard.css';
 
 const SIDEBAR_ITEMS = [
-  { icon: '📊', label: 'Dashboard' },
-  { icon: '✅', label: 'Course Approvals' },
-  { icon: '📚', label: 'Course Catalog' },
-  { icon: '🏷️', label: 'Categories' },
-  { icon: '👨‍🏫', label: 'Instructors' },
-  { icon: '⭐', label: 'Quality & Reviews' },
-  { icon: '📈', label: 'Reports' },
+  { icon: '📊', label: 'Dashboard', path: '/coordinator' },
+  { icon: '✅', label: 'Course Approvals', path: '/coordinator/courses/pending' },
+  { icon: '📚', label: 'Course Catalog', path: '/coordinator/courses' },
+  { icon: '🏷️', label: 'Categories', path: '/coordinator/categories' },
+  { icon: '👨‍🏫', label: 'Instructors', path: '/coordinator/instructors' },
+  { icon: '⭐', label: 'Quality & Reviews', path: '/coordinator/quality-reviews' },
+  { icon: '📈', label: 'Reports', path: '/coordinator/reports' },
 ];
 
 export default function CoordinatorDashboard() {
   const { user } = useAuth();
+  const location = useLocation();
 
   return (
     <div className="role-dashboard" id="coordinator-dashboard">
@@ -30,17 +32,21 @@ export default function CoordinatorDashboard() {
           <p>Course Quality & Oversight</p>
         </div>
         <ul className="sidebar-nav">
-          {SIDEBAR_ITEMS.map((item, i) => (
-            <li
-              key={item.label}
-              className={`sidebar-nav-item${i === 0 ? ' active' : ''}`}
-            >
-              <span className="sidebar-nav-icon">{item.icon}</span>
-              {item.label}
-              {i !== 0 && (
+          {SIDEBAR_ITEMS.map((item) => (
+            item.path !== '#' ? (
+              <Link to={item.path} key={item.label} style={{ textDecoration: 'none' }}>
+                <li className={`sidebar-nav-item${location.pathname === item.path ? ' active' : ''}`}>
+                  <span className="sidebar-nav-icon">{item.icon}</span>
+                  {item.label}
+                </li>
+              </Link>
+            ) : (
+              <li key={item.label} className="sidebar-nav-item">
+                <span className="sidebar-nav-icon">{item.icon}</span>
+                {item.label}
                 <span className="sidebar-coming-soon">Soon</span>
-              )}
-            </li>
+              </li>
+            )
           ))}
         </ul>
       </aside>
@@ -60,11 +66,21 @@ export default function CoordinatorDashboard() {
         <h3 style={{ marginBottom: 'var(--space-lg)' }}>Quick Access</h3>
         <div className="role-cards-grid">
           {SIDEBAR_ITEMS.slice(1).map((item) => (
-            <div key={item.label} className="role-placeholder-card">
-              <div className="card-icon">{item.icon}</div>
-              <h4>{item.label}</h4>
-              <p>Coming soon</p>
-            </div>
+            item.path !== '#' ? (
+              <Link to={item.path} key={item.label} style={{ textDecoration: 'none', display: 'block' }}>
+                <div className="role-placeholder-card" style={{ cursor: 'pointer', height: '100%' }}>
+                  <div className="card-icon">{item.icon}</div>
+                  <h4>{item.label}</h4>
+                  <p>View {item.label.toLowerCase()}</p>
+                </div>
+              </Link>
+            ) : (
+              <div key={item.label} className="role-placeholder-card">
+                <div className="card-icon">{item.icon}</div>
+                <h4>{item.label}</h4>
+                <p>Coming soon</p>
+              </div>
+            )
           ))}
         </div>
       </main>

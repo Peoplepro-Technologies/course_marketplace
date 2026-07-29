@@ -29,6 +29,12 @@ import ReviewModeration from './pages/admin/ReviewModeration';
 import SuperAdminDashboard from './pages/superadmin/SuperAdminDashboard';
 import SubAdminDashboard from './pages/subadmin/SubAdminDashboard';
 import CoordinatorDashboard from './pages/coordinator/CoordinatorDashboard';
+import InstructorRoster from './pages/coordinator/InstructorRoster';
+import CourseApprovals from './pages/coordinator/CourseApprovals';
+import CourseCatalog from './pages/coordinator/CourseCatalog';
+import CategoryManager from './pages/coordinator/CategoryManager';
+import QualityReviews from './pages/coordinator/QualityReviews';
+import Reports from './pages/coordinator/Reports';
 import AccountsDashboard from './pages/accounts/AccountsDashboard';
 
 export default function App() {
@@ -176,8 +182,56 @@ export default function App() {
             <Route 
               path="/coordinator" 
               element={
-                <ProtectedRoute role="course_coordinator">
+                <ProtectedRoute role="coursecoordinator">
                   <CoordinatorDashboard />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/coordinator/instructors" 
+              element={
+                <ProtectedRoute role="coursecoordinator">
+                  <InstructorRoster />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/coordinator/courses/pending" 
+              element={
+                <ProtectedRoute role="coursecoordinator">
+                  <CourseApprovals />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/coordinator/courses" 
+              element={
+                <ProtectedRoute role="coursecoordinator">
+                  <CourseCatalog />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/coordinator/categories" 
+              element={
+                <ProtectedRoute role="coursecoordinator">
+                  <CategoryManager />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/coordinator/quality-reviews" 
+              element={
+                <ProtectedRoute role="coursecoordinator">
+                  <QualityReviews />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/coordinator/reports" 
+              element={
+                <ProtectedRoute role="coursecoordinator">
+                  <Reports />
                 </ProtectedRoute>
               } 
             />

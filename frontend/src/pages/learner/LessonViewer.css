@@ -35,7 +35,7 @@
   padding: var(--space-md);
   font-weight: 600;
   font-size: var(--text-sm);
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--color-bg-tertiary);
 }
 
 .sidebar-lesson {
@@ -50,14 +50,14 @@
 }
 
 .sidebar-lesson:hover {
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--color-bg-tertiary);
   color: var(--color-text-primary);
 }
 
 .sidebar-lesson.active {
-  background: rgba(124, 58, 237, 0.1);
-  color: var(--color-accent-tertiary);
-  border-left: 3px solid var(--color-accent-primary);
+  background: rgba(0, 86, 210, 0.08);
+  color: #0056D2;
+  border-left: 3px solid #0056D2;
 }
 
 .sidebar-lesson.completed {

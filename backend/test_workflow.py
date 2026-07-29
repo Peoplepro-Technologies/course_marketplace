@@ -137,9 +137,9 @@ def test_workflow():
     def sub_admin_test_route():
         return {"role": "sub_admin"}
 
-    @app.get("/api/test/coordinator", dependencies=[Depends(require_role("course_coordinator"))])
-    def coordinator_test_route():
-        return {"role": "course_coordinator"}
+    @app.get("/api/test/coordinator", dependencies=[Depends(require_role("coursecoordinator"))])
+    def _test_coordinator():
+        return {"role": "coursecoordinator"}
 
     @app.get("/api/test/accounts", dependencies=[Depends(require_role("accounts"))])
     def accounts_test_route():
@@ -169,8 +169,8 @@ def test_workflow():
                 role = "admin"
             elif "sub_admin" in roles:
                 role = "sub_admin"
-            elif "course_coordinator" in roles:
-                role = "course_coordinator"
+            elif "coursecoordinator" in roles:
+                role = "coursecoordinator"
             elif "accounts" in roles:
                 role = "accounts"
             elif "instructor" in roles:
@@ -230,13 +230,12 @@ def test_workflow():
     assert resp.status_code == 403, resp.text
     print("OK: require_role('super_admin') denied access for sub_admin user")
 
-    # Test Course Coordinator Access
-    app.dependency_overrides[get_current_user] = get_user_with_roles(["course_coordinator"])
-    
+    # Course Coordinator
+    app.dependency_overrides[get_current_user] = get_user_with_roles(["coursecoordinator"])
     resp = client.get("/api/test/coordinator")
-    assert resp.status_code == 200, resp.text
-    assert resp.json()["role"] == "course_coordinator"
-    print("OK: require_role('course_coordinator') allowed access for coordinator user")
+    assert resp.status_code == 200, "Coordinator should access /api/test/coordinator"
+    assert resp.json()["role"] == "coursecoordinator"
+    print("OK: require_role('coursecoordinator') allowed access for coordinator user")
 
     resp = client.get("/api/test/sub-admin")
     assert resp.status_code == 403, resp.text
@@ -251,8 +250,8 @@ def test_workflow():
     print("OK: require_role('accounts') allowed access for accounts user")
 
     resp = client.get("/api/test/coordinator")
-    assert resp.status_code == 403, resp.text
-    print("OK: require_role('course_coordinator') denied access for accounts user")
+    assert resp.status_code == 403, "Accounts should NOT access coordinator route"
+    print("OK: require_role('coursecoordinator') denied access for accounts user")
 
     # Cleanup overrides
     app.dependency_overrides.clear()

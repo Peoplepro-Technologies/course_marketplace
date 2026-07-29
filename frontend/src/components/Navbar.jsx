@@ -81,7 +81,7 @@ export default function Navbar() {
             </Link>
           )}
 
-          {primaryRole === 'course_coordinator' && (
+          {primaryRole === 'coursecoordinator' && (
             <Link
               to="/coordinator"
               className={`nav-link ${isActive('/coordinator') ? 'active' : ''}`}
@@ -112,13 +112,13 @@ export default function Navbar() {
                 primaryRole === 'admin' || primaryRole === 'super_admin' ? 'danger'
                 : primaryRole === 'sub_admin' ? 'warning'
                 : primaryRole === 'instructor' ? 'warning'
-                : primaryRole === 'course_coordinator' ? 'success'
+                : primaryRole === 'coursecoordinator' ? 'success'
                 : primaryRole === 'accounts' ? 'primary'
                 : 'primary'
               }`}>
                 {primaryRole === 'super_admin' ? 'super admin'
                   : primaryRole === 'sub_admin' ? 'sub admin'
-                  : primaryRole === 'course_coordinator' ? 'coordinator'
+                  : primaryRole === 'coursecoordinator' ? 'coordinator'
                   : primaryRole}
               </span>
             </div>

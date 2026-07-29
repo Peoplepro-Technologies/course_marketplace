@@ -15,6 +15,9 @@ import LessonViewer from './pages/learner/LessonViewer';
 import InstructorDashboard from './pages/instructor/InstructorDashboard';
 import CourseForm from './pages/instructor/CourseForm';
 import SectionManager from './pages/instructor/SectionManager';
+import ReviewInbox from './pages/instructor/ReviewInbox';
+import EarningsChart from './pages/instructor/EarningsChart';
+import StudentsProgress from './pages/instructor/StudentsProgress';
 
 // Admin Pages
 import AdminDashboard from './pages/admin/AdminDashboard';
@@ -87,6 +90,30 @@ export default function App() {
               element={
                 <ProtectedRoute role="instructor">
                   <SectionManager />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/instructor/reviews" 
+              element={
+                <ProtectedRoute role="instructor">
+                  <ReviewInbox />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/instructor/earnings" 
+              element={
+                <ProtectedRoute role="instructor">
+                  <EarningsChart />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/instructor/course/:courseId/students" 
+              element={
+                <ProtectedRoute role="instructor">
+                  <StudentsProgress />
                 </ProtectedRoute>
               } 
             />

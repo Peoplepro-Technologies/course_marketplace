@@ -33,6 +33,7 @@ class Review(Base):
     )
     rating = Column(Integer, nullable=False)  # 1–5 stars
     comment = Column(Text, nullable=True)
+    instructor_reply = Column(Text, nullable=True)
     status = Column(
         String(20),
         nullable=False,

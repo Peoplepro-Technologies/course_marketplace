@@ -61,7 +61,7 @@
   font-size: 0.7rem;
   font-weight: 600;
   color: white;
-  background: rgba(124, 58, 237, 0.8);
+  background: #0056D2;
   border-radius: var(--radius-full);
   backdrop-filter: blur(4px);
 }

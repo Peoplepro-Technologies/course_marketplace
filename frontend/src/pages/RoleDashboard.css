@@ -93,7 +93,7 @@
 }
 
 .sidebar-nav-item.active {
-  background: rgba(124, 58, 237, 0.12);
+  background: #EBF2FF;
   color: var(--color-accent-tertiary);
   font-weight: 600;
 }

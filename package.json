@@ -3,8 +3,8 @@
   "version": "1.0.0",
   "scripts": {
     "dev": "concurrently -n \"keycloak,backend,frontend\" -c \"bgBlue.bold,bgGreen.bold,bgCyan.bold\" --kill-others-on-fail \"npm run start:keycloak\" \"npm run start:backend\" \"npm run start:frontend\"",
-    "start:keycloak": "cmd /d /s /c \"set KEYCLOAK_ADMIN=manasvi& set KEYCLOAK_ADMIN_PASSWORD=manasvi& C:\\keycloak\\keycloak-26.7.0\\bin\\kc.bat start-dev --http-port=8080\"",
-    "start:backend": "cmd /d /s /c \"set PYTHONIOENCODING=utf-8& set PATH=C:\\Users\\91844\\AppData\\Local\\Microsoft\\WinGet\\Packages\\Gyan.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe\\ffmpeg-8.1.2-full_build\\bin;%PATH%& cd backend& .\\venv\\Scripts\\python.exe -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload\"",
+    "start:keycloak": "cmd /d /s /c \"taskkill /F /IM java.exe /T 2>nul & timeout /t 2 /nobreak >nul & set KEYCLOAK_ADMIN=manasvi& set KEYCLOAK_ADMIN_PASSWORD=manasvi& C:\\keycloak\\keycloak-26.7.0\\bin\\kc.bat start-dev --http-port=8080\"",
+    "start:backend": "cmd /d /s /c \"taskkill /F /IM python.exe /T 2>nul & timeout /t 2 /nobreak >nul & set PYTHONIOENCODING=utf-8& set PATH=C:\\Users\\91844\\AppData\\Local\\Microsoft\\WinGet\\Packages\\Gyan.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe\\ffmpeg-8.1.2-full_build\\bin;%PATH%& cd backend& .\\venv\\Scripts\\python.exe -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload\"",
     "start:frontend": "cmd /d /s /c \"cd frontend& npm run dev\""
   },
   "devDependencies": {

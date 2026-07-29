@@ -55,7 +55,7 @@
 }
 
 .sidebar-lesson.active {
-  background: rgba(124, 58, 237, 0.1);
+  background: #EBF2FF;
   color: var(--color-accent-tertiary);
   border-left: 3px solid var(--color-accent-primary);
 }

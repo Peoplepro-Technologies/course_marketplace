@@ -25,6 +25,7 @@ class ReviewRead(BaseModel):
     status: str
     created_at: datetime
     learner_name: Optional[str] = None
+    course_title: Optional[str] = None
 
     class Config:
         from_attributes = True

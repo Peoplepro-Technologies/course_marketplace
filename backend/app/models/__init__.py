@@ -9,6 +9,7 @@ from app.models.lesson import Lesson
 from app.models.enrollment import Enrollment
 from app.models.progress import Progress
 from app.models.review import Review
+from app.models.category import Category
 
 __all__ = [
     "User",
@@ -18,4 +19,5 @@ __all__ = [
     "Enrollment",
     "Progress",
     "Review",
+    "Category",
 ]

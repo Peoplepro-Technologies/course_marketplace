@@ -112,10 +112,10 @@ async def get_current_user(
     name = payload.get("name", payload.get("preferred_username", ""))
     email = payload.get("email", "")
     realm_access = payload.get("realm_access", {})
-    roles = realm_access.get("roles", [])
+    roles = [r.lower() for r in realm_access.get("roles", [])]
 
     # Determine the highest-priority role for this user.
-    # Priority: super_admin > admin > sub_admin > course_coordinator > accounts > instructor > learner
+    # Priority: super_admin > admin > sub_admin > coursecoordinator > accounts > instructor > learner
     # Note: super_admin is stored as "admin" in the local DB for backward compatibility
     # with existing admin queries/logic, but the full realm_roles list is preserved.
     if "super_admin" in roles:
@@ -127,8 +127,8 @@ async def get_current_user(
         role = "admin"
     elif "sub_admin" in roles:
         role = "sub_admin"
-    elif "course_coordinator" in roles:
-        role = "course_coordinator"
+    elif "coursecoordinator" in roles:
+        role = "coursecoordinator"
     elif "accounts" in roles:
         role = "accounts"
     elif "instructor" in roles:

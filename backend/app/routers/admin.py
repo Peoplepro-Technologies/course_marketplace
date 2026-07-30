@@ -160,7 +160,11 @@ async def list_all_reviews(
     db: Session = Depends(get_db),
 ):
     """List all reviews with optional status filter for moderation."""
-    query = db.query(Review, User.name).join(User, Review.learner_id == User.id)
+    query = (
+        db.query(Review, User.name, Course.title)
+        .join(User, Review.learner_id == User.id)
+        .join(Course, Review.course_id == Course.id)
+    )
 
     if status:
         query = query.filter(Review.status == status)
@@ -174,9 +178,10 @@ async def list_all_reviews(
     )
 
     reviews = []
-    for review, learner_name in results:
+    for review, learner_name, course_title in results:
         review_data = ReviewRead.model_validate(review)
         review_data.learner_name = learner_name
+        review_data.course_title = course_title
         reviews.append(review_data)
 
     return {

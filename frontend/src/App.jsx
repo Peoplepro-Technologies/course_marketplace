@@ -15,6 +15,9 @@ import LessonViewer from './pages/learner/LessonViewer';
 import InstructorDashboard from './pages/instructor/InstructorDashboard';
 import CourseForm from './pages/instructor/CourseForm';
 import SectionManager from './pages/instructor/SectionManager';
+import ReviewInbox from './pages/instructor/ReviewInbox';
+import EarningsChart from './pages/instructor/EarningsChart';
+import StudentsProgress from './pages/instructor/StudentsProgress';
 
 // Admin Pages
 import AdminDashboard from './pages/admin/AdminDashboard';
@@ -26,6 +29,12 @@ import ReviewModeration from './pages/admin/ReviewModeration';
 import SuperAdminDashboard from './pages/superadmin/SuperAdminDashboard';
 import SubAdminDashboard from './pages/subadmin/SubAdminDashboard';
 import CoordinatorDashboard from './pages/coordinator/CoordinatorDashboard';
+import InstructorRoster from './pages/coordinator/InstructorRoster';
+import CourseApprovals from './pages/coordinator/CourseApprovals';
+import CourseCatalog from './pages/coordinator/CourseCatalog';
+import CategoryManager from './pages/coordinator/CategoryManager';
+import QualityReviews from './pages/coordinator/QualityReviews';
+import Reports from './pages/coordinator/Reports';
 import AccountsDashboard from './pages/accounts/AccountsDashboard';
 
 export default function App() {
@@ -90,6 +99,30 @@ export default function App() {
                 </ProtectedRoute>
               } 
             />
+            <Route 
+              path="/instructor/reviews" 
+              element={
+                <ProtectedRoute role="instructor">
+                  <ReviewInbox />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/instructor/earnings" 
+              element={
+                <ProtectedRoute role="instructor">
+                  <EarningsChart />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/instructor/course/:courseId/students" 
+              element={
+                <ProtectedRoute role="instructor">
+                  <StudentsProgress />
+                </ProtectedRoute>
+              } 
+            />
 
             {/* ── Admin Routes ───────────────────────────────────────── */}
             <Route 
@@ -149,8 +182,56 @@ export default function App() {
             <Route 
               path="/coordinator" 
               element={
-                <ProtectedRoute role="course_coordinator">
+                <ProtectedRoute role="coursecoordinator">
                   <CoordinatorDashboard />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/coordinator/instructors" 
+              element={
+                <ProtectedRoute role="coursecoordinator">
+                  <InstructorRoster />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/coordinator/courses/pending" 
+              element={
+                <ProtectedRoute role="coursecoordinator">
+                  <CourseApprovals />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/coordinator/courses" 
+              element={
+                <ProtectedRoute role="coursecoordinator">
+                  <CourseCatalog />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/coordinator/categories" 
+              element={
+                <ProtectedRoute role="coursecoordinator">
+                  <CategoryManager />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/coordinator/quality-reviews" 
+              element={
+                <ProtectedRoute role="coursecoordinator">
+                  <QualityReviews />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/coordinator/reports" 
+              element={
+                <ProtectedRoute role="coursecoordinator">
+                  <Reports />
                 </ProtectedRoute>
               } 
             />

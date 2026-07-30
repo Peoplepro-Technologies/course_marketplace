@@ -2,7 +2,7 @@
 auth/roles.py — Role-based access control dependency.
 
 Supported roles:
-    admin, super_admin, sub_admin, course_coordinator, accounts, instructor, learner
+    admin, super_admin, sub_admin, coursecoordinator, accounts, instructor, learner
 
 Note: Users with the "super_admin" Keycloak role also have "admin" injected
 into their realm_roles list, so require_role("admin") passes for them too.
@@ -26,7 +26,7 @@ def require_role(required_role: str):
 
     Args:
         required_role: One of "admin", "super_admin", "sub_admin",
-                       "course_coordinator", "accounts", "instructor", "learner".
+                       "coursecoordinator", "accounts", "instructor", "learner".
 
     Returns:
         A FastAPI dependency that raises 403 if the role doesn't match.

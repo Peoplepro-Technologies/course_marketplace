@@ -57,9 +57,17 @@ export default function InstructorDashboard() {
           <h2>Instructor Dashboard</h2>
           <p>Manage your courses</p>
         </div>
-        <Link to="/instructor/course/new" className="btn btn-primary">
-          + Create New Course
-        </Link>
+        <div className="flex" style={{ gap: '0.75rem' }}>
+          <Link to="/instructor/earnings" className="btn btn-secondary">
+            💰 Earnings
+          </Link>
+          <Link to="/instructor/reviews" className="btn btn-secondary">
+            📬 Review Inbox
+          </Link>
+          <Link to="/instructor/course/new" className="btn btn-primary">
+            + Create New Course
+          </Link>
+        </div>
       </div>
 
       <div className="table-wrapper box-glow">
@@ -90,7 +98,7 @@ export default function InstructorDashboard() {
                     </div>
                   </td>
                   <td>{course.category}</td>
-                  <td>{course.price > 0 ? `$${course.price.toFixed(2)}` : 'Free'}</td>
+                  <td>{(course.price > 0) ? `$${Number(course.price).toFixed(2)}` : 'Free'}</td>
                   <td>
                     <span className={`badge badge-${
                       course.status === 'published' ? 'success' : 
@@ -112,6 +120,9 @@ export default function InstructorDashboard() {
                       </Link>
                       <Link to={`/instructor/course/${course.id}/curriculum`} className="btn btn-secondary btn-sm">
                         Curriculum
+                      </Link>
+                      <Link to={`/instructor/course/${course.id}/students`} className="btn btn-secondary btn-sm">
+                        👥 Students
                       </Link>
                       {course.status === 'pending_review' ? (
                         <button className="btn btn-secondary btn-sm" disabled>

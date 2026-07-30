@@ -32,7 +32,12 @@ class User(Base):
 
     # ── Relationships ─────────────────────────────────────────────────
     courses = relationship("Course", back_populates="instructor", lazy="dynamic")
-    enrollments = relationship("Enrollment", back_populates="learner", lazy="dynamic")
+    enrollments = relationship(
+        "Enrollment",
+        back_populates="learner",
+        foreign_keys="Enrollment.learner_id",
+        lazy="dynamic",
+    )
     reviews = relationship("Review", back_populates="learner", lazy="dynamic")
     progress_records = relationship("Progress", back_populates="learner", lazy="dynamic")
 

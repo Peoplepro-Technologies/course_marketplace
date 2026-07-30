@@ -8,13 +8,16 @@ Provides:
   - Review submission (triggers background rating recalculation)
 """
 
+import os
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func
 
 from app.database import get_db
 from app.auth.roles import require_role
+from app.auth.keycloak import get_current_user_from_header_or_query
 from app.models.user import User
 from app.models.course import Course
 from app.models.enrollment import Enrollment
@@ -218,3 +221,66 @@ async def submit_review(
     background_tasks.add_task(recalculate_course_rating, str(data.course_id))
 
     return ReviewRead.model_validate(review)
+
+
+@router.get("/lessons/{lesson_id}/video")
+async def get_lesson_video(
+    lesson_id: str,
+    current_user: User = Depends(get_current_user_from_header_or_query),
+    db: Session = Depends(get_db),
+):
+    """
+    Secure video streaming endpoint.
+    Only allows:
+    - super_admin, admin, sub_admin, course_coordinator
+    - The course instructor who created the lesson
+    - An enrolled learner with an "approved" enrollment status
+    """
+    lesson = db.query(Lesson).filter(Lesson.id == lesson_id).first()
+    if not lesson:
+        raise HTTPException(status_code=404, detail="Lesson not found")
+
+    section = db.query(Section).filter(Section.id == lesson.section_id).first()
+    if not section:
+        raise HTTPException(status_code=404, detail="Section not found")
+
+    course = db.query(Course).filter(Course.id == section.course_id).first()
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found")
+
+    roles = getattr(current_user, "_realm_roles", [])
+    authorized = False
+
+    # Check admin/staff privileges
+    if any(r in roles for r in ["super_admin", "admin", "sub_admin", "course_coordinator"]):
+        authorized = True
+
+    # Check instructor ownership
+    elif "instructor" in roles and course.instructor_id == current_user.id:
+        authorized = True
+
+    # Check approved learner enrollment
+    else:
+        enrollment = db.query(Enrollment).filter(
+            Enrollment.learner_id == current_user.id,
+            Enrollment.course_id == course.id,
+        ).first()
+        if enrollment and enrollment.status == "approved":
+            authorized = True
+
+    if not authorized:
+        raise HTTPException(status_code=403, detail="You do not have access to this video.")
+
+    # Resolve video path
+    _HERE = os.path.dirname(os.path.abspath(__file__))
+    _MEDIA_ROOT = os.path.normpath(os.path.join(_HERE, "..", "media"))
+    _VIDEOS_DIR = os.path.join(_MEDIA_ROOT, "videos")
+    video_path = os.path.join(_VIDEOS_DIR, f"{lesson_id}.mp4")
+
+    # If the file doesn't exist, check if there's any file matching {lesson_id} (e.g. with different extension or fallback)
+    if not os.path.exists(video_path):
+        # Fallback to check raw files if any exist (e.g. for development or testing)
+        raise HTTPException(status_code=404, detail="Video file not found on server.")
+
+    # Return FileResponse which handles Range headers automatically
+    return FileResponse(video_path, media_type="video/mp4")

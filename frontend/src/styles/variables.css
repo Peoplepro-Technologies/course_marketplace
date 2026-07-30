@@ -3,7 +3,7 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 :root {
-  /* ── Colors ─────────────────────────────────────────────────────── */
+  /* ── Colors — Coursera-inspired palette ─────────────────────────── */
   --color-bg-primary: #F7F9FA;
   --color-bg-secondary: #FFFFFF;
   --color-bg-tertiary: #F0F2F5;
@@ -12,7 +12,7 @@
   --color-bg-input: #FFFFFF;
 
   --color-border: #E1E7EA;
-  --color-border-hover: #C5D1D8;
+  --color-border-hover: #B0BEC5;
   --color-border-accent: rgba(0, 86, 210, 0.4);
 
   --color-text-primary: #1F1F1F;
@@ -66,10 +66,10 @@
   --radius-full: 9999px;
 
   /* ── Shadows ────────────────────────────────────────────────────── */
-  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3);
-  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
-  --shadow-lg: 0 8px 30px rgba(0, 0, 0, 0.5);
-  --shadow-glow: 0 0 30px rgba(0, 86, 210, 0.15);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.10), 0 2px 4px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 8px 30px rgba(0, 0, 0, 0.12), 0 4px 8px rgba(0, 0, 0, 0.06);
+  --shadow-glow: 0 0 0 3px rgba(0, 86, 210, 0.15);
 
   /* ── Transitions ────────────────────────────────────────────────── */
   --transition-fast: 150ms ease;

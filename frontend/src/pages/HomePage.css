@@ -41,7 +41,11 @@
   transform: translate(-50%, -50%);
   width: 600px;
   height: 400px;
-  background: linear-gradient(135deg, #FFFFFF 0%, #F7F9FA 100%);
+  background: radial-gradient(
+    ellipse at center,
+    rgba(0, 86, 210, 0.07) 0%,
+    transparent 70%
+  );
   pointer-events: none;
   z-index: 0;
 }

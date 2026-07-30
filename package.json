@@ -2,12 +2,15 @@
   "name": "course-marketplace-root",
   "version": "1.0.0",
   "scripts": {
-    "dev": "concurrently -n \"keycloak,backend,frontend\" -c \"bgBlue.bold,bgGreen.bold,bgCyan.bold\" --kill-others-on-fail \"npm run start:keycloak\" \"npm run start:backend\" \"npm run start:frontend\"",
-    "start:keycloak": "cmd /d /s /c \"taskkill /F /IM java.exe /T 2>nul & timeout /t 2 /nobreak >nul & set KEYCLOAK_ADMIN=manasvi& set KEYCLOAK_ADMIN_PASSWORD=manasvi& C:\\keycloak\\keycloak-26.7.0\\bin\\kc.bat start-dev --http-port=8080\"",
-    "start:backend": "cmd /d /s /c \"taskkill /F /IM python.exe /T 2>nul & timeout /t 2 /nobreak >nul & set PYTHONIOENCODING=utf-8& set PATH=C:\\Users\\91844\\AppData\\Local\\Microsoft\\WinGet\\Packages\\Gyan.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe\\ffmpeg-8.1.2-full_build\\bin;%PATH%& cd backend& .\\venv\\Scripts\\python.exe -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload\"",
+    "dev": "dotenv -e .env -- concurrently -n \"keycloak,backend,frontend\" -c \"bgBlue.bold,bgGreen.bold,bgCyan.bold\" --kill-others-on-fail \"npm run start:keycloak\" \"npm run start:backend\" \"npm run start:frontend\"",
+    "prestart:keycloak": "taskkill /F /IM java.exe /T 2>nul || ver>nul",
+    "start:keycloak": "cmd /d /s /c \"%KEYCLOAK_BIN_PATH% start-dev --http-port=8080\"",
+    "prestart:backend": "taskkill /F /IM python.exe /T 2>nul || ver>nul",
+    "start:backend": "cmd /d /s /c \"set PATH=%FFMPEG_BIN_PATH%;%PATH%& cd backend& .\\venv\\Scripts\\python.exe -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload\"",
     "start:frontend": "cmd /d /s /c \"cd frontend& npm run dev\""
   },
   "devDependencies": {
-    "concurrently": "^8.2.2"
+    "concurrently": "^8.2.2",
+    "dotenv-cli": "^11.0.0"
   }
 }

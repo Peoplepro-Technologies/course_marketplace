@@ -6,8 +6,10 @@ Provides:
   - User listing
   - Course listing with moderation actions
   - Review moderation
+  - Enrollment listing and approval/rejection workflow
 """
 
+from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import func
@@ -22,6 +24,7 @@ from app.models.review import Review
 from app.schemas.user import UserRead
 from app.schemas.course import CourseRead, CourseModerateAction
 from app.schemas.review import ReviewRead, ReviewModerateAction
+from app.schemas.enrollment import EnrollmentRead
 from app.redis_client import invalidate_cache
 
 router = APIRouter(prefix="/api/v1/admin", tags=["Admin"])
@@ -218,3 +221,95 @@ async def moderate_review(
     db.commit()
 
     return {"message": f"Review {data.action}d", "status": new_status}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Enrollment management
+# ─────────────────────────────────────────────────────────────────────────────
+
+@router.get("/enrollments")
+async def list_enrollments(
+    status: Optional[str] = Query(None, description="Filter by enrollment status: pending, approved, rejected"),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    current_user: User = Depends(require_role("admin")),
+    db: Session = Depends(get_db),
+):
+    """List all enrollments, optionally filtered by status."""
+    query = db.query(Enrollment)
+    if status:
+        query = query.filter(Enrollment.status == status)
+
+    total = query.count()
+    enrollments = (
+        query
+        .order_by(Enrollment.enrolled_at.desc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+        .all()
+    )
+
+    return {
+        "enrollments": [EnrollmentRead.model_validate(e) for e in enrollments],
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+    }
+
+
+@router.put("/enrollments/{enrollment_id}/approve")
+async def approve_enrollment(
+    enrollment_id: str,
+    current_user: User = Depends(require_role("admin")),
+    db: Session = Depends(get_db),
+):
+    """
+    Approve a pending enrollment, granting the learner access to lesson videos.
+    Sets status to 'approved', records approved_at timestamp and approved_by admin id.
+    """
+    enrollment = db.query(Enrollment).filter(Enrollment.id == enrollment_id).first()
+    if not enrollment:
+        raise HTTPException(status_code=404, detail="Enrollment not found")
+    if enrollment.status == "approved":
+        raise HTTPException(status_code=400, detail="Enrollment is already approved")
+
+    enrollment.status = "approved"
+    enrollment.approved_at = datetime.now(timezone.utc)
+    enrollment.approved_by = current_user.id
+    db.commit()
+
+    return {
+        "message": "Enrollment approved",
+        "enrollment_id": str(enrollment.id),
+        "status": enrollment.status,
+        "approved_at": enrollment.approved_at.isoformat(),
+    }
+
+
+@router.put("/enrollments/{enrollment_id}/reject")
+async def reject_enrollment(
+    enrollment_id: str,
+    current_user: User = Depends(require_role("admin")),
+    db: Session = Depends(get_db),
+):
+    """
+    Reject a pending enrollment, preventing the learner from accessing lesson videos.
+    Sets status to 'rejected'.
+    """
+    enrollment = db.query(Enrollment).filter(Enrollment.id == enrollment_id).first()
+    if not enrollment:
+        raise HTTPException(status_code=404, detail="Enrollment not found")
+    if enrollment.status == "rejected":
+        raise HTTPException(status_code=400, detail="Enrollment is already rejected")
+
+    enrollment.status = "rejected"
+    # Clear any previously set approval metadata on rejection
+    enrollment.approved_at = None
+    enrollment.approved_by = None
+    db.commit()
+
+    return {
+        "message": "Enrollment rejected",
+        "enrollment_id": str(enrollment.id),
+        "status": enrollment.status,
+    }

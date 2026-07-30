@@ -388,15 +388,26 @@ async def upload_lesson_video(
         print(f"[VIDEO UPLOAD] Failed: Lesson {lesson_id} not found or unauthorized.")
         raise HTTPException(status_code=404, detail="Lesson not found")
 
-    # ── Check ffmpeg is available ──────────────────────────────────────
-    if shutil.which("ffmpeg") is None:
-        print("[VIDEO UPLOAD] Failed: ffmpeg not found on PATH.")
+    # ── Check ffmpeg is available (check PATH, winget links, or local node_modules fallback) ──
+    ffmpeg_bin = shutil.which("ffmpeg")
+    if ffmpeg_bin is None:
+        # Check standard winget links folder
+        links_ffmpeg = os.path.expandvars(r"%LOCALAPPDATA%\Microsoft\WinGet\Links\ffmpeg.exe")
+        if os.path.exists(links_ffmpeg):
+            ffmpeg_bin = links_ffmpeg
+        else:
+            # Check workspace root node_modules fallback
+            _HERE = os.path.dirname(os.path.abspath(__file__))
+            workspace_root = os.path.normpath(os.path.join(_HERE, "..", "..", ".."))
+            local_ffmpeg = os.path.normpath(os.path.join(workspace_root, "node_modules", "ffmpeg-static", "ffmpeg.exe"))
+            if os.path.exists(local_ffmpeg):
+                ffmpeg_bin = local_ffmpeg
+
+    if ffmpeg_bin is None:
+        print("[VIDEO UPLOAD] Failed: ffmpeg not found on PATH or local node_modules.")
         raise HTTPException(
             status_code=503,
-            detail=(
-                "ffmpeg is not installed or not on PATH. "
-                "Install it with: winget install ffmpeg — then restart the server."
-            ),
+            detail="ffmpeg is not installed or not on PATH.",
         )
 
     # ── Save the raw upload to a temp file ────────────────────────────
@@ -410,8 +421,8 @@ async def upload_lesson_video(
 
     try:
         with open(raw_path, "wb") as f:
-            content = await video.read()
-            f.write(content)
+            while chunk := await video.read(1024 * 1024):  # 1MB chunks
+                f.write(chunk)
         
         file_size_mb = os.path.getsize(raw_path) / (1024 * 1024)
         print(f"[VIDEO UPLOAD] File saved to {raw_path} (Size: {file_size_mb:.2f} MB)")
@@ -420,7 +431,7 @@ async def upload_lesson_video(
         import asyncio
         import subprocess
         ffmpeg_cmd = [
-            "ffmpeg", "-y",            # overwrite output
+            ffmpeg_bin, "-y",            # overwrite output
             "-i", raw_path,            # input
             "-c:v", "libx264",         # H.264 video codec
             "-preset", "fast",         # encoding speed
@@ -453,7 +464,7 @@ async def upload_lesson_video(
 
         # ── Extract thumbnail at 1 second ─────────────────────────────
         thumb_cmd = [
-            "ffmpeg", "-y",
+            ffmpeg_bin, "-y",
             "-i", out_path,
             "-ss", "00:00:01",   # seek to 1 second
             "-vframes", "1",     # grab exactly one frame
@@ -475,7 +486,7 @@ async def upload_lesson_video(
             print("[VIDEO UPLOAD] Warning: Thumbnail generation failed.")
 
         # ── Update the lesson record ───────────────────────────────────────
-        lesson.video_url = f"/media/videos/{lesson_id}.mp4"
+        lesson.video_url = f"/learner/lessons/{lesson_id}/video"
         if thumb_ok:
             lesson.thumbnail_url = f"/media/thumbnails/{lesson_id}.jpg"
 

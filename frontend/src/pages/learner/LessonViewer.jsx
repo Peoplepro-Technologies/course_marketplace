@@ -9,6 +9,7 @@ import LoadingSpinner from '../../components/LoadingSpinner';
 import Modal from '../../components/Modal';
 import ReviewForm from './ReviewForm';
 import VideoPlayer from '../../components/VideoPlayer';
+import keycloak from '../../auth/keycloak';
 import './LessonViewer.css';
 
 export default function LessonViewer() {
@@ -126,7 +127,11 @@ export default function LessonViewer() {
               {/* Video player — shown above text when lesson has a video */}
               {activeLesson.video_url && (
                 <VideoPlayer
-                  src={`http://localhost:8000${activeLesson.video_url}`}
+                  src={
+                    activeLesson.video_url.startsWith('/media/videos/')
+                      ? `http://localhost:8000/api/v1/learner/lessons/${activeLesson.id}/video?token=${keycloak.token}`
+                      : `http://localhost:8000/api/v1${activeLesson.video_url}?token=${keycloak.token}`
+                  }
                 />
               )}
               {/* Text / markdown content */}

@@ -14,6 +14,9 @@ class EnrollmentRead(BaseModel):
     learner_id: UUID
     course_id: UUID
     enrolled_at: datetime
+    status: str
+    approved_at: Optional[datetime] = None
+    approved_by: Optional[UUID] = None
     course_title: Optional[str] = None
     progress_percent: Optional[float] = 0.0
 

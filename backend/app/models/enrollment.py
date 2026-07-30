@@ -3,11 +3,16 @@ models/enrollment.py — Enrollment model (learner ↔ course link).
 
 Each enrollment represents a learner signing up for a course.
 A unique constraint prevents duplicate enrollments.
+
+Enrollment status workflow:
+  pending  → learner has requested enrollment, awaiting admin approval
+  approved → admin has approved access (learner can view lesson videos)
+  rejected → admin has rejected the request
 """
 
 import uuid
 from datetime import datetime, timezone
-from sqlalchemy import Column, DateTime, ForeignKey, UniqueConstraint
+from sqlalchemy import Column, DateTime, ForeignKey, UniqueConstraint, String
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
@@ -36,9 +41,27 @@ class Enrollment(Base):
         default=lambda: datetime.now(timezone.utc),
         nullable=False,
     )
+    status = Column(
+        String(50),
+        default="pending",
+        nullable=False,
+    )
+    approved_at = Column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    approved_by = Column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
 
     # ── Relationships ─────────────────────────────────────────────────
-    learner = relationship("User", back_populates="enrollments")
+    learner = relationship(
+        "User",
+        back_populates="enrollments",
+        foreign_keys=[learner_id],
+    )
     course = relationship("Course", back_populates="enrollments")
 
     def __repr__(self):

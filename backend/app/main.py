@@ -68,8 +68,8 @@ app.add_middleware(
 )
 
 # ── Static file serving for uploaded media ────────────────────────────
-# Videos and thumbnails are served at /media/videos/ and /media/thumbnails/
-app.mount("/media", StaticFiles(directory=MEDIA_ROOT), name="media")
+# Only mount thumbnails publicly. Videos are served securely via a custom endpoint.
+app.mount("/media/thumbnails", StaticFiles(directory=os.path.join(MEDIA_ROOT, "thumbnails")), name="thumbnails")
 
 # ── Routers ───────────────────────────────────────────────────────────
 app.include_router(public.router)

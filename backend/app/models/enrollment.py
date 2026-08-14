@@ -55,6 +55,11 @@ class Enrollment(Base):
         ForeignKey("users.id", ondelete="SET NULL"),
         nullable=True,
     )
+    payout_status = Column(
+        String(20),
+        nullable=False,
+        default="pending",
+    )
 
     # ── Relationships ─────────────────────────────────────────────────
     learner = relationship(

@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, Query, HTTPException
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
+from sqlalchemy import func
 from pydantic import BaseModel
 from typing import Optional
 
@@ -13,11 +14,11 @@ from app.models.section import Section
 from app.models.progress import Progress
 from app.models.enrollment import Enrollment
 from app.schemas.course import CourseRead
+from app.schemas.section import SectionRead
 from app.schemas.category import CategoryRead, CategoryCreate, CategoryUpdate
 from app.schemas.review import ReviewRead, ReviewModerateAction
 from app.schemas.report import ReportResponse
 from app.redis_client import invalidate_cache
-from sqlalchemy.orm import joinedload
 
 class RejectRequest(BaseModel):
     reason: str
@@ -146,6 +147,97 @@ def reject_course(
     course.rejection_reason = data.reason
     db.commit()
     return {"message": "Course rejected", "status": "rejected"}
+
+
+@router.get("/courses/{course_id}/preview")
+def preview_course(
+    course_id: str,
+    current_user: User = Depends(require_role("coursecoordinator")),
+    db: Session = Depends(get_db),
+):
+    """
+    Full course detail for coordinator review.
+
+    Unlike the public endpoint, this does NOT filter by status == 'published',
+    so coordinators can preview pending_review, rejected, or draft courses
+    before making approval decisions.
+    """
+    course = (
+        db.query(Course)
+        .options(
+            joinedload(Course.instructor),
+            joinedload(Course.sections).joinedload(Section.lessons),
+        )
+        .filter(Course.id == course_id)
+        .first()
+    )
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found")
+
+    sections_data = [SectionRead.model_validate(s) for s in course.sections]
+    return {
+        "course": CourseRead.model_validate(course),
+        "sections": sections_data,
+    }
+
+
+@router.get("/stats")
+def get_coordinator_stats(
+    current_user: User = Depends(require_role("coursecoordinator")),
+    db: Session = Depends(get_db),
+):
+    """
+    Dashboard summary statistics for the coordinator landing page.
+
+    Returns:
+      - pending_count: number of courses awaiting review
+      - recently_published: last 5 published courses (title + instructor)
+      - instructor_count: total number of instructors on the platform
+      - category_health: top categories by published course count
+    """
+    pending_count = (
+        db.query(Course).filter(Course.status == "pending_review").count()
+    )
+
+    recently_published = (
+        db.query(Course)
+        .options(joinedload(Course.instructor))
+        .filter(Course.status == "published")
+        .order_by(Course.created_at.desc())
+        .limit(5)
+        .all()
+    )
+
+    instructor_count = (
+        db.query(User).filter(User.role == "instructor").count()
+    )
+
+    category_rows = (
+        db.query(Course.category, func.count(Course.id).label("count"))
+        .filter(Course.status == "published", Course.category.isnot(None))
+        .group_by(Course.category)
+        .order_by(func.count(Course.id).desc())
+        .limit(8)
+        .all()
+    )
+
+    return {
+        "pending_count": pending_count,
+        "recently_published": [
+            {
+                "id": str(c.id),
+                "title": c.title,
+                "category": c.category,
+                "instructor_name": c.instructor.name if c.instructor else "Unknown",
+                "created_at": c.created_at.isoformat(),
+            }
+            for c in recently_published
+        ],
+        "instructor_count": instructor_count,
+        "category_health": [
+            {"category": cat, "count": count} for cat, count in category_rows
+        ],
+    }
 
 
 # ── Categories (CRUD) ──────────────────────────────────────────────────

@@ -20,6 +20,7 @@ from sqlalchemy.orm import Session
 from app.config import get_settings
 from app.database import get_db
 from app.models.user import User
+from app.services.audit import record_audit_log
 
 settings = get_settings()
 
@@ -154,6 +155,14 @@ async def get_current_user(
         # Update role and email if they changed in Keycloak
         changed = False
         if user.role != role:
+            record_audit_log(
+                db,
+                actor_id=user.id,
+                action="role_changed",
+                target_type="user",
+                target_id=str(user.id),
+                details={"old_role": user.role, "new_role": role}
+            )
             user.role = role
             changed = True
         if user.email != email and email:
@@ -168,6 +177,12 @@ async def get_current_user(
 
     # Attach the roles list for use in role-checking dependencies
     user._realm_roles = roles
+
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Account is deactivated.",
+        )
 
     return user
 
@@ -274,4 +289,11 @@ async def get_current_user_from_header_or_query(
             db.refresh(user)
 
     user._realm_roles = roles
+
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Account is deactivated.",
+        )
+
     return user

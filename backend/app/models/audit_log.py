@@ -10,7 +10,7 @@ Logs events such as:
 import uuid
 from datetime import datetime, timezone
 from sqlalchemy import Column, String, Text, DateTime, ForeignKey
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import relationship
 
 from app.database import Base
@@ -28,7 +28,7 @@ class AuditLog(Base):
     action = Column(String(100), nullable=False)       # e.g. "role_change", "course_status_override"
     target_type = Column(String(50), nullable=False)    # e.g. "user", "course", "enrollment"
     target_id = Column(String(255), nullable=False)     # UUID stored as string for flexibility
-    details = Column(Text, nullable=True)               # Human-readable description
+    details = Column(JSONB, nullable=True)               # Use JSONB for structured details like we did
     timestamp = Column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),

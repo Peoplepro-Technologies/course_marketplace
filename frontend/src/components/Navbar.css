@@ -138,3 +138,10 @@
     display: none;
   }
 }
+
+/* ── Auth Buttons (unauthenticated visitors) ───────────────────────── */
+.navbar-auth-buttons {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}

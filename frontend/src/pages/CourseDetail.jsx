@@ -17,7 +17,7 @@ import './CourseDetail.css';
 export default function CourseDetail() {
   const { courseId } = useParams();
   const navigate = useNavigate();
-  const { primaryRole } = useAuth();
+  const { primaryRole, login, authenticated } = useAuth();
 
   const [course, setCourse] = useState(null);
   const [sections, setSections] = useState([]);
@@ -37,8 +37,8 @@ export default function CourseDetail() {
       .catch(console.error)
       .finally(() => setLoading(false));
 
-    // Check if the learner is already enrolled
-    if (primaryRole === 'learner') {
+    // Check if the learner is already enrolled (only if authenticated learner)
+    if (authenticated && primaryRole === 'learner') {
       api.get('/learner/courses')
         .then((res) => {
           const isEnrolled = res.data.some((e) => e.course_id === courseId);
@@ -46,7 +46,7 @@ export default function CourseDetail() {
         })
         .catch(() => {});
     }
-  }, [courseId, primaryRole]);
+  }, [courseId, primaryRole, authenticated]);
 
   const handleEnroll = async () => {
     setEnrolling(true);
@@ -165,6 +165,12 @@ export default function CourseDetail() {
                         </span>
                       </div>
                       {review.comment && <p className="review-comment">{review.comment}</p>}
+                      {review.instructor_reply && (
+                        <div className="review-instructor-reply" style={{ marginTop: '1rem', padding: '1rem', background: 'rgba(255, 255, 255, 0.05)', borderRadius: '8px', borderLeft: '3px solid var(--color-primary)' }}>
+                          <div style={{ fontSize: 'var(--text-xs)', textTransform: 'uppercase', color: 'var(--color-primary)', marginBottom: '0.25rem', fontWeight: 'bold' }}>Instructor Reply</div>
+                          <p style={{ margin: 0, fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)' }}>{review.instructor_reply}</p>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -185,7 +191,20 @@ export default function CourseDetail() {
                 {course.price > 0 ? `$${course.price.toFixed(2)}` : 'Free'}
               </div>
 
-              {primaryRole === 'learner' && (
+              {/* Visitor: not logged in */}
+              {!authenticated && (
+                <button
+                  className="btn btn-primary"
+                  style={{ width: '100%' }}
+                  onClick={login}
+                  id="enroll-login-button"
+                >
+                  Log in to Enroll
+                </button>
+              )}
+
+              {/* Authenticated learner */}
+              {authenticated && primaryRole === 'learner' && (
                 enrolled ? (
                   <button
                     className="btn btn-success"

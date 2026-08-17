@@ -98,7 +98,7 @@ export default function InstructorDashboard() {
                     </div>
                   </td>
                   <td>{course.category}</td>
-                  <td>{(course.price > 0) ? `$${Number(course.price).toFixed(2)}` : 'Free'}</td>
+                  <td>{(course.price > 0) ? `₹${Number(course.price).toFixed(2)}` : 'Free'}</td>
                   <td>
                     <span className={`badge badge-${
                       course.status === 'published' ? 'success' : 

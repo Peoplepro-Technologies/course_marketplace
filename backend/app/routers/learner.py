@@ -10,7 +10,7 @@ Provides:
 
 import os
 from datetime import datetime, timezone
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, status
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func
@@ -59,10 +59,12 @@ async def enroll_in_course(
     if existing:
         raise HTTPException(status_code=400, detail="Already enrolled in this course")
 
-    # Create enrollment
+    # Create enrollment — status set to "approved" immediately for this platform's
+    # local enrollment flow (no external payment gateway; #55 remains MISSING).
     enrollment = Enrollment(
         learner_id=current_user.id,
         course_id=course_id,
+        status="approved",
     )
     db.add(enrollment)
     db.commit()
@@ -133,6 +135,42 @@ async def list_enrolled_courses(
         })
 
     return result
+
+
+@router.get("/courses/{course_id}/progress")
+async def get_course_progress(
+    course_id: str,
+    current_user: User = Depends(require_role("learner")),
+    db: Session = Depends(get_db),
+):
+    """
+    Return a list of lesson_ids the learner has completed for a given course.
+    Used by LessonViewer to restore progress state on load/refresh.
+    Also verifies that the learner is enrolled before returning data.
+    """
+    enrollment = db.query(Enrollment).filter(
+        Enrollment.learner_id == current_user.id,
+        Enrollment.course_id == course_id,
+        Enrollment.status == "approved",
+    ).first()
+    if not enrollment:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You are not enrolled in this course.",
+        )
+
+    completed = (
+        db.query(Progress.lesson_id)
+        .join(Lesson, Progress.lesson_id == Lesson.id)
+        .join(Section, Lesson.section_id == Section.id)
+        .filter(
+            Section.course_id == course_id,
+            Progress.learner_id == current_user.id,
+            Progress.status == "completed",
+        )
+        .all()
+    )
+    return {"completed_lesson_ids": [str(row[0]) for row in completed]}
 
 
 @router.put("/progress")

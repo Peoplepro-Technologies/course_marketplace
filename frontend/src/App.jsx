@@ -37,6 +37,17 @@ import QualityReviews from './pages/coordinator/QualityReviews';
 import Reports from './pages/coordinator/Reports';
 import AccountsDashboard from './pages/accounts/AccountsDashboard';
 
+// Super Admin Sub-pages
+import SAUserManagement from './pages/superadmin/SAUserManagement';
+import SARolesPermissions from './pages/superadmin/SARolesPermissions';
+import SACourseManagement from './pages/superadmin/SACourseManagement';
+import SACategories from './pages/superadmin/SACategories';
+import SAApprovals from './pages/superadmin/SAApprovals';
+import SAPaymentsFinance from './pages/superadmin/SAPaymentsFinance';
+import SAReportsAnalytics from './pages/superadmin/SAReportsAnalytics';
+import SAReviewsModeration from './pages/superadmin/SAReviewsModeration';
+import SAAuditLogs from './pages/superadmin/SAAuditLogs';
+
 export default function App() {
   return (
     <AuthProvider>
@@ -167,6 +178,17 @@ export default function App() {
                 </ProtectedRoute>
               } 
             />
+            <Route path="/super-admin/users" element={<ProtectedRoute role="super_admin"><SAUserManagement /></ProtectedRoute>} />
+            <Route path="/super-admin/roles" element={<ProtectedRoute role="super_admin"><SARolesPermissions /></ProtectedRoute>} />
+            <Route path="/super-admin/courses" element={<ProtectedRoute role="super_admin"><SACourseManagement /></ProtectedRoute>} />
+            <Route path="/super-admin/categories" element={<ProtectedRoute role="super_admin"><SACategories /></ProtectedRoute>} />
+            <Route path="/super-admin/approvals" element={<ProtectedRoute role="super_admin"><SAApprovals /></ProtectedRoute>} />
+            <Route path="/super-admin/finance" element={<ProtectedRoute role="super_admin"><SAPaymentsFinance /></ProtectedRoute>} />
+            <Route path="/super-admin/analytics" element={<ProtectedRoute role="super_admin"><SAReportsAnalytics /></ProtectedRoute>} />
+            <Route path="/super-admin/reviews" element={<ProtectedRoute role="super_admin"><SAReviewsModeration /></ProtectedRoute>} />
+            <Route path="/super-admin/support" element={<ProtectedRoute role="super_admin"><SuperAdminDashboard /></ProtectedRoute>} />
+            <Route path="/super-admin/settings" element={<ProtectedRoute role="super_admin"><SuperAdminDashboard /></ProtectedRoute>} />
+            <Route path="/super-admin/audit-logs" element={<ProtectedRoute role="super_admin"><SAAuditLogs /></ProtectedRoute>} />
 
             {/* ── Sub Admin Routes ───────────────────────────────────── */}
             <Route 

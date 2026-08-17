@@ -597,19 +597,41 @@ def reply_to_review(
 @router.get("/earnings")
 def get_instructor_earnings(
     current_user: User = Depends(require_role("instructor")),
+    db: Session = Depends(get_db),
 ):
     """
-    Stub endpoint — returns placeholder earnings data.
-
-    The finance/payout module has not been built yet.
-    No transactions or payouts table exists at this stage.
-    Replace this stub when the finance milestone is implemented.
+    Calculate earnings for the current instructor based on enrollments.
     """
+    from collections import defaultdict
+
+    enrollments = (
+        db.query(Enrollment, Course)
+        .join(Course, Enrollment.course_id == Course.id)
+        .filter(Course.instructor_id == current_user.id)
+        .all()
+    )
+
+    total_earnings = 0
+    pending_payout = 0
+    monthly_data = defaultdict(float)
+
+    for enrollment, course in enrollments:
+        price = float(course.price) if course.price else 0.0
+        total_earnings += price
+        if enrollment.payout_status == "pending":
+            pending_payout += price
+        
+        # Group by month (e.g., 'Jan', 'Feb')
+        if enrollment.enrolled_at:
+            month_abbr = enrollment.enrolled_at.strftime("%b")
+            monthly_data[month_abbr] += price
+    
+    monthly = [{"month": month, "amount": round(amount, 2)} for month, amount in monthly_data.items()]
+
     return {
-        "total_earnings": 0,
-        "pending_payout": 0,
-        "monthly": [],
-        "note": "Finance module pending",
+        "total_earnings": round(total_earnings, 2),
+        "pending_payout": round(pending_payout, 2),
+        "monthly": monthly,
     }
 
 

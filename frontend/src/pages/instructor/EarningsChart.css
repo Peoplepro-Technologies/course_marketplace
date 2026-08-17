@@ -1,38 +1,6 @@
 /* ═══════════════════════════════════════════════════════════════════════
-   EarningsChart.css — Styles for instructor earnings stub page
+   EarningsChart.css — Styles for instructor earnings page
    ═══════════════════════════════════════════════════════════════════════ */
-
-/* ── Pending Banner ─────────────────────────────────────────────────── */
-.ec-pending-banner {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.875rem;
-  background: rgba(245, 166, 35, 0.08);
-  border: 1px solid rgba(245, 166, 35, 0.35);
-  border-radius: var(--radius-md);
-  padding: 1rem 1.25rem;
-  margin-bottom: 1.75rem;
-}
-
-.ec-pending-icon {
-  font-size: 1.25rem;
-  flex-shrink: 0;
-  margin-top: 0.1rem;
-}
-
-.ec-pending-banner strong {
-  display: block;
-  font-size: var(--text-sm);
-  font-weight: 700;
-  color: #B07400;
-  margin-bottom: 0.2rem;
-}
-
-.ec-pending-banner p {
-  font-size: var(--text-xs);
-  color: #7A5000;
-  margin: 0;
-}
 
 /* ── Stat Cards ─────────────────────────────────────────────────────── */
 .ec-stat-card {
@@ -54,17 +22,65 @@
   font-size: var(--text-3xl);
   font-weight: 800;
   margin-bottom: 0.25rem;
-}
-
-.ec-muted {
-  color: var(--color-text-muted);
-  letter-spacing: 0.1em;
+  color: var(--color-text-primary);
 }
 
 .ec-stat-sub {
   font-size: var(--text-xs);
   color: var(--color-text-muted);
   font-style: italic;
+}
+
+/* ── Skeleton Loader ────────────────────────────────────────────────── */
+@keyframes ec-shimmer {
+  0%   { background-position: -400px 0; }
+  100% { background-position: 400px 0; }
+}
+
+.ec-skeleton .ec-skel-label,
+.ec-skeleton .ec-skel-value,
+.ec-skeleton .ec-skel-sub {
+  border-radius: 6px;
+  background: linear-gradient(
+    90deg,
+    var(--color-bg-tertiary) 25%,
+    rgba(255,255,255,0.08) 50%,
+    var(--color-bg-tertiary) 75%
+  );
+  background-size: 800px 100%;
+  animation: ec-shimmer 1.4s infinite linear;
+}
+
+.ec-skeleton .ec-skel-label {
+  height: 12px;
+  width: 60%;
+  margin-bottom: 0.75rem;
+}
+
+.ec-skeleton .ec-skel-value {
+  height: 36px;
+  width: 45%;
+  margin-bottom: 0.5rem;
+}
+
+.ec-skeleton .ec-skel-sub {
+  height: 10px;
+  width: 75%;
+}
+
+/* ── Error Banner ───────────────────────────────────────────────────── */
+.ec-error-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: rgba(220, 38, 38, 0.08);
+  border: 1px solid rgba(220, 38, 38, 0.3);
+  border-radius: var(--radius-md);
+  padding: 0.875rem 1.25rem;
+  margin-bottom: 1.5rem;
+  font-size: var(--text-sm);
+  color: #b91c1c;
+  font-weight: 500;
 }
 
 /* ── Chart Card ─────────────────────────────────────────────────────── */
@@ -88,18 +104,35 @@
   color: var(--color-text-primary);
 }
 
-.ec-coming-soon-badge {
+/* ── Live Data Badge ────────────────────────────────────────────────── */
+.ec-data-badge {
   display: inline-flex;
   align-items: center;
+  gap: 0.35rem;
   padding: 0.2rem 0.75rem;
-  background: rgba(123, 47, 190, 0.1);
-  border: 1px solid rgba(123, 47, 190, 0.25);
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.3);
   border-radius: var(--radius-full);
   font-size: var(--text-xs);
   font-weight: 700;
-  color: #7B2FBE;
+  color: #059669;
   text-transform: uppercase;
   letter-spacing: 0.06em;
+}
+
+.ec-data-badge::before {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #10b981;
+  animation: ec-pulse 2s infinite;
+}
+
+@keyframes ec-pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.3; }
 }
 
 /* ── Chart Wrapper + Overlay ────────────────────────────────────────── */
@@ -144,6 +177,34 @@
   line-height: 1.5;
 }
 
+/* ── Tooltip ────────────────────────────────────────────────────────── */
+.ec-tooltip {
+  background: var(--color-bg-primary, #fff);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 0.5rem 0.875rem;
+  font-size: var(--text-sm);
+  color: var(--color-text-primary);
+  box-shadow: var(--shadow-md);
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.ec-tooltip strong {
+  font-weight: 700;
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.ec-tooltip span {
+  font-weight: 800;
+  font-size: var(--text-base);
+  color: #0056D2;
+}
+
 /* ── Footnote ───────────────────────────────────────────────────────── */
 .ec-footnote {
   font-size: var(--text-xs);
@@ -159,17 +220,6 @@
   padding: 0.1rem 0.35rem;
   border-radius: 3px;
   font-size: 0.75rem;
-}
-
-/* ── Tooltip ────────────────────────────────────────────────────────── */
-.ec-tooltip {
-  background: var(--color-bg-secondary);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  padding: 0.4rem 0.75rem;
-  font-size: var(--text-xs);
-  color: var(--color-text-muted);
-  box-shadow: var(--shadow-sm);
 }
 
 /* ── Responsive ─────────────────────────────────────────────────────── */

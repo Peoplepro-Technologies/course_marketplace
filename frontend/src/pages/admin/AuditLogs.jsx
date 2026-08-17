@@ -1,39 +1,21 @@
-/**
- * UserManagement.jsx — View all users on the platform.
- */
-
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../../api/axios';
 import LoadingSpinner from '../../components/LoadingSpinner';
 
-export default function UserManagement() {
-  const [data, setData] = useState({ users: [], total: 0, page: 1, page_size: 20 });
+export default function AuditLogs() {
+  const [data, setData] = useState({ logs: [], total: 0, page: 1, page_size: 50 });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     setLoading(true);
-    api.get('/admin/users', { params: { page: data.page, page_size: data.page_size } })
+    api.get('/admin/audit-logs', { params: { page: data.page, page_size: data.page_size } })
       .then((res) => setData(prev => ({ ...prev, ...res.data })))
       .catch(console.error)
       .finally(() => setLoading(false));
   }, [data.page, data.page_size]);
 
-  const handleToggleActive = async (userId, currentStatus) => {
-    try {
-      const action = currentStatus ? 'deactivate' : 'activate';
-      await api.put(`/admin/users/${userId}/${action}`);
-      setData(prev => ({
-        ...prev,
-        users: prev.users.map(u => u.id === userId ? { ...u, is_active: !currentStatus } : u)
-      }));
-    } catch (err) {
-      console.error(err);
-      alert('Failed to update user status');
-    }
-  };
-
-  if (loading && data.users.length === 0) return <div className="page-wrapper"><LoadingSpinner /></div>;
+  if (loading && data.logs.length === 0) return <div className="page-wrapper"><LoadingSpinner /></div>;
 
   return (
     <div className="page-wrapper container">
@@ -42,7 +24,7 @@ export default function UserManagement() {
           <button className="btn btn-secondary btn-sm" onClick={() => window.history.back()} style={{ marginBottom: '1rem' }}>
             ← Back
           </button>
-          <h2>User Management</h2>
+          <h2>Audit Logs</h2>
         </div>
         <div>Total: {data.total}</div>
       </div>
@@ -51,31 +33,37 @@ export default function UserManagement() {
         <table>
           <thead>
             <tr>
-              <th>Name</th>
-              <th>Email</th>
-              <th>Role</th>
-              <th>Joined Date</th>
-              <th>Actions</th>
+              <th>Date/Time</th>
+              <th>Actor ID</th>
+              <th>Action</th>
+              <th>Target</th>
+              <th>Details</th>
             </tr>
           </thead>
           <tbody>
-            {data.users.map(user => (
-              <tr key={user.id}>
-                <td>{user.name}</td>
-                <td>{user.email}</td>
+            {data.logs.map(log => (
+              <tr key={log.id}>
+                <td>{new Date(log.created_at).toLocaleString()}</td>
+                <td><span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>{log.actor_id || 'System'}</span></td>
                 <td>
-                  <span className={`badge badge-${user.role === 'admin' ? 'danger' : user.role === 'instructor' ? 'warning' : 'primary'}`}>
-                    {user.role}
+                  <span className="badge badge-primary" style={{ textTransform: 'uppercase', fontSize: 'var(--text-xs)' }}>
+                    {log.action}
                   </span>
                 </td>
-                <td>{new Date(user.created_at).toLocaleDateString()}</td>
                 <td>
-                  <button 
-                    className={`btn btn-sm btn-${user.is_active ? 'danger' : 'success'}`}
-                    onClick={() => handleToggleActive(user.id, user.is_active)}
-                  >
-                    {user.is_active ? 'Deactivate' : 'Activate'}
-                  </button>
+                  {log.target_type && log.target_id ? (
+                    <div style={{ fontSize: 'var(--text-xs)' }}>
+                      <strong>{log.target_type}</strong><br />
+                      <span style={{ color: 'var(--color-text-muted)' }}>{log.target_id}</span>
+                    </div>
+                  ) : '-'}
+                </td>
+                <td>
+                  {log.details ? (
+                    <pre style={{ margin: 0, fontSize: 'var(--text-xs)', background: 'rgba(0,0,0,0.1)', padding: '0.5rem', borderRadius: '4px', overflowX: 'auto', maxWidth: '300px' }}>
+                      {JSON.stringify(log.details, null, 2)}
+                    </pre>
+                  ) : '-'}
                 </td>
               </tr>
             ))}

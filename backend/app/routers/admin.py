@@ -25,6 +25,9 @@ from app.schemas.user import UserRead
 from app.schemas.course import CourseRead, CourseModerateAction
 from app.schemas.review import ReviewRead, ReviewModerateAction
 from app.schemas.enrollment import EnrollmentRead
+from app.schemas.audit_log import AuditLogRead
+from app.models.audit_log import AuditLog
+from app.services.audit import record_audit_log
 from app.redis_client import invalidate_cache
 
 router = APIRouter(prefix="/api/v1/admin", tags=["Admin"])
@@ -77,6 +80,52 @@ async def list_users(
         "page": page,
         "page_size": page_size,
     }
+
+
+@router.put("/users/{user_id}/deactivate")
+async def deactivate_user(
+    user_id: str,
+    current_user: User = Depends(require_role("admin")),
+    db: Session = Depends(get_db),
+):
+    """Deactivate a user account."""
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    user.is_active = False
+    record_audit_log(
+        db,
+        actor_id=current_user.id,
+        action="account_deactivated",
+        target_type="user",
+        target_id=str(user.id),
+        details={"user_email": user.email}
+    )
+    db.commit()
+    return {"message": "User deactivated", "is_active": False}
+
+
+@router.put("/users/{user_id}/activate")
+async def activate_user(
+    user_id: str,
+    current_user: User = Depends(require_role("admin")),
+    db: Session = Depends(get_db),
+):
+    """Activate a user account."""
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    user.is_active = True
+    record_audit_log(
+        db,
+        actor_id=current_user.id,
+        action="account_activated",
+        target_type="user",
+        target_id=str(user.id),
+        details={"user_email": user.email}
+    )
+    db.commit()
+    return {"message": "User activated", "is_active": True}
 
 
 @router.get("/courses")
@@ -143,6 +192,12 @@ async def moderate_course(
     course.status = new_status
     if data.action == "reject" and data.rejection_reason:
         course.rejection_reason = data.rejection_reason
+        
+    if new_status == "published":
+        record_audit_log(db, current_user.id, "course_published", "course", str(course.id))
+    elif new_status == "removed":
+        record_audit_log(db, current_user.id, "course_unpublished", "course", str(course.id))
+
     db.commit()
 
     # Invalidate catalog cache
@@ -317,4 +372,29 @@ async def reject_enrollment(
         "message": "Enrollment rejected",
         "enrollment_id": str(enrollment.id),
         "status": enrollment.status,
+    }
+
+
+@router.get("/audit-logs")
+async def list_audit_logs(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(50, ge=1, le=100),
+    current_user: User = Depends(require_role("admin")),
+    db: Session = Depends(get_db),
+):
+    """List platform audit logs."""
+    total = db.query(func.count(AuditLog.id)).scalar()
+    logs = (
+        db.query(AuditLog)
+        .order_by(AuditLog.created_at.desc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+        .all()
+    )
+    
+    return {
+        "logs": [AuditLogRead.model_validate(l) for l in logs],
+        "total": total,
+        "page": page,
+        "page_size": page_size,
     }

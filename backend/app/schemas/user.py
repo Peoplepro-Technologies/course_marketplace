@@ -13,6 +13,7 @@ class UserBase(BaseModel):
     name: str = ""
     email: EmailStr = ""
     role: str = "learner"
+    is_active: bool = True
     profile_pic: Optional[str] = None
     bio: Optional[str] = None
 

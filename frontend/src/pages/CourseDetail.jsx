@@ -165,6 +165,12 @@ export default function CourseDetail() {
                         </span>
                       </div>
                       {review.comment && <p className="review-comment">{review.comment}</p>}
+                      {review.instructor_reply && (
+                        <div className="review-instructor-reply" style={{ marginTop: '1rem', padding: '1rem', background: 'rgba(255, 255, 255, 0.05)', borderRadius: '8px', borderLeft: '3px solid var(--color-primary)' }}>
+                          <div style={{ fontSize: 'var(--text-xs)', textTransform: 'uppercase', color: 'var(--color-primary)', marginBottom: '0.25rem', fontWeight: 'bold' }}>Instructor Reply</div>
+                          <p style={{ margin: 0, fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)' }}>{review.instructor_reply}</p>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>

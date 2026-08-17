@@ -24,6 +24,7 @@ import AdminDashboard from './pages/admin/AdminDashboard';
 import UserManagement from './pages/admin/UserManagement';
 import CourseModeration from './pages/admin/CourseModeration';
 import ReviewModeration from './pages/admin/ReviewModeration';
+import AuditLogs from './pages/admin/AuditLogs';
 
 // New Role Dashboards
 import SuperAdminDashboard from './pages/superadmin/SuperAdminDashboard';
@@ -154,6 +155,14 @@ export default function App() {
               element={
                 <ProtectedRoute role="admin">
                   <ReviewModeration />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/admin/audit-logs" 
+              element={
+                <ProtectedRoute role="admin">
+                  <AuditLogs />
                 </ProtectedRoute>
               } 
             />

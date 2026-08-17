@@ -7,7 +7,7 @@ Each row corresponds to a Keycloak user, linked via `keycloak_sub` (the
 
 import uuid
 from datetime import datetime, timezone
-from sqlalchemy import Column, String, Text, DateTime
+from sqlalchemy import Column, String, Text, DateTime, Boolean
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
@@ -22,6 +22,7 @@ class User(Base):
     name = Column(String(255), nullable=False, default="")
     email = Column(String(255), nullable=False, default="")
     role = Column(String(50), nullable=False, default="learner")
+    is_active = Column(Boolean, default=True, nullable=False)
     profile_pic = Column(Text, nullable=True)
     bio = Column(Text, nullable=True)
     created_at = Column(

@@ -33,7 +33,7 @@ export default function AuditLogs() {
         <table>
           <thead>
             <tr>
-              <th>Date/Time</th>
+              <th>Timestamp</th>
               <th>Actor ID</th>
               <th>Action</th>
               <th>Target</th>
@@ -43,8 +43,8 @@ export default function AuditLogs() {
           <tbody>
             {data.logs.map(log => (
               <tr key={log.id}>
-                <td>{new Date(log.created_at).toLocaleString()}</td>
-                <td><span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>{log.actor_id || 'System'}</span></td>
+                <td>{new Date(log.timestamp).toLocaleString()}</td>
+                <td><span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>{log.actor_user_id || 'System'}</span></td>
                 <td>
                   <span className="badge badge-primary" style={{ textTransform: 'uppercase', fontSize: 'var(--text-xs)' }}>
                     {log.action}

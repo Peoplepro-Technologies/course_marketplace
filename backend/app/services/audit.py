@@ -18,7 +18,7 @@ def record_audit_log(
     along with their business logic in a single transaction.
     """
     log_entry = AuditLog(
-        actor_id=actor_id,
+        actor_user_id=actor_id,
         action=action,
         target_type=target_type,
         target_id=target_id,

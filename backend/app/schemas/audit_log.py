@@ -6,12 +6,12 @@ from uuid import UUID
 
 class AuditLogRead(BaseModel):
     id: UUID
-    actor_id: Optional[UUID] = None
+    actor_user_id: Optional[UUID] = None
     action: str
     target_type: Optional[str] = None
     target_id: Optional[str] = None
     details: Optional[Dict[str, Any]] = None
-    created_at: datetime
+    timestamp: datetime
 
     class Config:
         from_attributes = True

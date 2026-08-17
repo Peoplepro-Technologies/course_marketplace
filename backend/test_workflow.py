@@ -253,6 +253,66 @@ def test_workflow():
     assert resp.status_code == 403, "Accounts should NOT access coordinator route"
     print("OK: require_role('coursecoordinator') denied access for accounts user")
 
+    # Test Sub Admin specific endpoints and security checks
+    print("\n--- Testing Sub Admin Restrictions ---")
+    # First create super_admin and learner users so they exist in DB
+    get_user_with_roles(["super_admin"])()
+    get_user_with_roles(["learner"])()
+
+    # Set override to sub_admin
+    app.dependency_overrides[get_current_user] = get_user_with_roles(["sub_admin"])
+    
+    # Retrieve a learner and a super_admin from database to use their IDs
+    db = next(get_db())
+    learner_user = db.query(User).filter(User.role == "learner").first()
+    super_admin_user = db.query(User).filter(User.role == "admin").filter(User.keycloak_sub.like("%super_admin%")).first()
+
+    assert learner_user is not None, "Learner user should be created"
+    assert super_admin_user is not None, "Super admin user should be created"
+
+    # 1. List users
+    resp = client.get("/api/v1/subadmin/users")
+    assert resp.status_code == 200, resp.text
+    assert "users" in resp.json()
+    print("OK: Sub-admin can list users")
+
+    # 2. Block assigning super_admin role
+    resp = client.put(f"/api/v1/subadmin/users/{learner_user.id}/role", json={"role": "super_admin"})
+    assert resp.status_code == 403, f"Expected 403, got {resp.status_code}: {resp.text}"
+    print("OK: Sub-admin blocked from assigning super_admin role")
+
+    # 3. Block modifying super_admin user's role
+    resp = client.put(f"/api/v1/subadmin/users/{super_admin_user.id}/role", json={"role": "learner"})
+    assert resp.status_code == 403, f"Expected 403, got {resp.status_code}: {resp.text}"
+    print("OK: Sub-admin blocked from modifying super_admin user's role")
+
+    # 4. Block deactivating super_admin user
+    resp = client.put(f"/api/v1/subadmin/users/{super_admin_user.id}/deactivate")
+    assert resp.status_code == 403, f"Expected 403, got {resp.status_code}: {resp.text}"
+    print("OK: Sub-admin blocked from deactivating super_admin user")
+
+    # 5. Allow role change for standard roles (e.g. learner -> instructor)
+    resp = client.put(f"/api/v1/subadmin/users/{learner_user.id}/role", json={"role": "instructor"})
+    assert resp.status_code == 200, resp.text
+    print("OK: Sub-admin can assign standard roles")
+
+    # 6. Allow deactivating and reactivating a learner
+    resp = client.put(f"/api/v1/subadmin/users/{learner_user.id}/deactivate")
+    assert resp.status_code == 200, resp.text
+    print("OK: Sub-admin can deactivate standard user")
+
+    # Block reactivating to super_admin
+    resp = client.put(f"/api/v1/subadmin/users/{learner_user.id}/reactivate", json={"role": "super_admin"})
+    assert resp.status_code == 403, resp.text
+    print("OK: Sub-admin blocked from reactivating user to super_admin")
+
+    # Reactivate to learner
+    resp = client.put(f"/api/v1/subadmin/users/{learner_user.id}/reactivate", json={"role": "learner"})
+    assert resp.status_code == 200, resp.text
+    print("OK: Sub-admin can reactivate standard user")
+
+    print("--- Sub Admin Restrictions Tests Passed! ---\n")
+
     # Cleanup overrides
     app.dependency_overrides.clear()
     print("--- New Role System Tests Passed! ---\n")

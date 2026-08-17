@@ -48,6 +48,14 @@ import SAReportsAnalytics from './pages/superadmin/SAReportsAnalytics';
 import SAReviewsModeration from './pages/superadmin/SAReviewsModeration';
 import SAAuditLogs from './pages/superadmin/SAAuditLogs';
 
+// Sub Admin Sub-pages
+import SubAdminUserManagement from './pages/subadmin/SubAdminUserManagement';
+import SubAdminCourseManagement from './pages/subadmin/SubAdminCourseManagement';
+import SubAdminCategories from './pages/subadmin/SubAdminCategories';
+import SubAdminApprovals from './pages/subadmin/SubAdminApprovals';
+import SubAdminReviewsModeration from './pages/subadmin/SubAdminReviewsModeration';
+import SubAdminReports from './pages/subadmin/SubAdminReports';
+
 export default function App() {
   return (
     <AuthProvider>
@@ -199,6 +207,13 @@ export default function App() {
                 </ProtectedRoute>
               } 
             />
+            <Route path="/sub-admin/users" element={<ProtectedRoute role="sub_admin"><SubAdminUserManagement /></ProtectedRoute>} />
+            <Route path="/sub-admin/courses" element={<ProtectedRoute role="sub_admin"><SubAdminCourseManagement /></ProtectedRoute>} />
+            <Route path="/sub-admin/categories" element={<ProtectedRoute role="sub_admin"><SubAdminCategories /></ProtectedRoute>} />
+            <Route path="/sub-admin/approvals" element={<ProtectedRoute role="sub_admin"><SubAdminApprovals /></ProtectedRoute>} />
+            <Route path="/sub-admin/reviews" element={<ProtectedRoute role="sub_admin"><SubAdminReviewsModeration /></ProtectedRoute>} />
+            <Route path="/sub-admin/reports" element={<ProtectedRoute role="sub_admin"><SubAdminReports /></ProtectedRoute>} />
+            <Route path="/sub-admin/support" element={<ProtectedRoute role="sub_admin"><SubAdminDashboard /></ProtectedRoute>} />
 
             {/* ── Course Coordinator Routes ──────────────────────────── */}
             <Route 

@@ -39,6 +39,12 @@ import CategoryManager from './pages/coordinator/CategoryManager';
 import QualityReviews from './pages/coordinator/QualityReviews';
 import Reports from './pages/coordinator/Reports';
 import AccountsDashboard from './pages/accounts/AccountsDashboard';
+import ACTransactions from './pages/accounts/ACTransactions';
+import ACPaymentsRefunds from './pages/accounts/ACPaymentsRefunds';
+import ACPayouts from './pages/accounts/ACPayouts';
+import ACInvoices from './pages/accounts/ACInvoices';
+import ACFinancialReports from './pages/accounts/ACFinancialReports';
+import ACReconciliation from './pages/accounts/ACReconciliation';
 
 // Super Admin Sub-pages
 import SAUserManagement from './pages/superadmin/SAUserManagement';
@@ -309,6 +315,12 @@ export default function App() {
                 </ProtectedRoute>
               } 
             />
+            <Route path="/accounts/transactions" element={<ProtectedRoute role="accounts"><ACTransactions /></ProtectedRoute>} />
+            <Route path="/accounts/refunds" element={<ProtectedRoute role="accounts"><ACPaymentsRefunds /></ProtectedRoute>} />
+            <Route path="/accounts/payouts" element={<ProtectedRoute role="accounts"><ACPayouts /></ProtectedRoute>} />
+            <Route path="/accounts/invoices" element={<ProtectedRoute role="accounts"><ACInvoices /></ProtectedRoute>} />
+            <Route path="/accounts/reports" element={<ProtectedRoute role="accounts"><ACFinancialReports /></ProtectedRoute>} />
+            <Route path="/accounts/reconciliation" element={<ProtectedRoute role="accounts"><ACReconciliation /></ProtectedRoute>} />
           </Routes>
         </main>
       </BrowserRouter>

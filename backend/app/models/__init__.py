@@ -11,6 +11,8 @@ from app.models.progress import Progress
 from app.models.review import Review
 from app.models.category import Category
 from app.models.audit_log import AuditLog
+from app.models.refund_request import RefundRequest
+from app.models.instructor_payout import InstructorPayout
 
 __all__ = [
     "User",
@@ -22,4 +24,6 @@ __all__ = [
     "Review",
     "Category",
     "AuditLog",
+    "RefundRequest",
+    "InstructorPayout",
 ]

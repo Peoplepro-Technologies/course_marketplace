@@ -80,7 +80,6 @@ app.include_router(coordinator.router)
 app.include_router(superadmin.router)
 app.include_router(accounts.router)
 app.include_router(subadmin.router)
-app.include_router(accounts.router)
 
 
 # ── Health Check ──────────────────────────────────────────────────────

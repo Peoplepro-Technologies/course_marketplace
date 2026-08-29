@@ -24,7 +24,7 @@ from app.models.review import Review
 from app.models.enrollment import Enrollment
 from app.models.progress import Progress
 from app.models.transaction import Transaction
-from app.models.payout import InstructorPayout
+from app.models.instructor_payout import InstructorPayout
 from app.schemas.course import CourseCreate, CourseUpdate, CourseRead
 from app.schemas.section import SectionCreate, SectionUpdate, SectionRead
 from app.schemas.lesson import LessonCreate, LessonUpdate, LessonRead

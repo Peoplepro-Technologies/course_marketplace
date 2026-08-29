@@ -1,11 +1,18 @@
 """
 models/instructor_payout.py — InstructorPayout model.
 
-Records a payout event for an instructor.
-Each "Mark as Paid" action by the accounts role creates one row.
+Two payout workflows share this table:
 
-NOTE: Earnings are estimated (sum of course prices × approved enrollments
-      minus a flat 20% platform fee). No real payment is processed.
+1. "Mark as Paid" (accounts role, ACPayouts.jsx): a manual snapshot of an
+   instructor's estimated earnings (gross_earnings, platform_fee, net_payout,
+   period_label, marked_paid_at, marked_paid_by). No linked transactions.
+
+2. "Run Payouts" (accounts role batch job + instructor earnings page): bundles
+   a set of Transactions into a payout for a period (period_start, period_end,
+   total_amount, status, released_at), linked back via
+   Transaction.included_in_payout_id.
+
+NOTE: Earnings are estimated / no real payment gateway is connected.
 """
 
 import uuid
@@ -26,7 +33,9 @@ class InstructorPayout(Base):
         ForeignKey("users.id", ondelete="CASCADE"),
         nullable=False,
     )
-    period_label = Column(String(50), nullable=False)  # e.g. "Aug 2026"
+
+    # ── "Mark as Paid" snapshot fields ───────────────────────────────────
+    period_label = Column(String(50), nullable=True)  # e.g. "Aug 2026"
     gross_earnings = Column(Float, nullable=False, default=0.0)
     platform_fee = Column(Float, nullable=False, default=0.0)   # 20% of gross
     net_payout = Column(Float, nullable=False, default=0.0)     # gross - fee
@@ -40,6 +49,22 @@ class InstructorPayout(Base):
         ForeignKey("users.id", ondelete="SET NULL"),
         nullable=True,
     )
+
+    # ── "Run Payouts" batch fields ────────────────────────────────────────
+    period_start = Column(DateTime(timezone=True), nullable=True)
+    period_end = Column(DateTime(timezone=True), nullable=True)
+    total_amount = Column(Float, nullable=False, default=0.0)
+    status = Column(
+        String(50),
+        nullable=False,
+        default="pending",  # "pending", "released", "settled"
+    )
+    created_at = Column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+    released_at = Column(DateTime(timezone=True), nullable=True)
 
     # ── Relationships ──────────────────────────────────────────────────
     instructor = relationship("User", foreign_keys=[instructor_id])

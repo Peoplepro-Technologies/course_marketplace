@@ -63,15 +63,25 @@ export default function EarningsChart() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  
+  const [payouts, setPayouts] = useState([]);
+  const [payoutsLoading, setPayoutsLoading] = useState(true);
+  const [payoutsError, setPayoutsError] = useState(null);
 
   useEffect(() => {
-    api.get('/instructor/earnings')
-      .then((res) => setData(res.data))
+    Promise.all([
+      api.get('/instructor/earnings').then((res) => setData(res.data)),
+      api.get('/instructor/payouts').then((res) => setPayouts(res.data))
+    ])
       .catch((err) => {
-        console.error('Error fetching earnings:', err);
-        setError('Failed to load earnings data. Please try again.');
+        console.error('Error fetching data:', err);
+        setError('Failed to load data. Please try again.');
+        setPayoutsError('Failed to load payouts.');
       })
-      .finally(() => setLoading(false));
+      .finally(() => {
+        setLoading(false);
+        setPayoutsLoading(false);
+      });
   }, []);
 
   const hasData = data?.monthly?.length > 0;
@@ -183,9 +193,63 @@ export default function EarningsChart() {
 
         {/* Footnote */}
         <p className="ec-footnote">
-          Earnings are computed from <code>Enrollment × Course.price</code>.
-          Payout settlement requires the finance module (coming soon).
+          Earnings are computed from <code>Transaction</code> history.
         </p>
+      </div>
+
+      {/* ── Payouts History ────────────────────────────────────────────── */}
+      <div className="ec-chart-card" style={{ marginTop: '2rem' }}>
+        <div className="ec-chart-header">
+          <h3>Payout History</h3>
+        </div>
+        {payoutsLoading ? (
+          <p style={{ padding: '20px', textAlign: 'center' }}>Loading payouts...</p>
+        ) : payoutsError ? (
+          <div className="ec-error-banner" style={{ margin: '20px' }}>
+            <span>⚠️</span> {payoutsError}
+          </div>
+        ) : (
+          <div className="table-responsive" style={{ padding: '0 20px 20px' }}>
+            <table className="table" style={{ width: '100%' }}>
+              <thead>
+                <tr>
+                  <th style={{ textAlign: 'left', padding: '12px' }}>Period</th>
+                  <th style={{ textAlign: 'left', padding: '12px' }}>Amount</th>
+                  <th style={{ textAlign: 'left', padding: '12px' }}>Status</th>
+                  <th style={{ textAlign: 'left', padding: '12px' }}>Released At</th>
+                </tr>
+              </thead>
+              <tbody>
+                {payouts.length > 0 ? (
+                  payouts.map((p) => (
+                    <tr key={p.id} style={{ borderBottom: '1px solid #eee' }}>
+                      <td style={{ padding: '12px' }}>
+                        {p.period_start ? new Date(p.period_start).toLocaleDateString() : 'All Time'} 
+                        {' - '} 
+                        {p.period_end ? new Date(p.period_end).toLocaleDateString() : 'Present'}
+                      </td>
+                      <td style={{ padding: '12px' }}>₹{p.total_amount?.toFixed(2)}</td>
+                      <td style={{ padding: '12px' }}>
+                        <span className={`badge badge-${p.status === 'released' ? 'success' : 'warning'}`} style={{ display: 'inline-block', padding: '4px 8px', borderRadius: '4px', fontSize: '12px', background: p.status === 'released' ? '#e6f4ea' : '#fef7e0', color: p.status === 'released' ? '#137333' : '#b06000' }}>
+                          {p.status.toUpperCase()}
+                        </span>
+                      </td>
+                      <td style={{ padding: '12px' }}>
+                        {p.released_at ? new Date(p.released_at).toLocaleDateString() : '-'}
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan="4" style={{ textAlign: 'center', padding: '24px', color: '#666' }}>
+                      No payouts generated yet.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
     </div>

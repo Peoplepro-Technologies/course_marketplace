@@ -37,12 +37,26 @@ export default function Navbar() {
           </Link>
 
           {primaryRole === 'learner' && (
-            <Link
-              to="/learner"
-              className={`nav-link ${isActive('/learner') ? 'active' : ''}`}
-            >
-              My Learning
-            </Link>
+            <>
+              <Link
+                to="/learner"
+                className={`nav-link ${location.pathname === '/learner' ? 'active' : ''}`}
+              >
+                My Learning
+              </Link>
+              <Link
+                to="/learner/wishlist"
+                className={`nav-link ${location.pathname === '/learner/wishlist' ? 'active' : ''}`}
+              >
+                Wishlist
+              </Link>
+              <Link
+                to="/learner/profile"
+                className={`nav-link ${location.pathname === '/learner/profile' ? 'active' : ''}`}
+              >
+                Profile
+              </Link>
+            </>
           )}
 
           {primaryRole === 'instructor' && (

@@ -237,3 +237,57 @@ async def list_payouts(
         "skip": skip,
         "limit": limit
     }
+
+@router.get("/reports/summary")
+async def get_reports_summary(
+    start_date: Optional[datetime] = None,
+    end_date: Optional[datetime] = None,
+    current_user: User = Depends(require_role("accounts")),
+    db: Session = Depends(get_db),
+):
+    """
+    Generate a financial summary report for the given date range.
+    """
+    # 1. Total Revenue (Transactions with status="completed")
+    rev_query = db.query(Transaction).filter(Transaction.status == "completed")
+    if start_date:
+        rev_query = rev_query.filter(Transaction.created_at >= start_date)
+    if end_date:
+        rev_query = rev_query.filter(Transaction.created_at <= end_date)
+    
+    completed_txns = rev_query.all()
+    total_revenue = sum(t.amount for t in completed_txns)
+    transaction_count = len(completed_txns)
+    
+    # 2. Total Refunded (Transactions with refund_status="approved")
+    ref_query = db.query(Transaction).filter(Transaction.refund_status == "approved")
+    if start_date:
+        ref_query = ref_query.filter(Transaction.created_at >= start_date)
+    if end_date:
+        ref_query = ref_query.filter(Transaction.created_at <= end_date)
+        
+    refunded_txns = ref_query.all()
+    total_refunded = sum(t.amount for t in refunded_txns)
+    refund_count = len(refunded_txns)
+    
+    # 3. Total Paid Out (InstructorPayouts with status in ["released", "settled"])
+    pay_query = db.query(InstructorPayout).filter(InstructorPayout.status.in_(["released", "settled"]))
+    if start_date:
+        pay_query = pay_query.filter(InstructorPayout.created_at >= start_date)
+    if end_date:
+        pay_query = pay_query.filter(InstructorPayout.created_at <= end_date)
+        
+    payouts = pay_query.all()
+    total_paid_out = sum(p.total_amount for p in payouts)
+    
+    # 4. Net Retained
+    net_retained = total_revenue - total_refunded - total_paid_out
+    
+    return {
+        "total_revenue": round(total_revenue, 2),
+        "total_refunded": round(total_refunded, 2),
+        "total_paid_out": round(total_paid_out, 2),
+        "net_retained": round(net_retained, 2),
+        "transaction_count": transaction_count,
+        "refund_count": refund_count
+    }

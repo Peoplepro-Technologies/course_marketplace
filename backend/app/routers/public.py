@@ -9,24 +9,33 @@ These endpoints are accessible to anyone and include:
 The catalog endpoint uses Redis caching with a 5-minute TTL.
 """
 
+<<<<<<< HEAD
 from fastapi import APIRouter, Depends, HTTPException, Query
+=======
+from fastapi import APIRouter, Depends, Query, HTTPException, status
+>>>>>>> feature/accounts-dashboard
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func, or_
 from typing import Optional
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 from app.database import get_db
 from app.models.course import Course
 from app.models.section import Section
 from app.models.lesson import Lesson
 from app.models.review import Review
-from app.models.review import Review
 from app.models.user import User
 from app.models.category import Category
+from app.models.enrollment import Enrollment
+from app.models.live_class import LiveClass
 from app.schemas.course import CourseRead, CourseListRead
 from app.schemas.section import SectionRead
 from app.schemas.lesson import LessonRead
 from app.schemas.review import ReviewRead
+from app.schemas.live_class import JoinInfoRead
 from app.redis_client import get_cache, set_cache
+from app.auth.keycloak import get_current_user
+from app.auth.roles import require_role
 
 router = APIRouter(prefix="/api/v1/public", tags=["Public"])
 
@@ -197,6 +206,7 @@ def list_categories(db: Session = Depends(get_db)):
     return [c[0] for c in categories if c[0]]
 
 
+<<<<<<< HEAD
 @router.get("/lessons/{lesson_id}/preview/video")
 def get_lesson_preview_video(
     lesson_id: str,
@@ -229,3 +239,63 @@ def get_lesson_preview_video(
         raise HTTPException(status_code=404, detail="Video file not found on server.")
 
     return FileResponse(video_path, media_type="video/mp4")
+=======
+# ═══════════════════════════════════════════════════════════════════════
+#  LIVE CLASS JOIN INFO (shared, authenticated)
+# ═══════════════════════════════════════════════════════════════════════
+
+@router.get("/live-classes/{live_class_id}/join-info", response_model=JoinInfoRead)
+def get_live_class_join_info(
+    live_class_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Returns the Jitsi room_name and metadata needed to join a live class.
+
+    Access control:
+      - The instructor who owns the live class may always access it.
+      - A learner with an 'approved' enrollment in the course may access it.
+      - Everyone else (pending/rejected enrollment, unauthenticated) gets 403.
+    """
+    live_class = db.query(LiveClass).filter(
+        LiveClass.id == live_class_id
+    ).first()
+    if not live_class:
+        raise HTTPException(status_code=404, detail="Live class not found")
+
+    roles = getattr(current_user, "_realm_roles", [])
+
+    # Instructor check
+    if "instructor" in roles and live_class.instructor_id == current_user.id:
+        return JoinInfoRead(
+            id=live_class.id,
+            room_name=live_class.room_name,
+            title=live_class.title,
+            scheduled_at=live_class.scheduled_at,
+            duration_minutes=live_class.duration_minutes,
+            status=live_class.status,
+        )
+
+    # Learner with approved enrollment check
+    if "learner" in roles:
+        enrollment = db.query(Enrollment).filter(
+            Enrollment.learner_id == current_user.id,
+            Enrollment.course_id == live_class.course_id,
+            Enrollment.status == "approved",
+        ).first()
+        if enrollment:
+            return JoinInfoRead(
+                id=live_class.id,
+                room_name=live_class.room_name,
+                title=live_class.title,
+                scheduled_at=live_class.scheduled_at,
+                duration_minutes=live_class.duration_minutes,
+                status=live_class.status,
+            )
+
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="You do not have access to this live class",
+    )
+>>>>>>> feature/accounts-dashboard

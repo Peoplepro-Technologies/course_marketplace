@@ -12,6 +12,7 @@ import LearnerDashboard from './pages/learner/LearnerDashboard';
 import LessonViewer from './pages/learner/LessonViewer';
 import PurchasesHistory from './pages/learner/PurchasesHistory';
 import InvoiceView from './pages/learner/InvoiceView';
+import LearnerLiveClasses from './pages/learner/LearnerLiveClasses';
 
 // Instructor Pages
 import InstructorDashboard from './pages/instructor/InstructorDashboard';
@@ -20,6 +21,7 @@ import SectionManager from './pages/instructor/SectionManager';
 import ReviewInbox from './pages/instructor/ReviewInbox';
 import EarningsChart from './pages/instructor/EarningsChart';
 import StudentsProgress from './pages/instructor/StudentsProgress';
+import LiveClassManager from './pages/instructor/LiveClassManager';
 
 // Admin Pages
 import AdminDashboard from './pages/admin/AdminDashboard';
@@ -109,6 +111,14 @@ export default function App() {
                 </ProtectedRoute>
               } 
             />
+            <Route 
+              path="/learner/live-classes" 
+              element={
+                <ProtectedRoute role="learner">
+                  <LearnerLiveClasses />
+                </ProtectedRoute>
+              } 
+            />
 
             {/* ── Instructor Routes ──────────────────────────────────── */}
             <Route 
@@ -164,6 +174,14 @@ export default function App() {
               element={
                 <ProtectedRoute role="instructor">
                   <StudentsProgress />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/instructor/live-classes" 
+              element={
+                <ProtectedRoute role="instructor">
+                  <LiveClassManager />
                 </ProtectedRoute>
               } 
             />

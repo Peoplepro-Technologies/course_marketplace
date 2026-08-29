@@ -30,6 +30,12 @@ export default function AccountsDashboard() {
   const [refundsLoading, setRefundsLoading] = useState(false);
   const [refundsError, setRefundsError] = useState('');
 
+  // Payouts state
+  const [payouts, setPayouts] = useState([]);
+  const [payoutsLoading, setPayoutsLoading] = useState(false);
+  const [payoutsError, setPayoutsError] = useState('');
+  const [runPayoutLoading, setRunPayoutLoading] = useState(false);
+
   const fetchTransactions = async () => {
     setTransLoading(true);
     try {
@@ -59,11 +65,27 @@ export default function AccountsDashboard() {
     }
   };
 
+  const fetchPayouts = async () => {
+    setPayoutsLoading(true);
+    try {
+      const response = await api.get('/accounts/payouts');
+      setPayouts(response.data.items);
+      setPayoutsError('');
+    } catch (err) {
+      console.error(err);
+      setPayoutsError('Failed to fetch payouts.');
+    } finally {
+      setPayoutsLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (activeTab === 'transactions') {
       fetchTransactions();
     } else if (activeTab === 'refunds') {
       fetchRefunds();
+    } else if (activeTab === 'payouts') {
+      fetchPayouts();
     }
   }, [activeTab, skip]);
 
@@ -105,6 +127,33 @@ export default function AccountsDashboard() {
     }
   };
 
+  const handleRunPayout = async () => {
+    if (!window.confirm("Are you sure you want to run the payout generator? This will bundle all valid transactions into pending payouts.")) return;
+    setRunPayoutLoading(true);
+    try {
+      const response = await api.post('/accounts/payouts/run');
+      alert(response.data.message);
+      fetchPayouts();
+    } catch (err) {
+      console.error(err);
+      alert(err.response?.data?.detail || "Failed to run payouts");
+    } finally {
+      setRunPayoutLoading(false);
+    }
+  };
+
+  const handleReleasePayout = async (payoutId) => {
+    if (!window.confirm("Are you sure you want to mark this payout as released?")) return;
+    try {
+      await api.put(`/accounts/payouts/${payoutId}/release`);
+      alert("Payout released successfully.");
+      fetchPayouts();
+    } catch (err) {
+      console.error(err);
+      alert(err.response?.data?.detail || "Failed to release payout");
+    }
+  };
+
   return (
     <div className="role-dashboard" id="accounts-dashboard">
       {/* ── Sidebar ──────────────────────────────────────────────── */}
@@ -115,7 +164,7 @@ export default function AccountsDashboard() {
         </div>
         <ul className="sidebar-nav">
           {SIDEBAR_ITEMS.map((item) => {
-            const isClickable = item.id === 'transactions' || item.id === 'refunds';
+            const isClickable = item.id === 'transactions' || item.id === 'refunds' || item.id === 'payouts';
             return (
               <li
                 key={item.id}
@@ -272,6 +321,75 @@ export default function AccountsDashboard() {
                       ) : (
                         <tr>
                           <td colSpan="6" className="text-center">No pending refund requests.</td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+
+        {activeTab === 'payouts' && (
+          <>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-md)' }}>
+              <h3>Instructor Payouts</h3>
+              <button 
+                className="btn btn-primary" 
+                onClick={handleRunPayout}
+                disabled={runPayoutLoading}
+              >
+                {runPayoutLoading ? 'Running...' : 'Run Payout Generator'}
+              </button>
+            </div>
+            
+            {payoutsLoading ? (
+              <p>Loading payouts...</p>
+            ) : payoutsError ? (
+              <div className="alert alert-danger">{payoutsError}</div>
+            ) : (
+              <div className="dashboard-card">
+                <div className="table-responsive">
+                  <table className="table">
+                    <thead>
+                      <tr>
+                        <th>Date Created</th>
+                        <th>Instructor</th>
+                        <th>Amount</th>
+                        <th>Status</th>
+                        <th>Released At</th>
+                        <th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {payouts.length > 0 ? (
+                        payouts.map((p) => (
+                          <tr key={p.id}>
+                            <td>{new Date(p.created_at).toLocaleDateString()}</td>
+                            <td>{p.instructor_name}</td>
+                            <td>${p.total_amount?.toFixed(2)}</td>
+                            <td>
+                              <span className={`badge badge-${p.status === 'released' ? 'success' : 'warning'}`}>
+                                {p.status}
+                              </span>
+                            </td>
+                            <td>{p.released_at ? new Date(p.released_at).toLocaleDateString() : '-'}</td>
+                            <td>
+                              {p.status === 'pending' && (
+                                <button 
+                                  className="btn btn-success btn-sm" 
+                                  onClick={() => handleReleasePayout(p.id)}
+                                >
+                                  Release Funds
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan="6" className="text-center">No payouts found.</td>
                         </tr>
                       )}
                     </tbody>

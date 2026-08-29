@@ -49,7 +49,11 @@ class Transaction(Base):
         default="none",
     )
     refund_reason = Column(String, nullable=True)
-
+    included_in_payout_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("instructor_payouts.id", ondelete="SET NULL"),
+        nullable=True,
+    )
     # ── Relationships ─────────────────────────────────────────────────
     learner = relationship("User")
     course = relationship("Course")

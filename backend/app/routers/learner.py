@@ -6,6 +6,7 @@ Provides:
   - Enrolled courses listing with progress
   - Lesson progress tracking
   - Review submission (triggers background rating recalculation)
+  - Refund request submission
 """
 
 import os
@@ -25,10 +26,12 @@ from app.models.progress import Progress
 from app.models.lesson import Lesson
 from app.models.section import Section
 from app.models.review import Review
+from app.models.refund_request import RefundRequest
 from app.models.transaction import Transaction
 from app.schemas.enrollment import EnrollmentRead
 from app.schemas.progress import ProgressUpdate, ProgressRead
 from app.schemas.review import ReviewCreate, ReviewRead
+from app.schemas.refund_request import RefundRequestCreate, RefundRequestRead
 from app.workers.tasks import recalculate_course_rating
 
 router = APIRouter(prefix="/api/v1/learner", tags=["Learner"])
@@ -164,6 +167,17 @@ async def list_enrolled_courses(
             else 0.0
         )
 
+        # Check for an existing pending refund request
+        has_pending_refund = (
+            db.query(RefundRequest)
+            .filter(
+                RefundRequest.enrollment_id == enrollment.id,
+                RefundRequest.status == "pending",
+            )
+            .first()
+            is not None
+        )
+
         result.append({
             "enrollment_id": str(enrollment.id),
             "course_id": str(course.id),
@@ -175,6 +189,8 @@ async def list_enrolled_courses(
             "progress_percent": round(progress_percent, 1),
             "total_lessons": total_lessons,
             "completed_lessons": completed_lessons,
+            "enrollment_status": enrollment.status,
+            "has_pending_refund": has_pending_refund,
         })
 
     return result
@@ -302,6 +318,56 @@ async def submit_review(
     background_tasks.add_task(recalculate_course_rating, str(data.course_id))
 
     return ReviewRead.model_validate(review)
+
+
+@router.post("/refund-request")
+async def request_refund(
+    data: RefundRequestCreate,
+    current_user: User = Depends(require_role("learner")),
+    db: Session = Depends(get_db),
+):
+    """
+    Submit a refund request for an approved enrollment.
+    Only one pending refund request per enrollment is allowed at a time.
+    """
+    # Verify enrollment exists and belongs to this learner
+    enrollment = db.query(Enrollment).filter(
+        Enrollment.id == data.enrollment_id,
+        Enrollment.learner_id == current_user.id,
+    ).first()
+    if not enrollment:
+        raise HTTPException(status_code=404, detail="Enrollment not found")
+
+    if enrollment.status != "approved":
+        raise HTTPException(
+            status_code=400,
+            detail="Refund requests can only be submitted for approved enrollments",
+        )
+
+    # Check for an existing pending request
+    existing = db.query(RefundRequest).filter(
+        RefundRequest.enrollment_id == data.enrollment_id,
+        RefundRequest.status == "pending",
+    ).first()
+    if existing:
+        raise HTTPException(
+            status_code=400,
+            detail="A refund request for this enrollment is already pending",
+        )
+
+    rr = RefundRequest(
+        enrollment_id=data.enrollment_id,
+        learner_id=current_user.id,
+        reason=data.reason,
+    )
+    db.add(rr)
+    db.commit()
+    db.refresh(rr)
+
+    return {
+        "message": "Refund request submitted successfully",
+        "refund_request_id": str(rr.id),
+    }
 
 
 @router.get("/lessons/{lesson_id}/video")

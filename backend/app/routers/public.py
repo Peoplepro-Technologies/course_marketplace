@@ -9,7 +9,7 @@ These endpoints are accessible to anyone and include:
 The catalog endpoint uses Redis caching with a 5-minute TTL.
 """
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func, or_
 from typing import Optional
@@ -24,6 +24,7 @@ from app.models.user import User
 from app.models.category import Category
 from app.schemas.course import CourseRead, CourseListRead
 from app.schemas.section import SectionRead
+from app.schemas.lesson import LessonRead
 from app.schemas.review import ReviewRead
 from app.redis_client import get_cache, set_cache
 
@@ -128,8 +129,29 @@ def get_course_detail(course_id: str, db: Session = Depends(get_db)):
         review_data.learner_name = learner_name
         review_list.append(review_data)
 
-    # Build sections with lessons
-    sections_data = [SectionRead.model_validate(s) for s in course.sections]
+    # Build sections with lessons — include is_preview in each lesson
+    sections_data = []
+    for section in sorted(course.sections, key=lambda s: s.order_index):
+        section_dict = {
+            "id": str(section.id),
+            "title": section.title,
+            "order_index": section.order_index,
+            "lessons": [
+                {
+                    "id": str(l.id),
+                    "title": l.title,
+                    "order_index": l.order_index,
+                    "duration": l.duration,
+                    "is_preview": l.is_preview,
+                    # Only expose video_url/content for preview lessons
+                    "video_url": l.video_url if l.is_preview else None,
+                    "content": l.content if l.is_preview else None,
+                    "thumbnail_url": l.thumbnail_url,
+                }
+                for l in sorted(section.lessons, key=lambda x: x.order_index)
+            ],
+        }
+        sections_data.append(section_dict)
 
     return {
         "course": CourseRead.model_validate(course),
@@ -138,8 +160,72 @@ def get_course_detail(course_id: str, db: Session = Depends(get_db)):
     }
 
 
+@router.get("/lessons/{lesson_id}/preview")
+def get_lesson_preview(
+    lesson_id: str,
+    db: Session = Depends(get_db),
+):
+    """
+    Returns content/video_url for a preview-flagged lesson.
+    No authentication required — this is the free preview endpoint.
+    Returns 403 if the lesson is NOT marked as is_preview.
+    """
+    lesson = db.query(Lesson).filter(Lesson.id == lesson_id).first()
+    if not lesson:
+        raise HTTPException(status_code=404, detail="Lesson not found")
+
+    if not lesson.is_preview:
+        raise HTTPException(
+            status_code=403,
+            detail="This lesson is not available as a free preview. Please enroll to access."
+        )
+
+    return {
+        "id": str(lesson.id),
+        "title": lesson.title,
+        "is_preview": lesson.is_preview,
+        "content": lesson.content,
+        "video_url": lesson.video_url,
+        "duration": lesson.duration,
+    }
+
+
 @router.get("/categories")
 def list_categories(db: Session = Depends(get_db)):
     """Return a list of all distinct course categories from the categories table."""
     categories = db.query(Category.name).order_by(Category.name.asc()).all()
     return [c[0] for c in categories if c[0]]
+
+
+@router.get("/lessons/{lesson_id}/preview/video")
+def get_lesson_preview_video(
+    lesson_id: str,
+    db: Session = Depends(get_db),
+):
+    """
+    Serve the video file for a preview-flagged lesson.
+    No authentication required — enforced by the is_preview check.
+    Returns 403 if the lesson is NOT marked as is_preview.
+    """
+    import os
+    from fastapi.responses import FileResponse
+
+    lesson = db.query(Lesson).filter(Lesson.id == lesson_id).first()
+    if not lesson:
+        raise HTTPException(status_code=404, detail="Lesson not found")
+
+    if not lesson.is_preview:
+        raise HTTPException(
+            status_code=403,
+            detail="This lesson video is not available as a free preview. Please enroll to access."
+        )
+
+    _HERE = os.path.dirname(os.path.abspath(__file__))
+    _MEDIA_ROOT = os.path.normpath(os.path.join(_HERE, "..", "media"))
+    _VIDEOS_DIR = os.path.join(_MEDIA_ROOT, "videos")
+    video_path = os.path.join(_VIDEOS_DIR, f"{lesson_id}.mp4")
+
+    if not os.path.exists(video_path):
+        raise HTTPException(status_code=404, detail="Video file not found on server.")
+
+    return FileResponse(video_path, media_type="video/mp4")

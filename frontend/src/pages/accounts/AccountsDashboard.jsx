@@ -36,6 +36,13 @@ export default function AccountsDashboard() {
   const [payoutsError, setPayoutsError] = useState('');
   const [runPayoutLoading, setRunPayoutLoading] = useState(false);
 
+  // Reports state
+  const [report, setReport] = useState(null);
+  const [reportLoading, setReportLoading] = useState(false);
+  const [reportError, setReportError] = useState('');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+
   const fetchTransactions = async () => {
     setTransLoading(true);
     try {
@@ -79,6 +86,26 @@ export default function AccountsDashboard() {
     }
   };
 
+  const fetchReport = async () => {
+    setReportLoading(true);
+    try {
+      let url = '/accounts/reports/summary';
+      const params = new URLSearchParams();
+      if (startDate) params.append('start_date', new Date(startDate).toISOString());
+      if (endDate) params.append('end_date', new Date(endDate).toISOString());
+      if (params.toString()) url += `?${params.toString()}`;
+      
+      const response = await api.get(url);
+      setReport(response.data);
+      setReportError('');
+    } catch (err) {
+      console.error(err);
+      setReportError('Failed to fetch report.');
+    } finally {
+      setReportLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (activeTab === 'transactions') {
       fetchTransactions();
@@ -86,6 +113,8 @@ export default function AccountsDashboard() {
       fetchRefunds();
     } else if (activeTab === 'payouts') {
       fetchPayouts();
+    } else if (activeTab === 'dashboard') {
+      fetchReport();
     }
   }, [activeTab, skip]);
 
@@ -164,7 +193,7 @@ export default function AccountsDashboard() {
         </div>
         <ul className="sidebar-nav">
           {SIDEBAR_ITEMS.map((item) => {
-            const isClickable = item.id === 'transactions' || item.id === 'refunds' || item.id === 'payouts';
+            const isClickable = item.id === 'transactions' || item.id === 'refunds' || item.id === 'payouts' || item.id === 'dashboard';
             return (
               <li
                 key={item.id}
@@ -397,6 +426,53 @@ export default function AccountsDashboard() {
                 </div>
               </div>
             )}
+          </>
+        )}
+
+        {activeTab === 'dashboard' && (
+          <>
+            <h3 style={{ marginBottom: 'var(--space-md)' }}>Financial Reports</h3>
+            <div className="dashboard-card" style={{ marginBottom: 'var(--space-md)' }}>
+              <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-end' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '4px' }}>Start Date</label>
+                  <input type="date" className="form-input" value={startDate} onChange={e => setStartDate(e.target.value)} />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '4px' }}>End Date</label>
+                  <input type="date" className="form-input" value={endDate} onChange={e => setEndDate(e.target.value)} />
+                </div>
+                <button className="btn btn-primary" onClick={fetchReport} disabled={reportLoading}>
+                  {reportLoading ? 'Generating...' : 'Generate Report'}
+                </button>
+              </div>
+            </div>
+
+            {reportError ? (
+              <div className="alert alert-danger">{reportError}</div>
+            ) : report ? (
+              <div className="grid grid-2">
+                <div className="stat-card">
+                  <div style={{ fontSize: '0.9rem', color: '#666' }}>Total Revenue</div>
+                  <div style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>${report.total_revenue?.toFixed(2)}</div>
+                  <div style={{ fontSize: '0.8rem', color: '#888', marginTop: '4px' }}>From {report.transaction_count} completed transactions</div>
+                </div>
+                <div className="stat-card">
+                  <div style={{ fontSize: '0.9rem', color: '#666' }}>Total Refunded</div>
+                  <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#d32f2f' }}>${report.total_refunded?.toFixed(2)}</div>
+                  <div style={{ fontSize: '0.8rem', color: '#888', marginTop: '4px' }}>Across {report.refund_count} approved refunds</div>
+                </div>
+                <div className="stat-card">
+                  <div style={{ fontSize: '0.9rem', color: '#666' }}>Total Paid Out</div>
+                  <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#f57c00' }}>${report.total_paid_out?.toFixed(2)}</div>
+                  <div style={{ fontSize: '0.8rem', color: '#888', marginTop: '4px' }}>To Instructors</div>
+                </div>
+                <div className="stat-card" style={{ background: '#f5f9ff', borderColor: '#cfe2ff' }}>
+                  <div style={{ fontSize: '0.9rem', color: '#084298' }}>Net Platform Position (Retained)</div>
+                  <div style={{ fontSize: '1.75rem', fontWeight: 'bold', color: '#084298' }}>${report.net_retained?.toFixed(2)}</div>
+                </div>
+              </div>
+            ) : null}
           </>
         )}
       </main>

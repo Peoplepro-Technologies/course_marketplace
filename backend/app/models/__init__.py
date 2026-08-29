@@ -14,6 +14,7 @@ from app.models.audit_log import AuditLog
 from app.models.refund_request import RefundRequest
 from app.models.instructor_payout import InstructorPayout
 from app.models.transaction import Transaction
+from app.models.live_class import LiveClass
 
 __all__ = [
     "User",
@@ -28,4 +29,5 @@ __all__ = [
     "RefundRequest",
     "InstructorPayout",
     "Transaction",
+    "LiveClass",
 ]

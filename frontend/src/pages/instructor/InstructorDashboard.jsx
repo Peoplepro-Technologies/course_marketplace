@@ -58,6 +58,9 @@ export default function InstructorDashboard() {
           <p>Manage your courses</p>
         </div>
         <div className="flex" style={{ gap: '0.75rem' }}>
+          <Link to="/instructor/live-classes" className="btn btn-secondary" id="instructor-nav-live-classes">
+            🎥 Live Classes
+          </Link>
           <Link to="/instructor/earnings" className="btn btn-secondary">
             💰 Earnings
           </Link>

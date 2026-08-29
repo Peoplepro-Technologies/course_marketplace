@@ -1,0 +1,45 @@
+/* JitsiRoomModal.css — Styles for the full-screen Jitsi overlay */
+
+.jitsi-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  background: #000;
+  display: flex;
+  flex-direction: column;
+}
+
+.jitsi-container {
+  flex: 1;
+  width: 100%;
+  height: 100%;
+}
+
+/* Ensure the Jitsi iframe fills the container */
+.jitsi-container iframe {
+  width: 100% !important;
+  height: 100% !important;
+  border: none;
+}
+
+.jitsi-close-btn {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  z-index: 10001;
+  background: rgba(220, 53, 69, 0.9);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 0.5rem 1.25rem;
+  font-size: 0.875rem;
+  font-weight: 700;
+  cursor: pointer;
+  backdrop-filter: blur(4px);
+  transition: background 0.2s;
+  letter-spacing: 0.02em;
+}
+
+.jitsi-close-btn:hover {
+  background: #dc3545;
+}

@@ -122,9 +122,19 @@ export default function LearnerDashboard() {
         </div>
       )}
 
-      <div className="section-header">
-        <h2>My Learning</h2>
-        <p>Pick up where you left off</p>
+      <div className="section-header flex-between">
+        <div>
+          <h2>My Learning</h2>
+          <p>Pick up where you left off</p>
+        </div>
+        <div className="flex" style={{ gap: '0.75rem' }}>
+          <Link to="/learner/live-classes" className="btn btn-secondary" id="learner-nav-live-classes">
+            🎥 Live Classes
+          </Link>
+          <Link to="/learner/purchases" className="btn btn-secondary">
+            🧾 Purchases
+          </Link>
+        </div>
       </div>
 
       {enrollments.length === 0 ? (

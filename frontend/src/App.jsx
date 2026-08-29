@@ -12,6 +12,9 @@ import LearnerDashboard from './pages/learner/LearnerDashboard';
 import LessonViewer from './pages/learner/LessonViewer';
 import Wishlist from './pages/learner/Wishlist';
 import Profile from './pages/learner/Profile';
+import PurchasesHistory from './pages/learner/PurchasesHistory';
+import InvoiceView from './pages/learner/InvoiceView';
+import LearnerLiveClasses from './pages/learner/LearnerLiveClasses';
 
 // Instructor Pages
 import InstructorDashboard from './pages/instructor/InstructorDashboard';
@@ -20,6 +23,7 @@ import SectionManager from './pages/instructor/SectionManager';
 import ReviewInbox from './pages/instructor/ReviewInbox';
 import EarningsChart from './pages/instructor/EarningsChart';
 import StudentsProgress from './pages/instructor/StudentsProgress';
+import LiveClassManager from './pages/instructor/LiveClassManager';
 
 // Admin Pages
 import AdminDashboard from './pages/admin/AdminDashboard';
@@ -39,6 +43,12 @@ import CategoryManager from './pages/coordinator/CategoryManager';
 import QualityReviews from './pages/coordinator/QualityReviews';
 import Reports from './pages/coordinator/Reports';
 import AccountsDashboard from './pages/accounts/AccountsDashboard';
+import ACTransactions from './pages/accounts/ACTransactions';
+import ACPaymentsRefunds from './pages/accounts/ACPaymentsRefunds';
+import ACPayouts from './pages/accounts/ACPayouts';
+import ACInvoices from './pages/accounts/ACInvoices';
+import ACFinancialReports from './pages/accounts/ACFinancialReports';
+import ACReconciliation from './pages/accounts/ACReconciliation';
 
 // Super Admin Sub-pages
 import SAUserManagement from './pages/superadmin/SAUserManagement';
@@ -103,6 +113,14 @@ export default function App() {
                 </ProtectedRoute>
               } 
             />
+            <Route 
+              path="/learner/live-classes" 
+              element={
+                <ProtectedRoute role="learner">
+                  <LearnerLiveClasses />
+                </ProtectedRoute>
+              } 
+            />
 
             {/* ── Instructor Routes ──────────────────────────────────── */}
             <Route 
@@ -158,6 +176,14 @@ export default function App() {
               element={
                 <ProtectedRoute role="instructor">
                   <StudentsProgress />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/instructor/live-classes" 
+              element={
+                <ProtectedRoute role="instructor">
+                  <LiveClassManager />
                 </ProtectedRoute>
               } 
             />
@@ -309,6 +335,12 @@ export default function App() {
                 </ProtectedRoute>
               } 
             />
+            <Route path="/accounts/transactions" element={<ProtectedRoute role="accounts"><ACTransactions /></ProtectedRoute>} />
+            <Route path="/accounts/refunds" element={<ProtectedRoute role="accounts"><ACPaymentsRefunds /></ProtectedRoute>} />
+            <Route path="/accounts/payouts" element={<ProtectedRoute role="accounts"><ACPayouts /></ProtectedRoute>} />
+            <Route path="/accounts/invoices" element={<ProtectedRoute role="accounts"><ACInvoices /></ProtectedRoute>} />
+            <Route path="/accounts/reports" element={<ProtectedRoute role="accounts"><ACFinancialReports /></ProtectedRoute>} />
+            <Route path="/accounts/reconciliation" element={<ProtectedRoute role="accounts"><ACReconciliation /></ProtectedRoute>} />
           </Routes>
         </main>
       </BrowserRouter>

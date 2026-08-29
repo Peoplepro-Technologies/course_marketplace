@@ -10,18 +10,6 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-"""Add is_active to User
-
-Revision ID: fb359fb4e3e3
-Revises: 30960ccd623d
-Create Date: 2026-08-17 15:48:08.598778
-"""
-from typing import Sequence, Union
-from alembic import op
-import sqlalchemy as sa
-
-
-# revision identifiers, used by Alembic.
 revision: str = 'fb359fb4e3e3'
 down_revision: Union[str, None] = '30960ccd623d'
 branch_labels: Union[str, Sequence[str], None] = None

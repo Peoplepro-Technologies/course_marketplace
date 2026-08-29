@@ -24,10 +24,12 @@ from app.models.review import Review
 from app.models.enrollment import Enrollment
 from app.models.progress import Progress
 from app.models.transaction import Transaction
-from app.models.payout import InstructorPayout
+from app.models.instructor_payout import InstructorPayout
+from app.models.live_class import LiveClass
 from app.schemas.course import CourseCreate, CourseUpdate, CourseRead
 from app.schemas.section import SectionCreate, SectionUpdate, SectionRead
 from app.schemas.lesson import LessonCreate, LessonUpdate, LessonRead
+from app.schemas.live_class import LiveClassCreate, LiveClassRead
 from app.redis_client import invalidate_cache
 
 router = APIRouter(prefix="/api/v1/instructor", tags=["Instructor"])
@@ -751,3 +753,128 @@ def list_course_students(
         "total_lessons": total_lessons,
         "students": results,
     }
+
+
+# ═══════════════════════════════════════════════════════════════════════
+#  LIVE CLASSES
+# ═══════════════════════════════════════════════════════════════════════
+
+@router.post("/courses/{course_id}/live-classes", response_model=LiveClassRead)
+async def schedule_live_class(
+    course_id: str,
+    payload: LiveClassCreate,
+    current_user: User = Depends(require_role("instructor")),
+    db: Session = Depends(get_db),
+):
+    """
+    Schedule a new live class for a course owned by the current instructor.
+    Auto-generates a unique Jitsi room_name.
+    """
+    course = db.query(Course).filter(
+        Course.id == course_id,
+        Course.instructor_id == current_user.id,
+    ).first()
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found or not yours")
+
+    room_name = f"coursemkt-{uuid_lib.uuid4().hex}"
+    live_class = LiveClass(
+        course_id=course.id,
+        instructor_id=current_user.id,
+        title=payload.title,
+        scheduled_at=payload.scheduled_at,
+        duration_minutes=payload.duration_minutes,
+        room_name=room_name,
+        status="scheduled",
+    )
+    db.add(live_class)
+    db.commit()
+    db.refresh(live_class)
+
+    result = LiveClassRead.model_validate(live_class)
+    result.course_title = course.title
+    return result
+
+
+@router.get("/live-classes", response_model=list[LiveClassRead])
+async def list_instructor_live_classes(
+    current_user: User = Depends(require_role("instructor")),
+    db: Session = Depends(get_db),
+):
+    """List all live classes scheduled by this instructor (across all courses)."""
+    from sqlalchemy.orm import joinedload
+    live_classes = (
+        db.query(LiveClass)
+        .options(joinedload(LiveClass.course))
+        .filter(LiveClass.instructor_id == current_user.id)
+        .order_by(LiveClass.scheduled_at.desc())
+        .all()
+    )
+    results = []
+    for lc in live_classes:
+        item = LiveClassRead.model_validate(lc)
+        item.course_title = lc.course.title if lc.course else None
+        results.append(item)
+    return results
+
+
+@router.put("/live-classes/{live_class_id}/start", response_model=LiveClassRead)
+async def start_live_class(
+    live_class_id: str,
+    current_user: User = Depends(require_role("instructor")),
+    db: Session = Depends(get_db),
+):
+    """Mark a scheduled live class as 'live'. Only the owning instructor can do this."""
+    live_class = db.query(LiveClass).filter(
+        LiveClass.id == live_class_id,
+        LiveClass.instructor_id == current_user.id,
+    ).first()
+    if not live_class:
+        raise HTTPException(status_code=404, detail="Live class not found or not yours")
+    if live_class.status == "ended":
+        raise HTTPException(status_code=400, detail="Cannot start a class that has already ended")
+    live_class.status = "live"
+    db.commit()
+    db.refresh(live_class)
+    return LiveClassRead.model_validate(live_class)
+
+
+@router.put("/live-classes/{live_class_id}/end", response_model=LiveClassRead)
+async def end_live_class(
+    live_class_id: str,
+    current_user: User = Depends(require_role("instructor")),
+    db: Session = Depends(get_db),
+):
+    """Mark a live class as 'ended'. Only the owning instructor can do this."""
+    live_class = db.query(LiveClass).filter(
+        LiveClass.id == live_class_id,
+        LiveClass.instructor_id == current_user.id,
+    ).first()
+    if not live_class:
+        raise HTTPException(status_code=404, detail="Live class not found or not yours")
+    if live_class.status != "live":
+        raise HTTPException(status_code=400, detail="Can only end a class that is currently live")
+    live_class.status = "ended"
+    db.commit()
+    db.refresh(live_class)
+    return LiveClassRead.model_validate(live_class)
+
+
+@router.delete("/live-classes/{live_class_id}", status_code=204)
+async def delete_live_class(
+    live_class_id: str,
+    current_user: User = Depends(require_role("instructor")),
+    db: Session = Depends(get_db),
+):
+    """Cancel/delete a scheduled live class. Cannot delete if already live or ended."""
+    live_class = db.query(LiveClass).filter(
+        LiveClass.id == live_class_id,
+        LiveClass.instructor_id == current_user.id,
+    ).first()
+    if not live_class:
+        raise HTTPException(status_code=404, detail="Live class not found or not yours")
+    if live_class.status in ("live", "ended"):
+        raise HTTPException(status_code=400, detail="Can only cancel a scheduled class")
+    db.delete(live_class)
+    db.commit()
+    return None

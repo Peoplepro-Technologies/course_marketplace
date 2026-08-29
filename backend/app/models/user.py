@@ -41,6 +41,7 @@ class User(Base):
     )
     reviews = relationship("Review", back_populates="learner", lazy="dynamic")
     progress_records = relationship("Progress", back_populates="learner", lazy="dynamic")
+    live_classes = relationship("LiveClass", back_populates="instructor", lazy="dynamic")
 
     def __repr__(self):
         return f"<User {self.name} ({self.role})>"

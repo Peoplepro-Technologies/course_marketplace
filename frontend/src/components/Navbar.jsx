@@ -40,15 +40,21 @@ export default function Navbar() {
             <>
               <Link
                 to="/learner"
-                className={`nav-link ${isActive('/learner') && !isActive('/learner/purchases') ? 'active' : ''}`}
+                className={`nav-link ${location.pathname === '/learner' ? 'active' : ''}`}
               >
                 My Learning
               </Link>
               <Link
-                to="/learner/purchases"
-                className={`nav-link ${isActive('/learner/purchases') ? 'active' : ''}`}
+                to="/learner/wishlist"
+                className={`nav-link ${location.pathname === '/learner/wishlist' ? 'active' : ''}`}
               >
-                Purchase History
+                Wishlist
+              </Link>
+              <Link
+                to="/learner/profile"
+                className={`nav-link ${location.pathname === '/learner/profile' ? 'active' : ''}`}
+              >
+                Profile
               </Link>
             </>
           )}

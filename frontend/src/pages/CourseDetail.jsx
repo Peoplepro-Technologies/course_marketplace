@@ -32,6 +32,8 @@ export default function CourseDetail() {
   const [enrollmentStatus, setEnrollmentStatus] = useState(null); // null | "pending" | "approved" | "revoked" | etc.
   const [expandedSections, setExpandedSections] = useState({});
   const [previewLesson, setPreviewLesson] = useState(null); // lesson being previewed inline
+  const [isWishlisted, setIsWishlisted] = useState(false);
+  const [togglingWishlist, setTogglingWishlist] = useState(false);
 
   const isEnrolledAndApproved = enrollmentStatus === 'approved';
 
@@ -57,6 +59,12 @@ export default function CourseDetail() {
           setEnrollmentStatus(enrollment?.status || null);
         })
         .catch(() => {});
+        
+      api.get('/learner/wishlist')
+        .then((res) => {
+          setIsWishlisted(res.data.some(w => w.course_id === courseId));
+        })
+        .catch(() => {});
     }
   }, [courseId, primaryRole, authenticated]);
 
@@ -69,6 +77,27 @@ export default function CourseDetail() {
       alert(err.response?.data?.detail || 'Enrollment failed');
     } finally {
       setEnrolling(false);
+    }
+  };
+
+  const handleWishlistToggle = async () => {
+    if (!authenticated) {
+      login();
+      return;
+    }
+    setTogglingWishlist(true);
+    try {
+      if (isWishlisted) {
+        await api.delete(`/learner/wishlist/${courseId}`);
+        setIsWishlisted(false);
+      } else {
+        await api.post(`/learner/wishlist/${courseId}`);
+        setIsWishlisted(true);
+      }
+    } catch (err) {
+      alert("Failed to update wishlist");
+    } finally {
+      setTogglingWishlist(false);
     }
   };
 
@@ -290,6 +319,20 @@ export default function CourseDetail() {
 
               <div className="sidebar-price">
                 {course.price > 0 ? `$${course.price.toFixed(2)}` : 'Free'}
+              </div>
+
+              <div style={{ marginBottom: '1rem' }}>
+                <button
+                  className="btn btn-outline"
+                  style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+                  onClick={handleWishlistToggle}
+                  disabled={togglingWishlist}
+                >
+                  <span style={{ color: isWishlisted ? 'red' : 'inherit' }}>
+                    {isWishlisted ? '❤️' : '🤍'}
+                  </span>
+                  {isWishlisted ? 'Wishlisted' : 'Add to Wishlist'}
+                </button>
               </div>
 
               {/* Visitor: not logged in */}

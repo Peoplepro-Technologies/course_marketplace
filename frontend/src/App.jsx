@@ -10,6 +10,8 @@ import CourseDetail from './pages/CourseDetail';
 // Learner Pages
 import LearnerDashboard from './pages/learner/LearnerDashboard';
 import LessonViewer from './pages/learner/LessonViewer';
+import Wishlist from './pages/learner/Wishlist';
+import Profile from './pages/learner/Profile';
 import PurchasesHistory from './pages/learner/PurchasesHistory';
 import InvoiceView from './pages/learner/InvoiceView';
 import LearnerLiveClasses from './pages/learner/LearnerLiveClasses';
@@ -96,18 +98,18 @@ export default function App() {
               } 
             />
             <Route 
-              path="/learner/purchases" 
+              path="/learner/wishlist" 
               element={
                 <ProtectedRoute role="learner">
-                  <PurchasesHistory />
+                  <Wishlist />
                 </ProtectedRoute>
               } 
             />
             <Route 
-              path="/learner/transactions/:transactionId/invoice" 
+              path="/learner/profile" 
               element={
                 <ProtectedRoute role="learner">
-                  <InvoiceView />
+                  <Profile />
                 </ProtectedRoute>
               } 
             />

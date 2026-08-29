@@ -32,11 +32,125 @@ from app.models.live_class import LiveClass
 from app.schemas.enrollment import EnrollmentRead
 from app.schemas.progress import ProgressUpdate, ProgressRead
 from app.schemas.review import ReviewCreate, ReviewRead
+from app.schemas.user import UserRead, UserUpdate
+from app.schemas.wishlist import WishlistRead
+from app.models.wishlist import Wishlist
 from app.schemas.refund_request import RefundRequestCreate, RefundRequestRead
 from app.schemas.live_class import LiveClassRead
 from app.workers.tasks import recalculate_course_rating
 
 router = APIRouter(prefix="/api/v1/learner", tags=["Learner"])
+
+
+@router.get("/profile", response_model=UserRead)
+async def get_profile(
+    current_user: User = Depends(require_role("learner")),
+):
+    """
+    Get the logged-in learner's profile.
+    """
+    return current_user
+
+
+@router.put("/profile", response_model=UserRead)
+async def update_profile(
+    data: UserUpdate,
+    current_user: User = Depends(require_role("learner")),
+    db: Session = Depends(get_db),
+):
+    """
+    Update the logged-in learner's profile.
+    """
+    if data.name is not None:
+        current_user.name = data.name
+    if data.profile_pic is not None:
+        current_user.profile_pic = data.profile_pic
+    if data.bio is not None:
+        current_user.bio = data.bio
+
+    db.commit()
+    db.refresh(current_user)
+    return current_user
+
+
+@router.post("/wishlist/{course_id}")
+async def add_to_wishlist(
+    course_id: str,
+    current_user: User = Depends(require_role("learner")),
+    db: Session = Depends(get_db),
+):
+    """
+    Add a course to the learner's wishlist.
+    """
+    course = db.query(Course).filter(Course.id == course_id, Course.status == "published").first()
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found or not published")
+
+    existing = db.query(Wishlist).filter(
+        Wishlist.learner_id == current_user.id,
+        Wishlist.course_id == course_id,
+    ).first()
+
+    if not existing:
+        wishlist_item = Wishlist(learner_id=current_user.id, course_id=course_id)
+        db.add(wishlist_item)
+        db.commit()
+
+    return {"message": "Course added to wishlist"}
+
+
+@router.delete("/wishlist/{course_id}")
+async def remove_from_wishlist(
+    course_id: str,
+    current_user: User = Depends(require_role("learner")),
+    db: Session = Depends(get_db),
+):
+    """
+    Remove a course from the learner's wishlist.
+    """
+    existing = db.query(Wishlist).filter(
+        Wishlist.learner_id == current_user.id,
+        Wishlist.course_id == course_id,
+    ).first()
+
+    if existing:
+        db.delete(existing)
+        db.commit()
+
+    return {"message": "Course removed from wishlist"}
+
+
+@router.get("/wishlist")
+async def get_wishlist(
+    current_user: User = Depends(require_role("learner")),
+    db: Session = Depends(get_db),
+):
+    """
+    Get the learner's wishlist.
+    """
+    wishlist_items = (
+        db.query(Wishlist)
+        .options(joinedload(Wishlist.course).joinedload(Course.instructor))
+        .filter(Wishlist.learner_id == current_user.id)
+        .order_by(Wishlist.added_at.desc())
+        .all()
+    )
+
+    result = []
+    for item in wishlist_items:
+        course = item.course
+        result.append({
+            "id": item.id,
+            "course_id": course.id,
+            "course_title": course.title,
+            "course_thumbnail": course.thumbnail_url,
+            "course_category": course.category,
+            "instructor_name": course.instructor.name if course.instructor else "",
+            "course_price": course.price,
+            "added_at": item.added_at,
+        })
+    return result
+
 
 
 @router.post("/enroll/{course_id}")

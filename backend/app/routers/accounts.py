@@ -17,9 +17,9 @@ NOTE: Revenue and payout figures are *estimated* (course price × approved
 All endpoints require the "accounts" Keycloak realm role.
 """
 
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Body
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 
@@ -62,36 +62,35 @@ async def get_dashboard_kpis(
         .filter(Enrollment.status == "approved")
         .all()
     )
-    total_revenue = sum(r.price for r in revenue_rows if r.price)
+    total_revenue = sum(r[0] if isinstance(r, (tuple, list)) else getattr(r, 'price', 0.0) for r in revenue_rows if (r[0] if isinstance(r, (tuple, list)) else getattr(r, 'price', None)))
 
     # Pending refund requests
     pending_refunds = (
         db.query(func.count(RefundRequest.id))
         .filter(RefundRequest.status == "pending")
-        .scalar()
+        .scalar() or 0
     )
 
     # Recent transactions: approved enrollments in last 30 days
-    from datetime import timedelta
     cutoff = datetime.now(timezone.utc) - timedelta(days=30)
     recent_transactions = (
         db.query(func.count(Enrollment.id))
         .filter(
             Enrollment.status == "approved",
-            Enrollment.approved_at >= cutoff,
+            func.coalesce(Enrollment.approved_at, Enrollment.enrolled_at) >= cutoff,
         )
-        .scalar()
+        .scalar() or 0
     )
 
     # Total approved enrollments
     total_approved = (
         db.query(func.count(Enrollment.id))
         .filter(Enrollment.status == "approved")
-        .scalar()
+        .scalar() or 0
     )
 
     return {
-        "total_revenue": round(total_revenue, 2),
+        "total_revenue": round(float(total_revenue), 2),
         "pending_refunds_count": pending_refunds,
         "recent_transactions_count": recent_transactions,
         "total_approved_enrollments": total_approved,
@@ -118,25 +117,25 @@ async def list_transactions(
         .join(User, Enrollment.learner_id == User.id)
         .join(Course, Enrollment.course_id == Course.id)
         .filter(Enrollment.status == "approved")
-        .order_by(Enrollment.approved_at.desc())
+        .order_by(func.coalesce(Enrollment.approved_at, Enrollment.enrolled_at).desc())
     )
 
     total = query.count()
     rows = query.offset((page - 1) * page_size).limit(page_size).all()
 
-    transactions = [
-        {
+    transactions = []
+    for enrollment, learner, course in rows:
+        event_date = enrollment.approved_at or enrollment.enrolled_at or datetime.now(timezone.utc)
+        transactions.append({
             "transaction_id": str(enrollment.id),
             "learner_name": learner.name,
             "learner_email": learner.email,
             "course_title": course.title,
             "amount": course.price,
-            "date": enrollment.approved_at.isoformat() if enrollment.approved_at else enrollment.enrolled_at.isoformat(),
+            "date": event_date.isoformat(),
             "status": "completed",
             "enrollment_status": enrollment.status,
-        }
-        for enrollment, learner, course in rows
-    ]
+        })
 
     return {
         "transactions": transactions,
@@ -197,7 +196,7 @@ async def list_refund_requests(
 @router.put("/refunds/{refund_id}/approve")
 async def approve_refund(
     refund_id: str,
-    body: RefundRequestResolve = RefundRequestResolve(),
+    body: Optional[RefundRequestResolve] = Body(default=None),
     current_user: User = Depends(require_role("accounts")),
     db: Session = Depends(get_db),
 ):
@@ -224,6 +223,14 @@ async def approve_refund(
     enrollment = db.query(Enrollment).filter(Enrollment.id == rr.enrollment_id).first()
     if enrollment:
         enrollment.status = "refunded"
+        
+        # Sync Transaction table if transaction exists
+        tx = db.query(Transaction).filter(
+            Transaction.learner_id == rr.learner_id,
+            Transaction.course_id == enrollment.course_id,
+        ).first()
+        if tx:
+            tx.refund_status = "refunded"
 
     db.commit()
 
@@ -237,7 +244,7 @@ async def approve_refund(
 @router.put("/refunds/{refund_id}/reject")
 async def reject_refund(
     refund_id: str,
-    body: RefundRequestResolve = RefundRequestResolve(),
+    body: Optional[RefundRequestResolve] = Body(default=None),
     current_user: User = Depends(require_role("accounts")),
     db: Session = Depends(get_db),
 ):
@@ -257,6 +264,16 @@ async def reject_refund(
     rr.status = "rejected"
     rr.resolved_at = datetime.now(timezone.utc)
     rr.resolved_by = current_user.id
+
+    enrollment = db.query(Enrollment).filter(Enrollment.id == rr.enrollment_id).first()
+    if enrollment:
+        tx = db.query(Transaction).filter(
+            Transaction.learner_id == rr.learner_id,
+            Transaction.course_id == enrollment.course_id,
+        ).first()
+        if tx:
+            tx.refund_status = "rejected"
+
     db.commit()
 
     return {
@@ -533,25 +550,25 @@ async def list_invoices(
         .join(User, Enrollment.learner_id == User.id)
         .join(Course, Enrollment.course_id == Course.id)
         .filter(Enrollment.status == "approved")
-        .order_by(Enrollment.approved_at.desc())
+        .order_by(func.coalesce(Enrollment.approved_at, Enrollment.enrolled_at).desc())
     )
 
     total = query.count()
     rows = query.offset((page - 1) * page_size).limit(page_size).all()
 
-    invoices = [
-        {
+    invoices = []
+    for enrollment, learner, course in rows:
+        event_date = enrollment.approved_at or enrollment.enrolled_at or datetime.now(timezone.utc)
+        invoices.append({
             "invoice_id": f"INV-{str(enrollment.id)[:8].upper()}",
             "enrollment_id": str(enrollment.id),
             "learner_name": learner.name,
             "learner_email": learner.email,
             "course_title": course.title,
             "amount": course.price,
-            "invoice_date": enrollment.approved_at.isoformat() if enrollment.approved_at else enrollment.enrolled_at.isoformat(),
+            "invoice_date": event_date.isoformat(),
             "status": "paid",
-        }
-        for enrollment, learner, course in rows
-    ]
+        })
 
     return {
         "invoices": invoices,
@@ -577,8 +594,6 @@ async def get_financial_reports(
     Revenue = estimated (course price × approved enrollments).
     Payouts = sum of InstructorPayout.net_payout records.
     """
-    from datetime import timedelta
-
     now = datetime.now(timezone.utc)
     month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
     year_start = now.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
@@ -590,7 +605,7 @@ async def get_financial_reports(
         .filter(Enrollment.status == "approved")
         .all()
     )
-    total_revenue_all_time = round(sum(r.price for r in all_time_rows if r.price), 2)
+    total_revenue_all_time = round(float(sum(r[0] if isinstance(r, (tuple, list)) else getattr(r, 'price', 0.0) for r in all_time_rows if (r[0] if isinstance(r, (tuple, list)) else getattr(r, 'price', None)))), 2)
 
     # Monthly revenue (approved enrollments this month)
     monthly_rows = (
@@ -598,11 +613,11 @@ async def get_financial_reports(
         .join(Enrollment, Enrollment.course_id == Course.id)
         .filter(
             Enrollment.status == "approved",
-            Enrollment.approved_at >= month_start,
+            func.coalesce(Enrollment.approved_at, Enrollment.enrolled_at) >= month_start,
         )
         .all()
     )
-    total_revenue_this_month = round(sum(r.price for r in monthly_rows if r.price), 2)
+    total_revenue_this_month = round(float(sum(r[0] if isinstance(r, (tuple, list)) else getattr(r, 'price', 0.0) for r in monthly_rows if (r[0] if isinstance(r, (tuple, list)) else getattr(r, 'price', None)))), 2)
 
     # Year-to-date revenue
     ytd_rows = (
@@ -610,38 +625,38 @@ async def get_financial_reports(
         .join(Enrollment, Enrollment.course_id == Course.id)
         .filter(
             Enrollment.status == "approved",
-            Enrollment.approved_at >= year_start,
+            func.coalesce(Enrollment.approved_at, Enrollment.enrolled_at) >= year_start,
         )
         .all()
     )
-    total_revenue_ytd = round(sum(r.price for r in ytd_rows if r.price), 2)
+    total_revenue_ytd = round(float(sum(r[0] if isinstance(r, (tuple, list)) else getattr(r, 'price', 0.0) for r in ytd_rows if (r[0] if isinstance(r, (tuple, list)) else getattr(r, 'price', None)))), 2)
 
     # Total payouts issued (net sums from InstructorPayout records)
     payout_sum = db.query(func.sum(InstructorPayout.net_payout)).scalar() or 0.0
-    payout_count = db.query(func.count(InstructorPayout.id)).scalar()
+    payout_count = db.query(func.count(InstructorPayout.id)).scalar() or 0
 
     # Pending refunds
     pending_refunds = (
         db.query(func.count(RefundRequest.id))
         .filter(RefundRequest.status == "pending")
-        .scalar()
+        .scalar() or 0
     )
     approved_refunds = (
         db.query(func.count(RefundRequest.id))
         .filter(RefundRequest.status == "approved")
-        .scalar()
+        .scalar() or 0
     )
 
     # Total enrollments breakdown
     total_approved = (
         db.query(func.count(Enrollment.id))
         .filter(Enrollment.status == "approved")
-        .scalar()
+        .scalar() or 0
     )
     total_refunded = (
         db.query(func.count(Enrollment.id))
         .filter(Enrollment.status == "refunded")
-        .scalar()
+        .scalar() or 0
     )
 
     return {
@@ -651,7 +666,7 @@ async def get_financial_reports(
             "year_to_date": total_revenue_ytd,
         },
         "payouts": {
-            "total_issued": round(payout_sum, 2),
+            "total_issued": round(float(payout_sum), 2),
             "payout_events": payout_count,
         },
         "refunds": {

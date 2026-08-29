@@ -28,10 +28,12 @@ from app.models.section import Section
 from app.models.review import Review
 from app.models.refund_request import RefundRequest
 from app.models.transaction import Transaction
+from app.models.live_class import LiveClass
 from app.schemas.enrollment import EnrollmentRead
 from app.schemas.progress import ProgressUpdate, ProgressRead
 from app.schemas.review import ReviewCreate, ReviewRead
 from app.schemas.refund_request import RefundRequestCreate, RefundRequestRead
+from app.schemas.live_class import LiveClassRead
 from app.workers.tasks import recalculate_course_rating
 
 router = APIRouter(prefix="/api/v1/learner", tags=["Learner"])
@@ -506,3 +508,47 @@ async def request_refund(
     db.refresh(transaction)
 
     return {"message": "Refund requested successfully", "refund_status": transaction.refund_status}
+
+
+# ═══════════════════════════════════════════════════════════════════════
+#  LIVE CLASSES
+# ═══════════════════════════════════════════════════════════════════════
+
+@router.get("/courses/{course_id}/live-classes", response_model=list[LiveClassRead])
+async def list_course_live_classes(
+    course_id: str,
+    current_user: User = Depends(require_role("learner")),
+    db: Session = Depends(get_db),
+):
+    """
+    List upcoming and live classes for an enrolled course.
+    Only learners with an 'approved' enrollment for that course may access this.
+    Returns scheduled and live classes (not ended) ordered by scheduled_at ascending.
+    """
+    # Verify approved enrollment
+    enrollment = db.query(Enrollment).filter(
+        Enrollment.learner_id == current_user.id,
+        Enrollment.course_id == course_id,
+        Enrollment.status == "approved",
+    ).first()
+    if not enrollment:
+        raise HTTPException(
+            status_code=403,
+            detail="You do not have approved access to this course",
+        )
+
+    live_classes = (
+        db.query(LiveClass)
+        .filter(
+            LiveClass.course_id == course_id,
+            LiveClass.status.in_(["scheduled", "live"]),
+        )
+        .order_by(LiveClass.scheduled_at.asc())
+        .all()
+    )
+
+    results = []
+    for lc in live_classes:
+        item = LiveClassRead.model_validate(lc)
+        results.append(item)
+    return results

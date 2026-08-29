@@ -10,6 +10,8 @@ import CourseDetail from './pages/CourseDetail';
 // Learner Pages
 import LearnerDashboard from './pages/learner/LearnerDashboard';
 import LessonViewer from './pages/learner/LessonViewer';
+import PurchasesHistory from './pages/learner/PurchasesHistory';
+import InvoiceView from './pages/learner/InvoiceView';
 
 // Instructor Pages
 import InstructorDashboard from './pages/instructor/InstructorDashboard';
@@ -74,6 +76,22 @@ export default function App() {
               element={
                 <ProtectedRoute role="learner">
                   <LessonViewer />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/learner/purchases" 
+              element={
+                <ProtectedRoute role="learner">
+                  <PurchasesHistory />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/learner/transactions/:transactionId/invoice" 
+              element={
+                <ProtectedRoute role="learner">
+                  <InvoiceView />
                 </ProtectedRoute>
               } 
             />

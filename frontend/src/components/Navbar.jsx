@@ -37,12 +37,20 @@ export default function Navbar() {
           </Link>
 
           {primaryRole === 'learner' && (
-            <Link
-              to="/learner"
-              className={`nav-link ${isActive('/learner') ? 'active' : ''}`}
-            >
-              My Learning
-            </Link>
+            <>
+              <Link
+                to="/learner"
+                className={`nav-link ${isActive('/learner') && !isActive('/learner/purchases') ? 'active' : ''}`}
+              >
+                My Learning
+              </Link>
+              <Link
+                to="/learner/purchases"
+                className={`nav-link ${isActive('/learner/purchases') ? 'active' : ''}`}
+              >
+                Purchase History
+              </Link>
+            </>
           )}
 
           {primaryRole === 'instructor' && (

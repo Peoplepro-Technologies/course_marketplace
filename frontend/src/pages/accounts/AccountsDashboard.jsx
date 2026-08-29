@@ -1,25 +1,109 @@
-/**
- * AccountsDashboard.jsx — Placeholder dashboard for the accounts role.
- *
- * Displays a welcome header and a sidebar with 7 menu items (non-functional).
- * Reuses the shared RoleDashboard layout and existing design system.
- */
-
+import { useState, useEffect } from 'react';
 import useAuth from '../../hooks/useAuth';
+import api from '../../api/axios';
 import '../RoleDashboard.css';
 
 const SIDEBAR_ITEMS = [
-  { icon: '📊', label: 'Dashboard' },
-  { icon: '💰', label: 'Transactions' },
-  { icon: '💳', label: 'Payments & Refunds' },
-  { icon: '🏦', label: 'Instructor Payouts' },
-  { icon: '🧾', label: 'Invoices' },
-  { icon: '📈', label: 'Financial Reports' },
-  { icon: '🔄', label: 'Reconciliation' },
+  { id: 'transactions', icon: '💰', label: 'Transactions' },
+  { id: 'refunds', icon: '💸', label: 'Refunds Queue' },
+  { id: 'dashboard', icon: '📊', label: 'Dashboard' },
+  { id: 'payments', icon: '💳', label: 'Payments & Refunds' },
+  { id: 'payouts', icon: '🏦', label: 'Instructor Payouts' },
+  { id: 'invoices', icon: '🧾', label: 'Invoices' },
 ];
 
 export default function AccountsDashboard() {
   const { user } = useAuth();
+  
+  const [activeTab, setActiveTab] = useState('transactions');
+  
+  // Transactions state
+  const [transactions, setTransactions] = useState([]);
+  const [transLoading, setTransLoading] = useState(false);
+  const [transError, setTransError] = useState('');
+  const [skip, setSkip] = useState(0);
+  const [total, setTotal] = useState(0);
+  const limit = 20;
+
+  // Refunds state
+  const [refunds, setRefunds] = useState([]);
+  const [refundsLoading, setRefundsLoading] = useState(false);
+  const [refundsError, setRefundsError] = useState('');
+
+  const fetchTransactions = async () => {
+    setTransLoading(true);
+    try {
+      const response = await api.get(`/accounts/transactions?skip=${skip}&limit=${limit}`);
+      setTransactions(response.data.items);
+      setTotal(response.data.total);
+      setTransError('');
+    } catch (err) {
+      console.error(err);
+      setTransError('Failed to fetch transactions.');
+    } finally {
+      setTransLoading(false);
+    }
+  };
+
+  const fetchRefunds = async () => {
+    setRefundsLoading(true);
+    try {
+      const response = await api.get('/accounts/refunds/pending');
+      setRefunds(response.data);
+      setRefundsError('');
+    } catch (err) {
+      console.error(err);
+      setRefundsError('Failed to fetch pending refunds.');
+    } finally {
+      setRefundsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'transactions') {
+      fetchTransactions();
+    } else if (activeTab === 'refunds') {
+      fetchRefunds();
+    }
+  }, [activeTab, skip]);
+
+  const handleNext = () => {
+    if (skip + limit < total) {
+      setSkip(skip + limit);
+    }
+  };
+
+  const handlePrev = () => {
+    if (skip - limit >= 0) {
+      setSkip(skip - limit);
+    }
+  };
+
+  const handleApproveRefund = async (transactionId) => {
+    if (!window.confirm("Are you sure you want to approve this refund and revoke the learner's access?")) return;
+    
+    try {
+      await api.put(`/accounts/transactions/${transactionId}/refund/approve`);
+      alert("Refund approved successfully.");
+      fetchRefunds(); // refresh list
+    } catch (err) {
+      console.error(err);
+      alert(err.response?.data?.detail || "Failed to approve refund");
+    }
+  };
+
+  const handleRejectRefund = async (transactionId) => {
+    if (!window.confirm("Are you sure you want to reject this refund?")) return;
+    
+    try {
+      await api.put(`/accounts/transactions/${transactionId}/refund/reject`, { reason: "" });
+      alert("Refund rejected successfully.");
+      fetchRefunds(); // refresh list
+    } catch (err) {
+      console.error(err);
+      alert(err.response?.data?.detail || "Failed to reject refund");
+    }
+  };
 
   return (
     <div className="role-dashboard" id="accounts-dashboard">
@@ -30,18 +114,23 @@ export default function AccountsDashboard() {
           <p>Financial Operations</p>
         </div>
         <ul className="sidebar-nav">
-          {SIDEBAR_ITEMS.map((item, i) => (
-            <li
-              key={item.label}
-              className={`sidebar-nav-item${i === 0 ? ' active' : ''}`}
-            >
-              <span className="sidebar-nav-icon">{item.icon}</span>
-              {item.label}
-              {i !== 0 && (
-                <span className="sidebar-coming-soon">Soon</span>
-              )}
-            </li>
-          ))}
+          {SIDEBAR_ITEMS.map((item) => {
+            const isClickable = item.id === 'transactions' || item.id === 'refunds';
+            return (
+              <li
+                key={item.id}
+                className={`sidebar-nav-item ${activeTab === item.id ? 'active' : ''} ${!isClickable ? 'disabled' : ''}`}
+                onClick={() => isClickable && setActiveTab(item.id)}
+                style={{ cursor: isClickable ? 'pointer' : 'default' }}
+              >
+                <span className="sidebar-nav-icon">{item.icon}</span>
+                {item.label}
+                {!isClickable && (
+                  <span className="sidebar-coming-soon">Soon</span>
+                )}
+              </li>
+            );
+          })}
         </ul>
       </aside>
 
@@ -57,16 +146,141 @@ export default function AccountsDashboard() {
           </p>
         </div>
 
-        <h3 style={{ marginBottom: 'var(--space-lg)' }}>Quick Access</h3>
-        <div className="role-cards-grid">
-          {SIDEBAR_ITEMS.slice(1).map((item) => (
-            <div key={item.label} className="role-placeholder-card">
-              <div className="card-icon">{item.icon}</div>
-              <h4>{item.label}</h4>
-              <p>Coming soon</p>
-            </div>
-          ))}
-        </div>
+        {activeTab === 'transactions' && (
+          <>
+            <h3 style={{ marginBottom: 'var(--space-md)' }}>Platform Transactions</h3>
+            
+            {transLoading && transactions.length === 0 ? (
+              <p>Loading transactions...</p>
+            ) : transError ? (
+              <div className="alert alert-danger">{transError}</div>
+            ) : (
+              <div className="dashboard-card">
+                <div className="table-responsive">
+                  <table className="table">
+                    <thead>
+                      <tr>
+                        <th>Date</th>
+                        <th>Learner</th>
+                        <th>Course</th>
+                        <th>Instructor</th>
+                        <th>Amount</th>
+                        <th>Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {transactions.length > 0 ? (
+                        transactions.map((t) => (
+                          <tr key={t.id}>
+                            <td>{new Date(t.date).toLocaleDateString()}</td>
+                            <td>{t.learner_name}</td>
+                            <td>{t.course_title}</td>
+                            <td>{t.instructor_name}</td>
+                            <td>${t.amount?.toFixed(2)}</td>
+                            <td>
+                              <span className={`badge badge-${t.status === 'completed' ? 'success' : t.status === 'refunded' ? 'danger' : 'warning'}`}>
+                                {t.status}
+                              </span>
+                            </td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan="6" className="text-center">No transactions found.</td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+                
+                {/* Pagination Controls */}
+                <div className="pagination" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 'var(--space-md)' }}>
+                  <div>
+                    Showing {transactions.length > 0 ? skip + 1 : 0} to {Math.min(skip + limit, total)} of {total} entries
+                  </div>
+                  <div style={{ display: 'flex', gap: 'var(--space-sm)' }}>
+                    <button 
+                      className="btn btn-secondary btn-sm" 
+                      onClick={handlePrev} 
+                      disabled={skip === 0}
+                    >
+                      Previous
+                    </button>
+                    <button 
+                      className="btn btn-secondary btn-sm" 
+                      onClick={handleNext} 
+                      disabled={skip + limit >= total}
+                    >
+                      Next
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+
+        {activeTab === 'refunds' && (
+          <>
+            <h3 style={{ marginBottom: 'var(--space-md)' }}>Pending Refund Requests</h3>
+            
+            {refundsLoading ? (
+              <p>Loading refunds...</p>
+            ) : refundsError ? (
+              <div className="alert alert-danger">{refundsError}</div>
+            ) : (
+              <div className="dashboard-card">
+                <div className="table-responsive">
+                  <table className="table">
+                    <thead>
+                      <tr>
+                        <th>Date Requested</th>
+                        <th>Learner</th>
+                        <th>Course</th>
+                        <th>Amount</th>
+                        <th>Reason</th>
+                        <th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {refunds.length > 0 ? (
+                        refunds.map((r) => (
+                          <tr key={r.id}>
+                            <td>{new Date(r.date).toLocaleDateString()}</td>
+                            <td>{r.learner_name}</td>
+                            <td>{r.course_title}</td>
+                            <td>${r.amount?.toFixed(2)}</td>
+                            <td style={{ maxWidth: '250px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={r.refund_reason}>
+                              {r.refund_reason || "No reason provided"}
+                            </td>
+                            <td style={{ display: 'flex', gap: '8px' }}>
+                              <button 
+                                className="btn btn-success btn-sm" 
+                                onClick={() => handleApproveRefund(r.id)}
+                              >
+                                Approve
+                              </button>
+                              <button 
+                                className="btn btn-danger btn-sm" 
+                                onClick={() => handleRejectRefund(r.id)}
+                              >
+                                Reject
+                              </button>
+                            </td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan="6" className="text-center">No pending refund requests.</td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </>
+        )}
       </main>
     </div>
   );

@@ -129,6 +129,7 @@ async def list_enrolled_courses(
             "course_category": course.category,
             "instructor_name": course.instructor.name if course.instructor else "",
             "enrolled_at": enrollment.enrolled_at.isoformat(),
+            "status": enrollment.status,
             "progress_percent": round(progress_percent, 1),
             "total_lessons": total_lessons,
             "completed_lessons": completed_lessons,
@@ -289,8 +290,12 @@ async def get_lesson_video(
     roles = getattr(current_user, "_realm_roles", [])
     authorized = False
 
+    # Preview lessons are accessible to any authenticated user (regardless of enrollment)
+    if lesson.is_preview:
+        authorized = True
+
     # Check admin/staff privileges
-    if any(r in roles for r in ["super_admin", "admin", "sub_admin", "course_coordinator"]):
+    elif any(r in roles for r in ["super_admin", "admin", "sub_admin", "course_coordinator"]):
         authorized = True
 
     # Check instructor ownership

@@ -116,6 +116,19 @@
   font-size: var(--text-xs);
 }
 
+.lesson-accessible:hover {
+  background: rgba(0, 86, 210, 0.06);
+  transition: background 0.15s ease;
+}
+
+.lesson-locked {
+  opacity: 0.65;
+}
+
+.lesson-locked .lesson-title {
+  color: var(--color-text-muted);
+}
+
 /* ── Reviews ──────────────────────────────────────────────────────── */
 .reviews-list {
   display: flex;

@@ -15,6 +15,7 @@ class LessonBase(BaseModel):
     thumbnail_url: Optional[str] = None
     order_index: int = 0
     duration: Optional[int] = 0  # minutes
+    is_preview: bool = False
 
 
 class LessonCreate(LessonBase):
@@ -30,6 +31,7 @@ class LessonUpdate(BaseModel):
     thumbnail_url: Optional[str] = None
     order_index: Optional[int] = None
     duration: Optional[int] = None
+    is_preview: Optional[bool] = None
 
 
 class LessonRead(LessonBase):

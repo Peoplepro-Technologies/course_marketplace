@@ -25,6 +25,7 @@ from app.models.progress import Progress
 from app.models.lesson import Lesson
 from app.models.section import Section
 from app.models.review import Review
+from app.models.transaction import Transaction
 from app.schemas.enrollment import EnrollmentRead
 from app.schemas.progress import ProgressUpdate, ProgressRead
 from app.schemas.review import ReviewCreate, ReviewRead
@@ -181,10 +182,52 @@ async def enroll_in_course(
         status="approved",
     )
     db.add(enrollment)
+    
+    # Create transaction for this enrollment mock payment
+    transaction = Transaction(
+        learner_id=current_user.id,
+        course_id=course_id,
+        amount=course.price,
+        status="completed",
+        payment_method="mock"
+    )
+    db.add(transaction)
+    
     db.commit()
     db.refresh(enrollment)
 
     return {"message": "Successfully enrolled", "enrollment_id": str(enrollment.id)}
+
+
+@router.get("/transactions")
+async def list_transactions(
+    current_user: User = Depends(require_role("learner")),
+    db: Session = Depends(get_db),
+):
+    """
+    Return the logged-in learner's transaction history.
+    """
+    transactions = (
+        db.query(Transaction)
+        .options(joinedload(Transaction.course))
+        .filter(Transaction.learner_id == current_user.id)
+        .order_by(Transaction.created_at.desc())
+        .all()
+    )
+
+    result = []
+    for t in transactions:
+        result.append({
+            "id": str(t.id),
+            "course_id": str(t.course_id),
+            "course_title": t.course.title if t.course else None,
+            "amount": t.amount,
+            "status": t.status,
+            "payment_method": t.payment_method,
+            "created_at": t.created_at.isoformat(),
+        })
+
+    return result
 
 
 @router.get("/courses")
@@ -441,3 +484,73 @@ async def get_lesson_video(
 
     # Return FileResponse which handles Range headers automatically
     return FileResponse(video_path, media_type="video/mp4")
+
+
+@router.get("/transactions/{transaction_id}/invoice")
+async def get_invoice(
+    transaction_id: str,
+    current_user: User = Depends(require_role("learner")),
+    db: Session = Depends(get_db),
+):
+    """
+    Returns structured invoice data for a specific transaction.
+    Restricted to the transaction's own learner.
+    """
+    transaction = (
+        db.query(Transaction)
+        .options(joinedload(Transaction.course).joinedload(Course.instructor))
+        .filter(Transaction.id == transaction_id)
+        .first()
+    )
+
+    if not transaction:
+        raise HTTPException(status_code=404, detail="Transaction not found")
+
+    if transaction.learner_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized to view this invoice")
+
+    invoice_number = f"INV-{str(transaction.id)[:8].upper()}"
+
+    return {
+        "invoice_number": invoice_number,
+        "learner_name": current_user.name,
+        "learner_email": current_user.email,
+        "course_title": transaction.course.title if transaction.course else "Unknown Course",
+        "instructor_name": transaction.course.instructor.name if transaction.course and transaction.course.instructor else "Unknown Instructor",
+        "amount": transaction.amount,
+        "date": transaction.created_at.isoformat(),
+        "status": transaction.status,
+    }
+
+from pydantic import BaseModel
+
+class RefundRequest(BaseModel):
+    reason: str
+
+@router.post("/transactions/{transaction_id}/request-refund")
+async def request_refund(
+    transaction_id: str,
+    data: RefundRequest,
+    current_user: User = Depends(require_role("learner")),
+    db: Session = Depends(get_db),
+):
+    """
+    Learner submits a reason and sets refund_status to "requested".
+    """
+    transaction = db.query(Transaction).filter(Transaction.id == transaction_id).first()
+
+    if not transaction:
+        raise HTTPException(status_code=404, detail="Transaction not found")
+
+    if transaction.learner_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    if transaction.refund_status != "none":
+        raise HTTPException(status_code=400, detail=f"Refund already {transaction.refund_status}")
+
+    transaction.refund_status = "requested"
+    transaction.refund_reason = data.reason
+    db.commit()
+    db.refresh(transaction)
+
+    return {"message": "Refund requested successfully", "refund_status": transaction.refund_status}

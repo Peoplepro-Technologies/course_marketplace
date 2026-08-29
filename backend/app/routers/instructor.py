@@ -23,6 +23,8 @@ from app.models.lesson import Lesson
 from app.models.review import Review
 from app.models.enrollment import Enrollment
 from app.models.progress import Progress
+from app.models.transaction import Transaction
+from app.models.payout import InstructorPayout
 from app.schemas.course import CourseCreate, CourseUpdate, CourseRead
 from app.schemas.section import SectionCreate, SectionUpdate, SectionRead
 from app.schemas.lesson import LessonCreate, LessonUpdate, LessonRead
@@ -600,14 +602,18 @@ def get_instructor_earnings(
     db: Session = Depends(get_db),
 ):
     """
-    Calculate earnings for the current instructor based on enrollments.
+    Calculate earnings for the current instructor based on valid transactions.
     """
     from collections import defaultdict
 
-    enrollments = (
-        db.query(Enrollment, Course)
-        .join(Course, Enrollment.course_id == Course.id)
+    # Fetch valid transactions (completed, not refunded) for the instructor's courses
+    transactions_data = (
+        db.query(Transaction, InstructorPayout)
+        .join(Course, Transaction.course_id == Course.id)
+        .outerjoin(InstructorPayout, Transaction.included_in_payout_id == InstructorPayout.id)
         .filter(Course.instructor_id == current_user.id)
+        .filter(Transaction.status == "completed")
+        .filter(Transaction.refund_status == "none")
         .all()
     )
 
@@ -615,16 +621,18 @@ def get_instructor_earnings(
     pending_payout = 0
     monthly_data = defaultdict(float)
 
-    for enrollment, course in enrollments:
-        price = float(course.price) if course.price else 0.0
-        total_earnings += price
-        if enrollment.payout_status == "pending":
-            pending_payout += price
+    for transaction, payout in transactions_data:
+        amount = transaction.amount
+        total_earnings += amount
+        
+        # Pending if not included in any payout OR included but payout is still "pending"
+        if transaction.included_in_payout_id is None or (payout and payout.status == "pending"):
+            pending_payout += amount
         
         # Group by month (e.g., 'Jan', 'Feb')
-        if enrollment.enrolled_at:
-            month_abbr = enrollment.enrolled_at.strftime("%b")
-            monthly_data[month_abbr] += price
+        if transaction.created_at:
+            month_abbr = transaction.created_at.strftime("%b")
+            monthly_data[month_abbr] += amount
     
     monthly = [{"month": month, "amount": round(amount, 2)} for month, amount in monthly_data.items()]
 
@@ -633,6 +641,34 @@ def get_instructor_earnings(
         "pending_payout": round(pending_payout, 2),
         "monthly": monthly,
     }
+
+@router.get("/payouts")
+def get_instructor_payouts(
+    current_user: User = Depends(require_role("instructor")),
+    db: Session = Depends(get_db),
+):
+    """
+    Get the payout history for the logged-in instructor.
+    """
+    payouts = (
+        db.query(InstructorPayout)
+        .filter(InstructorPayout.instructor_id == current_user.id)
+        .order_by(InstructorPayout.created_at.desc())
+        .all()
+    )
+    
+    return [
+        {
+            "id": str(p.id),
+            "period_start": p.period_start.isoformat() if p.period_start else None,
+            "period_end": p.period_end.isoformat() if p.period_end else None,
+            "total_amount": p.total_amount,
+            "status": p.status,
+            "created_at": p.created_at.isoformat(),
+            "released_at": p.released_at.isoformat() if p.released_at else None,
+        }
+        for p in payouts
+    ]
 
 
 # ═══════════════════════════════════════════════════════════════════════

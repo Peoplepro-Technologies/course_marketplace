@@ -6,8 +6,12 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../../api/axios';
 import LoadingSpinner from '../../components/LoadingSpinner';
+import useAuth from '../../hooks/useAuth';
 
 export default function UserManagement() {
+  const { primaryRole } = useAuth();
+  const canChangeRole = primaryRole === 'super_admin' || primaryRole === 'sub_admin';
+
   const [data, setData] = useState({ users: [], total: 0, page: 1, page_size: 20 });
   const [loading, setLoading] = useState(true);
 
@@ -30,6 +34,19 @@ export default function UserManagement() {
     } catch (err) {
       console.error(err);
       alert('Failed to update user status');
+    }
+  };
+
+  const handleRoleChange = async (userId, newRole) => {
+    try {
+      await api.put(`/admin/users/${userId}/role`, { new_role: newRole });
+      setData(prev => ({
+        ...prev,
+        users: prev.users.map(u => u.id === userId ? { ...u, role: newRole } : u)
+      }));
+    } catch (err) {
+      console.error(err);
+      alert('Failed to update user role');
     }
   };
 
@@ -64,9 +81,24 @@ export default function UserManagement() {
                 <td>{user.name}</td>
                 <td>{user.email}</td>
                 <td>
-                  <span className={`badge badge-${user.role === 'admin' ? 'danger' : user.role === 'instructor' ? 'warning' : 'primary'}`}>
-                    {user.role}
-                  </span>
+                  {canChangeRole ? (
+                    <select 
+                      value={user.role}
+                      onChange={(e) => handleRoleChange(user.id, e.target.value)}
+                      style={{ padding: '4px', fontSize: '0.85rem', borderRadius: '4px', border: '1px solid #ccc' }}
+                    >
+                      <option value="learner">Learner</option>
+                      <option value="instructor">Instructor</option>
+                      <option value="coursecoordinator">Coordinator</option>
+                      <option value="accounts">Accounts</option>
+                      <option value="sub_admin">Sub Admin</option>
+                      <option value="admin">Admin</option>
+                    </select>
+                  ) : (
+                    <span className={`badge badge-${user.role === 'admin' ? 'danger' : user.role === 'instructor' ? 'warning' : 'primary'}`}>
+                      {user.role}
+                    </span>
+                  )}
                 </td>
                 <td>{new Date(user.created_at).toLocaleDateString()}</td>
                 <td>

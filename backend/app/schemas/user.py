@@ -38,3 +38,6 @@ class UserUpdate(BaseModel):
     name: Optional[str] = None
     profile_pic: Optional[str] = None
     bio: Optional[str] = None
+
+class RoleUpdate(BaseModel):
+    new_role: str

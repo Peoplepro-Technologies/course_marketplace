@@ -21,7 +21,8 @@ from app.models.user import User
 from app.models.course import Course
 from app.models.enrollment import Enrollment
 from app.models.review import Review
-from app.schemas.user import UserRead
+from app.schemas.user import UserRead, RoleUpdate
+from app.auth.keycloak import get_current_user
 from app.schemas.course import CourseRead, CourseModerateAction
 from app.schemas.review import ReviewRead, ReviewModerateAction
 from app.schemas.enrollment import EnrollmentRead
@@ -126,6 +127,44 @@ async def activate_user(
     )
     db.commit()
     return {"message": "User activated", "is_active": True}
+
+
+def require_super_or_sub_admin(current_user: User = Depends(get_current_user)):
+    roles = getattr(current_user, "_realm_roles", [])
+    if "super_admin" not in roles and "sub_admin" not in roles:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied. Super Admin or Sub Admin role required."
+        )
+    return current_user
+
+
+@router.put("/users/{user_id}/role")
+async def update_user_role(
+    user_id: str,
+    data: RoleUpdate,
+    current_user: User = Depends(require_super_or_sub_admin),
+    db: Session = Depends(get_db),
+):
+    """Change a user's role (restricted to super_admin or sub_admin)."""
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    old_role = user.role
+    user.role = data.new_role
+    
+    record_audit_log(
+        db,
+        actor_id=current_user.id,
+        action="role_changed_by_admin",
+        target_type="user",
+        target_id=str(user.id),
+        details={"old_role": old_role, "new_role": data.new_role}
+    )
+    db.commit()
+    return {"message": "User role updated locally. Keycloak sync required.", "role": data.new_role}
+
 
 
 @router.get("/courses")

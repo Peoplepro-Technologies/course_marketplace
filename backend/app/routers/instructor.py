@@ -23,6 +23,7 @@ from app.schemas.course import CourseCreate, CourseUpdate, CourseRead
 from app.schemas.section import SectionCreate, SectionUpdate, SectionRead
 from app.schemas.lesson import LessonCreate, LessonUpdate, LessonRead
 from app.redis_client import invalidate_cache
+from app.config import get_settings
 
 router = APIRouter(prefix="/api/v1/instructor", tags=["Instructor"])
 
@@ -389,13 +390,21 @@ async def upload_lesson_video(
         raise HTTPException(status_code=404, detail="Lesson not found")
 
     # ── Check ffmpeg is available ──────────────────────────────────────
-    if shutil.which("ffmpeg") is None:
-        print("[VIDEO UPLOAD] Failed: ffmpeg not found on PATH.")
+    settings = get_settings()
+    ffmpeg_setting = settings.FFMPEG_PATH or "ffmpeg"
+    ffmpeg_executable = shutil.which(ffmpeg_setting) or (os.path.isfile(ffmpeg_setting) and ffmpeg_setting)
+    if not ffmpeg_executable and os.path.isdir(ffmpeg_setting):
+        candidate = os.path.join(ffmpeg_setting, "ffmpeg.exe" if os.name == "nt" else "ffmpeg")
+        if os.path.isfile(candidate):
+            ffmpeg_executable = candidate
+
+    if not ffmpeg_executable:
+        print("[VIDEO UPLOAD] Failed: ffmpeg not found on PATH or configured FFMPEG_PATH.")
         raise HTTPException(
             status_code=503,
             detail=(
-                "ffmpeg is not installed or not on PATH. "
-                "Install it with: winget install ffmpeg — then restart the server."
+                "ffmpeg is not installed or not found at configured FFMPEG_PATH. "
+                "Install it with: winget install ffmpeg — then restart the server or configure FFMPEG_PATH in backend/.env."
             ),
         )
 
@@ -420,7 +429,7 @@ async def upload_lesson_video(
         import asyncio
         import subprocess
         ffmpeg_cmd = [
-            "ffmpeg", "-y",            # overwrite output
+            ffmpeg_executable, "-y",            # overwrite output
             "-i", raw_path,            # input
             "-c:v", "libx264",         # H.264 video codec
             "-preset", "fast",         # encoding speed
@@ -453,7 +462,7 @@ async def upload_lesson_video(
 
         # ── Extract thumbnail at 1 second ─────────────────────────────
         thumb_cmd = [
-            "ffmpeg", "-y",
+            ffmpeg_executable, "-y",
             "-i", out_path,
             "-ss", "00:00:01",   # seek to 1 second
             "-vframes", "1",     # grab exactly one frame

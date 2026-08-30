@@ -27,6 +27,9 @@ class Settings(BaseSettings):
     KEYCLOAK_REALM: str = "course-marketplace"
     KEYCLOAK_CLIENT_ID: str = "course-frontend"
 
+    # ── FFmpeg ────────────────────────────────────────────────────────
+    FFMPEG_PATH: str = "ffmpeg"
+
     # ── Computed Properties ───────────────────────────────────────────
     @property
     def JWKS_URL(self) -> str:

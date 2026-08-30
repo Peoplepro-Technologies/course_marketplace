@@ -8,6 +8,8 @@
 
 import { useState, useRef } from 'react';
 import api from '../../api/axios';
+import VideoPlayer from '../../components/VideoPlayer';
+import keycloak from '../../auth/keycloak';
 
 export default function LessonForm({ sectionId, existingLesson, onSuccess, orderIndex = 0 }) {
   const isEditing = !!existingLesson;
@@ -80,7 +82,8 @@ export default function LessonForm({ sectionId, existingLesson, onSuccess, order
           const msg = uploadErr.response?.data?.detail || 'Video upload failed';
           setUploadStatus('error');
           setUploadError(msg);
-          // Don't block the overall success — lesson text was saved
+          setSubmitting(false);
+          return; // Stay open so user can see error and retry
         }
       }
 
@@ -139,9 +142,21 @@ export default function LessonForm({ sectionId, existingLesson, onSuccess, order
       <div className="form-group">
         <label>Video File (optional)</label>
         {existingLesson?.video_url && (
-          <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)', marginBottom: '0.5rem' }}>
-            ✓ A video is already attached. Selecting a new file will replace it.
-          </p>
+          <div style={{ marginBottom: '1rem' }}>
+            <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)', marginBottom: '0.5rem' }}>
+              ✓ Current video preview:
+            </p>
+            <VideoPlayer
+              src={
+                existingLesson.video_url.startsWith('/media/videos/')
+                  ? `http://localhost:8000/api/v1/learner/lessons/${existingLesson.id}/video?token=${keycloak.token}`
+                  : `http://localhost:8000/api/v1${existingLesson.video_url}?token=${keycloak.token}`
+              }
+            />
+            <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)', marginBottom: '0.5rem' }}>
+              Selecting a new file will replace the current video.
+            </p>
+          </div>
         )}
         <input
           ref={videoFileRef}

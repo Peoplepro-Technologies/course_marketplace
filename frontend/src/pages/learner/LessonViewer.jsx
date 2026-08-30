@@ -9,6 +9,7 @@ import LoadingSpinner from '../../components/LoadingSpinner';
 import Modal from '../../components/Modal';
 import ReviewForm from './ReviewForm';
 import VideoPlayer from '../../components/VideoPlayer';
+import keycloak from '../../auth/keycloak';
 import './LessonViewer.css';
 
 export default function LessonViewer() {
@@ -23,26 +24,35 @@ export default function LessonViewer() {
   const [reviewModalOpen, setReviewModalOpen] = useState(false);
 
   useEffect(() => {
-    // We need the curriculum and the user's progress. 
-    // Since we don't have a specific endpoint for "learner course detail with progress",
-    // we'll fetch the public course detail, then loop over lessons and construct progress map,
-    // or just track it locally. Actually, learner can fetch public detail. 
-    // Wait, we need an endpoint to get the user's progress. We don't have a GET /learner/progress endpoint.
-    // We'll manage progress locally for the UI based on what we submit, or just show completion toggle.
+    // Fetch the public course detail (sections + lessons structure)
+    const courseDetailPromise = api.get(`/public/courses/${courseId}`);
+    // Fetch persisted progress — this also verifies enrollment (403 if not enrolled)
+    const progressPromise = api.get(`/learner/courses/${courseId}/progress`);
 
-    api.get(`/public/courses/${courseId}`)
-      .then((res) => {
-        setCourse(res.data.course);
-        setSections(res.data.sections);
+    Promise.all([courseDetailPromise, progressPromise])
+      .then(([courseRes, progressRes]) => {
+        setCourse(courseRes.data.course);
+        setSections(courseRes.data.sections);
+        // Restore progress from backend
+        const completedIds = progressRes.data.completed_lesson_ids || [];
+        const progressMap = {};
+        completedIds.forEach((id) => { progressMap[id] = 'completed'; });
+        setProgressData(progressMap);
         // Default to first lesson
-        if (res.data.sections.length > 0 && res.data.sections[0].lessons.length > 0) {
-          setActiveLesson(res.data.sections[0].lessons[0]);
+        if (courseRes.data.sections.length > 0 && courseRes.data.sections[0].lessons.length > 0) {
+          setActiveLesson(courseRes.data.sections[0].lessons[0]);
         }
       })
       .catch((err) => {
-        console.error(err);
-        alert('Could not load course');
-        navigate('/learner');
+        const status = err.response?.status;
+        if (status === 403 || status === 401) {
+          // Not enrolled or not authenticated — redirect to course page
+          navigate(`/courses/${courseId}`);
+        } else {
+          console.error(err);
+          alert('Could not load course');
+          navigate('/learner');
+        }
       })
       .finally(() => setLoading(false));
   }, [courseId, navigate]);
@@ -126,7 +136,11 @@ export default function LessonViewer() {
               {/* Video player — shown above text when lesson has a video */}
               {activeLesson.video_url && (
                 <VideoPlayer
-                  src={`http://localhost:8000${activeLesson.video_url}`}
+                  src={
+                    activeLesson.video_url.startsWith('/media/videos/')
+                      ? `http://localhost:8000/api/v1/learner/lessons/${activeLesson.id}/video?token=${keycloak.token}`
+                      : `http://localhost:8000/api/v1${activeLesson.video_url}?token=${keycloak.token}`
+                  }
                 />
               )}
               {/* Text / markdown content */}

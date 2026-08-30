@@ -10,8 +10,9 @@ import shutil
 import subprocess
 import uuid as uuid_lib
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Body
 from sqlalchemy.orm import Session, joinedload
+from sqlalchemy import func
 
 from app.database import get_db
 from app.auth.roles import require_role
@@ -19,9 +20,16 @@ from app.models.user import User
 from app.models.course import Course
 from app.models.section import Section
 from app.models.lesson import Lesson
+from app.models.review import Review
+from app.models.enrollment import Enrollment
+from app.models.progress import Progress
+from app.models.transaction import Transaction
+from app.models.instructor_payout import InstructorPayout
+from app.models.live_class import LiveClass
 from app.schemas.course import CourseCreate, CourseUpdate, CourseRead
 from app.schemas.section import SectionCreate, SectionUpdate, SectionRead
 from app.schemas.lesson import LessonCreate, LessonUpdate, LessonRead
+from app.schemas.live_class import LiveClassCreate, LiveClassRead
 from app.redis_client import invalidate_cache
 from app.config import get_settings
 
@@ -389,22 +397,46 @@ async def upload_lesson_video(
         print(f"[VIDEO UPLOAD] Failed: Lesson {lesson_id} not found or unauthorized.")
         raise HTTPException(status_code=404, detail="Lesson not found")
 
-    # ── Check ffmpeg is available ──────────────────────────────────────
+    # ── Check ffmpeg is available (check settings, PATH, winget links, or local node_modules) ──
     settings = get_settings()
-    ffmpeg_setting = settings.FFMPEG_PATH or "ffmpeg"
-    ffmpeg_executable = shutil.which(ffmpeg_setting) or (os.path.isfile(ffmpeg_setting) and ffmpeg_setting)
-    if not ffmpeg_executable and os.path.isdir(ffmpeg_setting):
+    ffmpeg_executable = None
+
+    # 1. Configured FFMPEG_PATH in settings
+    ffmpeg_setting = getattr(settings, "FFMPEG_PATH", None) or "ffmpeg"
+    if os.path.isfile(ffmpeg_setting):
+        ffmpeg_executable = ffmpeg_setting
+    elif os.path.isdir(ffmpeg_setting):
         candidate = os.path.join(ffmpeg_setting, "ffmpeg.exe" if os.name == "nt" else "ffmpeg")
         if os.path.isfile(candidate):
             ffmpeg_executable = candidate
+    else:
+        ffmpeg_executable = shutil.which(ffmpeg_setting)
+
+    # 2. Check PATH
+    if not ffmpeg_executable:
+        ffmpeg_executable = shutil.which("ffmpeg")
+
+    # 3. Check standard winget links folder
+    if not ffmpeg_executable:
+        links_ffmpeg = os.path.expandvars(r"%LOCALAPPDATA%\Microsoft\WinGet\Links\ffmpeg.exe")
+        if os.path.exists(links_ffmpeg):
+            ffmpeg_executable = links_ffmpeg
+
+    # 4. Check workspace root node_modules fallback
+    if not ffmpeg_executable:
+        _HERE = os.path.dirname(os.path.abspath(__file__))
+        workspace_root = os.path.normpath(os.path.join(_HERE, "..", "..", ".."))
+        local_ffmpeg = os.path.normpath(os.path.join(workspace_root, "node_modules", "ffmpeg-static", "ffmpeg.exe" if os.name == "nt" else "ffmpeg"))
+        if os.path.exists(local_ffmpeg):
+            ffmpeg_executable = local_ffmpeg
 
     if not ffmpeg_executable:
-        print("[VIDEO UPLOAD] Failed: ffmpeg not found on PATH or configured FFMPEG_PATH.")
+        print("[VIDEO UPLOAD] Failed: ffmpeg not found on PATH, configured FFMPEG_PATH, or local node_modules.")
         raise HTTPException(
             status_code=503,
             detail=(
-                "ffmpeg is not installed or not found at configured FFMPEG_PATH. "
-                "Install it with: winget install ffmpeg — then restart the server or configure FFMPEG_PATH in backend/.env."
+                "ffmpeg is not installed or not found. "
+                "Install it with: winget install ffmpeg — or configure FFMPEG_PATH in backend/.env."
             ),
         )
 
@@ -419,8 +451,8 @@ async def upload_lesson_video(
 
     try:
         with open(raw_path, "wb") as f:
-            content = await video.read()
-            f.write(content)
+            while chunk := await video.read(1024 * 1024):  # 1MB chunks
+                f.write(chunk)
         
         file_size_mb = os.path.getsize(raw_path) / (1024 * 1024)
         print(f"[VIDEO UPLOAD] File saved to {raw_path} (Size: {file_size_mb:.2f} MB)")
@@ -484,7 +516,7 @@ async def upload_lesson_video(
             print("[VIDEO UPLOAD] Warning: Thumbnail generation failed.")
 
         # ── Update the lesson record ───────────────────────────────────────
-        lesson.video_url = f"/media/videos/{lesson_id}.mp4"
+        lesson.video_url = f"/learner/lessons/{lesson_id}/video"
         if thumb_ok:
             lesson.thumbnail_url = f"/media/thumbnails/{lesson_id}.jpg"
 
@@ -507,3 +539,364 @@ async def upload_lesson_video(
         if os.path.exists(raw_path):
             os.remove(raw_path)
             print(f"[VIDEO UPLOAD] Cleaned up raw file: {raw_path}")
+
+
+# ═══════════════════════════════════════════════════════════════════════
+#  REVIEWS
+# ═══════════════════════════════════════════════════════════════════════
+
+@router.get("/reviews")
+def list_instructor_reviews(
+    current_user: User = Depends(require_role("instructor")),
+    db: Session = Depends(get_db),
+):
+    """
+    Return all reviews on courses owned by the current instructor.
+
+    Joins reviews → courses (ownership filter) → users (learner name).
+    """
+    rows = (
+        db.query(Review, Course, User)
+        .join(Course, Review.course_id == Course.id)
+        .join(User, Review.learner_id == User.id)
+        .filter(Course.instructor_id == current_user.id)
+        .order_by(Review.created_at.desc())
+        .all()
+    )
+
+    return [
+        {
+            "id": str(review.id),
+            "course_id": str(course.id),
+            "course_title": course.title,
+            "learner_name": learner.name,
+            "rating": review.rating,
+            "comment": review.comment,
+            "instructor_reply": review.instructor_reply,
+            "status": review.status,
+            "created_at": review.created_at.isoformat(),
+        }
+        for review, course, learner in rows
+    ]
+
+
+@router.put("/reviews/{review_id}/reply")
+def reply_to_review(
+    review_id: str,
+    reply: str = Body(..., embed=True),
+    current_user: User = Depends(require_role("instructor")),
+    db: Session = Depends(get_db),
+):
+    """
+    Set or update the instructor reply on a review.
+
+    - 404 if the review does not exist.
+    - 403 if the review's course does not belong to the current instructor.
+    """
+    review = db.query(Review).filter(Review.id == review_id).first()
+    if not review:
+        raise HTTPException(status_code=404, detail="Review not found")
+
+    # Verify ownership via the course
+    course = db.query(Course).filter(Course.id == review.course_id).first()
+    if not course or course.instructor_id != current_user.id:
+        raise HTTPException(
+            status_code=403,
+            detail="You do not have permission to reply to this review",
+        )
+
+    review.instructor_reply = reply
+    db.commit()
+    db.refresh(review)
+
+    return {
+        "id": str(review.id),
+        "instructor_reply": review.instructor_reply,
+        "message": "Reply saved successfully",
+    }
+
+
+# ═══════════════════════════════════════════════════════════════════════
+#  EARNINGS (STUB — finance module not yet built)
+# ═══════════════════════════════════════════════════════════════════════
+
+@router.get("/earnings")
+def get_instructor_earnings(
+    current_user: User = Depends(require_role("instructor")),
+    db: Session = Depends(get_db),
+):
+    """
+    Calculate earnings for the current instructor based on valid transactions.
+    """
+    from collections import defaultdict
+
+    # Fetch valid transactions (completed, not refunded) for the instructor's courses
+    transactions_data = (
+        db.query(Transaction, InstructorPayout)
+        .join(Course, Transaction.course_id == Course.id)
+        .outerjoin(InstructorPayout, Transaction.included_in_payout_id == InstructorPayout.id)
+        .filter(Course.instructor_id == current_user.id)
+        .filter(Transaction.status == "completed")
+        .filter(Transaction.refund_status == "none")
+        .all()
+    )
+
+    total_earnings = 0
+    pending_payout = 0
+    monthly_data = defaultdict(float)
+
+    for transaction, payout in transactions_data:
+        amount = transaction.amount
+        total_earnings += amount
+        
+        # Pending if not included in any payout OR included but payout is still "pending"
+        if transaction.included_in_payout_id is None or (payout and payout.status == "pending"):
+            pending_payout += amount
+        
+        # Group by month (e.g., 'Jan', 'Feb')
+        if transaction.created_at:
+            month_abbr = transaction.created_at.strftime("%b")
+            monthly_data[month_abbr] += amount
+    
+    monthly = [{"month": month, "amount": round(amount, 2)} for month, amount in monthly_data.items()]
+
+    return {
+        "total_earnings": round(total_earnings, 2),
+        "pending_payout": round(pending_payout, 2),
+        "monthly": monthly,
+    }
+
+@router.get("/payouts")
+def get_instructor_payouts(
+    current_user: User = Depends(require_role("instructor")),
+    db: Session = Depends(get_db),
+):
+    """
+    Get the payout history for the logged-in instructor.
+    """
+    payouts = (
+        db.query(InstructorPayout)
+        .filter(InstructorPayout.instructor_id == current_user.id)
+        .order_by(InstructorPayout.created_at.desc())
+        .all()
+    )
+    
+    return [
+        {
+            "id": str(p.id),
+            "period_start": p.period_start.isoformat() if p.period_start else None,
+            "period_end": p.period_end.isoformat() if p.period_end else None,
+            "total_amount": p.total_amount,
+            "status": p.status,
+            "created_at": p.created_at.isoformat(),
+            "released_at": p.released_at.isoformat() if p.released_at else None,
+        }
+        for p in payouts
+    ]
+
+
+# ═══════════════════════════════════════════════════════════════════════
+#  STUDENTS & PROGRESS
+# ═══════════════════════════════════════════════════════════════════════
+
+@router.get("/courses/{course_id}/students")
+def list_course_students(
+    course_id: str,
+    current_user: User = Depends(require_role("instructor")),
+    db: Session = Depends(get_db),
+):
+    """
+    Return all enrolled learners for a course, with per-learner progress.
+
+    - 403 if the course does not belong to the current instructor.
+    - 404 if the course does not exist.
+    - No schema changes — read-only aggregation over existing tables.
+
+    Completion is defined as progress.status == 'completed' for a lesson
+    that belongs to this course (via lesson → section → course).
+    """
+    # ── Ownership check ───────────────────────────────────────────────
+    course = db.query(Course).filter(Course.id == course_id).first()
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found")
+    if course.instructor_id != current_user.id:
+        raise HTTPException(
+            status_code=403,
+            detail="You do not have permission to view this course's students",
+        )
+
+    # ── Total lessons in this course ──────────────────────────────────
+    total_lessons = (
+        db.query(func.count(Lesson.id))
+        .join(Section, Lesson.section_id == Section.id)
+        .filter(Section.course_id == course_id)
+        .scalar()
+    ) or 0
+
+    # ── Enrolled learners ─────────────────────────────────────────────
+    enrollments = (
+        db.query(Enrollment, User)
+        .join(User, Enrollment.learner_id == User.id)
+        .filter(Enrollment.course_id == course_id)
+        .order_by(Enrollment.enrolled_at.desc())
+        .all()
+    )
+
+    results = []
+    for enrollment, learner in enrollments:
+        # Count completed lessons for this learner in this course
+        completed = (
+            db.query(func.count(Progress.id))
+            .join(Lesson, Progress.lesson_id == Lesson.id)
+            .join(Section, Lesson.section_id == Section.id)
+            .filter(
+                Section.course_id == course_id,
+                Progress.learner_id == learner.id,
+                Progress.status == "completed",
+            )
+            .scalar()
+        ) or 0
+
+        completion_pct = round((completed / total_lessons * 100), 1) if total_lessons > 0 else 0.0
+
+        results.append({
+            "learner_id": str(learner.id),
+            "learner_name": learner.name,
+            "email": learner.email,
+            "enrolled_at": enrollment.enrolled_at.isoformat(),
+            "completed_lessons": completed,
+            "total_lessons": total_lessons,
+            "completion_pct": completion_pct,
+        })
+
+    return {
+        "course_id": course_id,
+        "course_title": course.title,
+        "total_lessons": total_lessons,
+        "students": results,
+    }
+
+
+# ═══════════════════════════════════════════════════════════════════════
+#  LIVE CLASSES
+# ═══════════════════════════════════════════════════════════════════════
+
+@router.post("/courses/{course_id}/live-classes", response_model=LiveClassRead)
+async def schedule_live_class(
+    course_id: str,
+    payload: LiveClassCreate,
+    current_user: User = Depends(require_role("instructor")),
+    db: Session = Depends(get_db),
+):
+    """
+    Schedule a new live class for a course owned by the current instructor.
+    Auto-generates a unique Jitsi room_name.
+    """
+    course = db.query(Course).filter(
+        Course.id == course_id,
+        Course.instructor_id == current_user.id,
+    ).first()
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found or not yours")
+
+    room_name = f"coursemkt-{uuid_lib.uuid4().hex}"
+    live_class = LiveClass(
+        course_id=course.id,
+        instructor_id=current_user.id,
+        title=payload.title,
+        scheduled_at=payload.scheduled_at,
+        duration_minutes=payload.duration_minutes,
+        room_name=room_name,
+        status="scheduled",
+    )
+    db.add(live_class)
+    db.commit()
+    db.refresh(live_class)
+
+    result = LiveClassRead.model_validate(live_class)
+    result.course_title = course.title
+    return result
+
+
+@router.get("/live-classes", response_model=list[LiveClassRead])
+async def list_instructor_live_classes(
+    current_user: User = Depends(require_role("instructor")),
+    db: Session = Depends(get_db),
+):
+    """List all live classes scheduled by this instructor (across all courses)."""
+    from sqlalchemy.orm import joinedload
+    live_classes = (
+        db.query(LiveClass)
+        .options(joinedload(LiveClass.course))
+        .filter(LiveClass.instructor_id == current_user.id)
+        .order_by(LiveClass.scheduled_at.desc())
+        .all()
+    )
+    results = []
+    for lc in live_classes:
+        item = LiveClassRead.model_validate(lc)
+        item.course_title = lc.course.title if lc.course else None
+        results.append(item)
+    return results
+
+
+@router.put("/live-classes/{live_class_id}/start", response_model=LiveClassRead)
+async def start_live_class(
+    live_class_id: str,
+    current_user: User = Depends(require_role("instructor")),
+    db: Session = Depends(get_db),
+):
+    """Mark a scheduled live class as 'live'. Only the owning instructor can do this."""
+    live_class = db.query(LiveClass).filter(
+        LiveClass.id == live_class_id,
+        LiveClass.instructor_id == current_user.id,
+    ).first()
+    if not live_class:
+        raise HTTPException(status_code=404, detail="Live class not found or not yours")
+    if live_class.status == "ended":
+        raise HTTPException(status_code=400, detail="Cannot start a class that has already ended")
+    live_class.status = "live"
+    db.commit()
+    db.refresh(live_class)
+    return LiveClassRead.model_validate(live_class)
+
+
+@router.put("/live-classes/{live_class_id}/end", response_model=LiveClassRead)
+async def end_live_class(
+    live_class_id: str,
+    current_user: User = Depends(require_role("instructor")),
+    db: Session = Depends(get_db),
+):
+    """Mark a live class as 'ended'. Only the owning instructor can do this."""
+    live_class = db.query(LiveClass).filter(
+        LiveClass.id == live_class_id,
+        LiveClass.instructor_id == current_user.id,
+    ).first()
+    if not live_class:
+        raise HTTPException(status_code=404, detail="Live class not found or not yours")
+    if live_class.status != "live":
+        raise HTTPException(status_code=400, detail="Can only end a class that is currently live")
+    live_class.status = "ended"
+    db.commit()
+    db.refresh(live_class)
+    return LiveClassRead.model_validate(live_class)
+
+
+@router.delete("/live-classes/{live_class_id}", status_code=204)
+async def delete_live_class(
+    live_class_id: str,
+    current_user: User = Depends(require_role("instructor")),
+    db: Session = Depends(get_db),
+):
+    """Cancel/delete a scheduled live class. Cannot delete if already live or ended."""
+    live_class = db.query(LiveClass).filter(
+        LiveClass.id == live_class_id,
+        LiveClass.instructor_id == current_user.id,
+    ).first()
+    if not live_class:
+        raise HTTPException(status_code=404, detail="Live class not found or not yours")
+    if live_class.status in ("live", "ended"):
+        raise HTTPException(status_code=400, detail="Can only cancel a scheduled class")
+    db.delete(live_class)
+    db.commit()
+    return None

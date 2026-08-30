@@ -5,14 +5,15 @@
  * If not, redirects to the home page or shows access denied.
  */
 
-import { Navigate } from 'react-router-dom';
 import useAuth from '../hooks/useAuth';
 
 export default function ProtectedRoute({ role, children }) {
-  const { hasRole, authenticated } = useAuth();
+  const { hasRole, authenticated, login } = useAuth();
 
   if (!authenticated) {
-    return <Navigate to="/" replace />;
+    // Trigger the Keycloak login flow so the user is prompted to log in
+    login();
+    return null;
   }
 
   if (role && !hasRole(role)) {

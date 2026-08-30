@@ -59,6 +59,12 @@ class Course(Base):
         back_populates="course",
         cascade="all, delete-orphan",
     )
+    live_classes = relationship(
+        "LiveClass",
+        back_populates="course",
+        cascade="all, delete-orphan",
+        order_by="LiveClass.scheduled_at",
+    )
 
     def __repr__(self):
         return f"<Course {self.title} [{self.status}]>"

@@ -10,8 +10,9 @@ This module:
 from __future__ import annotations
 
 import httpx
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, status, Request, Query
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from typing import Optional
 from jose import jwt, JWTError, jwk
 from jose.utils import base64url_decode
 from sqlalchemy.orm import Session
@@ -19,6 +20,7 @@ from sqlalchemy.orm import Session
 from app.config import get_settings
 from app.database import get_db
 from app.models.user import User
+from app.services.audit import record_audit_log
 
 settings = get_settings()
 
@@ -111,10 +113,10 @@ async def get_current_user(
     name = payload.get("name", payload.get("preferred_username", ""))
     email = payload.get("email", "")
     realm_access = payload.get("realm_access", {})
-    roles = realm_access.get("roles", [])
+    roles = [r.lower() for r in realm_access.get("roles", [])]
 
     # Determine the highest-priority role for this user.
-    # Priority: super_admin > admin > sub_admin > course_coordinator > accounts > instructor > learner
+    # Priority: super_admin > admin > sub_admin > coursecoordinator > accounts > instructor > learner
     # Note: super_admin is stored as "admin" in the local DB for backward compatibility
     # with existing admin queries/logic, but the full realm_roles list is preserved.
     if "super_admin" in roles:
@@ -126,8 +128,8 @@ async def get_current_user(
         role = "admin"
     elif "sub_admin" in roles:
         role = "sub_admin"
-    elif "course_coordinator" in roles:
-        role = "course_coordinator"
+    elif "coursecoordinator" in roles:
+        role = "coursecoordinator"
     elif "accounts" in roles:
         role = "accounts"
     elif "instructor" in roles:
@@ -153,6 +155,14 @@ async def get_current_user(
         # Update role and email if they changed in Keycloak
         changed = False
         if user.role != role:
+            record_audit_log(
+                db,
+                actor_id=user.id,
+                action="role_changed",
+                target_type="user",
+                target_id=str(user.id),
+                details={"old_role": user.role, "new_role": role}
+            )
             user.role = role
             changed = True
         if user.email != email and email:
@@ -167,5 +177,123 @@ async def get_current_user(
 
     # Attach the roles list for use in role-checking dependencies
     user._realm_roles = roles
+
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Account is deactivated.",
+        )
+
+    return user
+
+
+async def get_current_user_from_header_or_query(
+    request: Request,
+    token: Optional[str] = Query(None),
+    db: Session = Depends(get_db),
+) -> User:
+    """
+    Extract the JWT from either the 'Authorization' header or a 'token'
+    query parameter, validate it, and return the database User.
+    """
+    auth_header = request.headers.get("Authorization")
+    token_str = None
+    if auth_header and auth_header.startswith("Bearer "):
+        token_str = auth_header.split(" ")[1]
+    elif token:
+        token_str = token
+
+    if not token_str:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication token required.",
+        )
+
+    jwks = await _get_jwks()
+    rsa_key = _find_rsa_key(token_str, jwks)
+
+    if rsa_key is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Unable to find matching RSA key in JWKS.",
+        )
+
+    try:
+        payload = jwt.decode(
+            token_str,
+            rsa_key,
+            algorithms=["RS256"],
+            issuer=settings.KEYCLOAK_ISSUER,
+            options={"verify_aud": False},
+        )
+    except JWTError as e:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=f"Token validation failed: {str(e)}",
+        )
+
+    sub = payload.get("sub")
+    if not sub:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token missing 'sub' claim.",
+        )
+
+    name = payload.get("name", payload.get("preferred_username", ""))
+    email = payload.get("email", "")
+    realm_access = payload.get("realm_access", {})
+    roles = realm_access.get("roles", [])
+
+    if "super_admin" in roles:
+        role = "admin"
+        if "admin" not in roles:
+            roles = list(roles) + ["admin"]
+    elif "admin" in roles:
+        role = "admin"
+    elif "sub_admin" in roles:
+        role = "sub_admin"
+    elif "course_coordinator" in roles:
+        role = "course_coordinator"
+    elif "accounts" in roles:
+        role = "accounts"
+    elif "instructor" in roles:
+        role = "instructor"
+    else:
+        role = "learner"
+
+    user = db.query(User).filter(User.keycloak_sub == sub).first()
+
+    if user is None:
+        user = User(
+            keycloak_sub=sub,
+            name=name,
+            email=email,
+            role=role,
+        )
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+    else:
+        changed = False
+        if user.role != role:
+            user.role = role
+            changed = True
+        if user.email != email and email:
+            user.email = email
+            changed = True
+        if user.name != name and name:
+            user.name = name
+            changed = True
+        if changed:
+            db.commit()
+            db.refresh(user)
+
+    user._realm_roles = roles
+
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Account is deactivated.",
+        )
 
     return user

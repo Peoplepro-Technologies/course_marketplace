@@ -7,7 +7,7 @@ have a transcoded MP4 video stored at video_url.
 """
 
 import uuid
-from sqlalchemy import Column, String, Text, Integer, ForeignKey
+from sqlalchemy import Column, String, Text, Integer, Boolean, ForeignKey
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
@@ -29,6 +29,7 @@ class Lesson(Base):
     thumbnail_url = Column(String(1000), nullable=True)  # Relative URL to video thumbnail
     order_index = Column(Integer, nullable=False, default=0)
     duration = Column(Integer, nullable=True, default=0)  # Duration in minutes
+    is_preview = Column(Boolean, nullable=False, default=False, server_default="false")  # Free preview lesson
 
     # ── Relationships ─────────────────────────────────────────────────
     section = relationship("Section", back_populates="lessons")

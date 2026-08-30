@@ -6,8 +6,10 @@ Provides:
   - User listing
   - Course listing with moderation actions
   - Review moderation
+  - Enrollment listing and approval/rejection workflow
 """
 
+from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import func
@@ -19,9 +21,14 @@ from app.models.user import User
 from app.models.course import Course
 from app.models.enrollment import Enrollment
 from app.models.review import Review
-from app.schemas.user import UserRead
+from app.schemas.user import UserRead, RoleUpdate
+from app.auth.keycloak import get_current_user
 from app.schemas.course import CourseRead, CourseModerateAction
 from app.schemas.review import ReviewRead, ReviewModerateAction
+from app.schemas.enrollment import EnrollmentRead
+from app.schemas.audit_log import AuditLogRead
+from app.models.audit_log import AuditLog
+from app.services.audit import record_audit_log
 from app.redis_client import invalidate_cache
 
 router = APIRouter(prefix="/api/v1/admin", tags=["Admin"])
@@ -74,6 +81,90 @@ async def list_users(
         "page": page,
         "page_size": page_size,
     }
+
+
+@router.put("/users/{user_id}/deactivate")
+async def deactivate_user(
+    user_id: str,
+    current_user: User = Depends(require_role("admin")),
+    db: Session = Depends(get_db),
+):
+    """Deactivate a user account."""
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    user.is_active = False
+    record_audit_log(
+        db,
+        actor_id=current_user.id,
+        action="account_deactivated",
+        target_type="user",
+        target_id=str(user.id),
+        details={"user_email": user.email}
+    )
+    db.commit()
+    return {"message": "User deactivated", "is_active": False}
+
+
+@router.put("/users/{user_id}/activate")
+async def activate_user(
+    user_id: str,
+    current_user: User = Depends(require_role("admin")),
+    db: Session = Depends(get_db),
+):
+    """Activate a user account."""
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    user.is_active = True
+    record_audit_log(
+        db,
+        actor_id=current_user.id,
+        action="account_activated",
+        target_type="user",
+        target_id=str(user.id),
+        details={"user_email": user.email}
+    )
+    db.commit()
+    return {"message": "User activated", "is_active": True}
+
+
+def require_super_or_sub_admin(current_user: User = Depends(get_current_user)):
+    roles = getattr(current_user, "_realm_roles", [])
+    if "super_admin" not in roles and "sub_admin" not in roles:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied. Super Admin or Sub Admin role required."
+        )
+    return current_user
+
+
+@router.put("/users/{user_id}/role")
+async def update_user_role(
+    user_id: str,
+    data: RoleUpdate,
+    current_user: User = Depends(require_super_or_sub_admin),
+    db: Session = Depends(get_db),
+):
+    """Change a user's role (restricted to super_admin or sub_admin)."""
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    old_role = user.role
+    user.role = data.new_role
+    
+    record_audit_log(
+        db,
+        actor_id=current_user.id,
+        action="role_changed_by_admin",
+        target_type="user",
+        target_id=str(user.id),
+        details={"old_role": old_role, "new_role": data.new_role}
+    )
+    db.commit()
+    return {"message": "User role updated locally. Keycloak sync required.", "role": data.new_role}
+
 
 
 @router.get("/courses")
@@ -140,6 +231,12 @@ async def moderate_course(
     course.status = new_status
     if data.action == "reject" and data.rejection_reason:
         course.rejection_reason = data.rejection_reason
+        
+    if new_status == "published":
+        record_audit_log(db, current_user.id, "course_published", "course", str(course.id))
+    elif new_status == "removed":
+        record_audit_log(db, current_user.id, "course_unpublished", "course", str(course.id))
+
     db.commit()
 
     # Invalidate catalog cache
@@ -157,7 +254,11 @@ async def list_all_reviews(
     db: Session = Depends(get_db),
 ):
     """List all reviews with optional status filter for moderation."""
-    query = db.query(Review, User.name).join(User, Review.learner_id == User.id)
+    query = (
+        db.query(Review, User.name, Course.title)
+        .join(User, Review.learner_id == User.id)
+        .join(Course, Review.course_id == Course.id)
+    )
 
     if status:
         query = query.filter(Review.status == status)
@@ -171,9 +272,10 @@ async def list_all_reviews(
     )
 
     reviews = []
-    for review, learner_name in results:
+    for review, learner_name, course_title in results:
         review_data = ReviewRead.model_validate(review)
         review_data.learner_name = learner_name
+        review_data.course_title = course_title
         reviews.append(review_data)
 
     return {
@@ -218,3 +320,120 @@ async def moderate_review(
     db.commit()
 
     return {"message": f"Review {data.action}d", "status": new_status}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Enrollment management
+# ─────────────────────────────────────────────────────────────────────────────
+
+@router.get("/enrollments")
+async def list_enrollments(
+    status: Optional[str] = Query(None, description="Filter by enrollment status: pending, approved, rejected"),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    current_user: User = Depends(require_role("admin")),
+    db: Session = Depends(get_db),
+):
+    """List all enrollments, optionally filtered by status."""
+    query = db.query(Enrollment)
+    if status:
+        query = query.filter(Enrollment.status == status)
+
+    total = query.count()
+    enrollments = (
+        query
+        .order_by(Enrollment.enrolled_at.desc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+        .all()
+    )
+
+    return {
+        "enrollments": [EnrollmentRead.model_validate(e) for e in enrollments],
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+    }
+
+
+@router.put("/enrollments/{enrollment_id}/approve")
+async def approve_enrollment(
+    enrollment_id: str,
+    current_user: User = Depends(require_role("admin")),
+    db: Session = Depends(get_db),
+):
+    """
+    Approve a pending enrollment, granting the learner access to lesson videos.
+    Sets status to 'approved', records approved_at timestamp and approved_by admin id.
+    """
+    enrollment = db.query(Enrollment).filter(Enrollment.id == enrollment_id).first()
+    if not enrollment:
+        raise HTTPException(status_code=404, detail="Enrollment not found")
+    if enrollment.status == "approved":
+        raise HTTPException(status_code=400, detail="Enrollment is already approved")
+
+    enrollment.status = "approved"
+    enrollment.approved_at = datetime.now(timezone.utc)
+    enrollment.approved_by = current_user.id
+    db.commit()
+
+    return {
+        "message": "Enrollment approved",
+        "enrollment_id": str(enrollment.id),
+        "status": enrollment.status,
+        "approved_at": enrollment.approved_at.isoformat(),
+    }
+
+
+@router.put("/enrollments/{enrollment_id}/reject")
+async def reject_enrollment(
+    enrollment_id: str,
+    current_user: User = Depends(require_role("admin")),
+    db: Session = Depends(get_db),
+):
+    """
+    Reject a pending enrollment, preventing the learner from accessing lesson videos.
+    Sets status to 'rejected'.
+    """
+    enrollment = db.query(Enrollment).filter(Enrollment.id == enrollment_id).first()
+    if not enrollment:
+        raise HTTPException(status_code=404, detail="Enrollment not found")
+    if enrollment.status == "rejected":
+        raise HTTPException(status_code=400, detail="Enrollment is already rejected")
+
+    enrollment.status = "rejected"
+    # Clear any previously set approval metadata on rejection
+    enrollment.approved_at = None
+    enrollment.approved_by = None
+    db.commit()
+
+    return {
+        "message": "Enrollment rejected",
+        "enrollment_id": str(enrollment.id),
+        "status": enrollment.status,
+    }
+
+
+@router.get("/audit-logs")
+async def list_audit_logs(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(50, ge=1, le=100),
+    current_user: User = Depends(require_role("admin")),
+    db: Session = Depends(get_db),
+):
+    """List platform audit logs."""
+    total = db.query(func.count(AuditLog.id)).scalar()
+    logs = (
+        db.query(AuditLog)
+        .order_by(AuditLog.created_at.desc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+        .all()
+    )
+    
+    return {
+        "logs": [AuditLogRead.model_validate(l) for l in logs],
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+    }

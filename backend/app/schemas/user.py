@@ -13,6 +13,7 @@ class UserBase(BaseModel):
     name: str = ""
     email: EmailStr = ""
     role: str = "learner"
+    is_active: bool = True
     profile_pic: Optional[str] = None
     bio: Optional[str] = None
 
@@ -37,3 +38,6 @@ class UserUpdate(BaseModel):
     name: Optional[str] = None
     profile_pic: Optional[str] = None
     bio: Optional[str] = None
+
+class RoleUpdate(BaseModel):
+    new_role: str

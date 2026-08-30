@@ -17,7 +17,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app.database import engine, Base
 from app.models import *  # noqa: F401, F403 — ensures all models are registered
-from app.routers import public, learner, instructor, admin
+from app.routers import public, learner, instructor, admin, coordinator, superadmin, subadmin, accounts
 
 # ── Media directory paths ─────────────────────────────────────────────
 # Resolve relative to this file so it works from any working directory.
@@ -68,14 +68,18 @@ app.add_middleware(
 )
 
 # ── Static file serving for uploaded media ────────────────────────────
-# Videos and thumbnails are served at /media/videos/ and /media/thumbnails/
-app.mount("/media", StaticFiles(directory=MEDIA_ROOT), name="media")
+# Only mount thumbnails publicly. Videos are served securely via a custom endpoint.
+app.mount("/media/thumbnails", StaticFiles(directory=os.path.join(MEDIA_ROOT, "thumbnails")), name="thumbnails")
 
 # ── Routers ───────────────────────────────────────────────────────────
 app.include_router(public.router)
 app.include_router(learner.router)
 app.include_router(instructor.router)
 app.include_router(admin.router)
+app.include_router(coordinator.router)
+app.include_router(superadmin.router)
+app.include_router(accounts.router)
+app.include_router(subadmin.router)
 
 
 # ── Health Check ──────────────────────────────────────────────────────

@@ -7,7 +7,7 @@ Each row corresponds to a Keycloak user, linked via `keycloak_sub` (the
 
 import uuid
 from datetime import datetime, timezone
-from sqlalchemy import Column, String, Text, DateTime
+from sqlalchemy import Column, String, Text, DateTime, Boolean
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
@@ -22,6 +22,7 @@ class User(Base):
     name = Column(String(255), nullable=False, default="")
     email = Column(String(255), nullable=False, default="")
     role = Column(String(50), nullable=False, default="learner")
+    is_active = Column(Boolean, default=True, nullable=False)
     profile_pic = Column(Text, nullable=True)
     bio = Column(Text, nullable=True)
     created_at = Column(
@@ -32,9 +33,15 @@ class User(Base):
 
     # ── Relationships ─────────────────────────────────────────────────
     courses = relationship("Course", back_populates="instructor", lazy="dynamic")
-    enrollments = relationship("Enrollment", back_populates="learner", lazy="dynamic")
+    enrollments = relationship(
+        "Enrollment",
+        back_populates="learner",
+        foreign_keys="Enrollment.learner_id",
+        lazy="dynamic",
+    )
     reviews = relationship("Review", back_populates="learner", lazy="dynamic")
     progress_records = relationship("Progress", back_populates="learner", lazy="dynamic")
+    live_classes = relationship("LiveClass", back_populates="instructor", lazy="dynamic")
 
     def __repr__(self):
         return f"<User {self.name} ({self.role})>"

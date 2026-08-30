@@ -9,7 +9,7 @@
  *   - login/logout/hasRole helpers
  */
 
-import { createContext, useState, useEffect, useCallback } from 'react';
+import { createContext, useState, useEffect, useCallback, useRef } from 'react';
 import keycloak from './keycloak';
 
 export const AuthContext = createContext(null);
@@ -19,12 +19,17 @@ export default function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [roles, setRoles] = useState([]);
   const [loading, setLoading] = useState(true);
+  const isRun = useRef(false);
 
   useEffect(() => {
+    if (isRun.current) return;
+    isRun.current = true;
+
     // Initialize Keycloak with login-required mode and PKCE
     keycloak
       .init({
-        onLoad: 'login-required',
+        onLoad: 'check-sso',
+        silentCheckSsoRedirectUri: window.location.origin + '/silent-check-sso.html',
         pkceMethod: 'S256',
         checkLoginIframe: false,
       })
@@ -34,6 +39,8 @@ export default function AuthProvider({ children }) {
         if (auth && keycloak.tokenParsed) {
           // Extract user info from the token
           const tokenData = keycloak.tokenParsed;
+          console.log("RAW KEYCLOAK TOKEN:", tokenData);
+
           setUser({
             sub: tokenData.sub,
             name: tokenData.name || tokenData.preferred_username || '',
@@ -42,7 +49,8 @@ export default function AuthProvider({ children }) {
           });
 
           // Extract realm roles
-          const realmRoles = tokenData.realm_access?.roles || [];
+          const realmRoles = (tokenData.realm_access?.roles || []).map(r => r.toLowerCase());
+          console.log("EXTRACTED ROLES:", realmRoles);
           setRoles(realmRoles);
         }
 
@@ -78,6 +86,10 @@ export default function AuthProvider({ children }) {
     keycloak.login();
   }, []);
 
+  const register = useCallback(() => {
+    keycloak.register();
+  }, []);
+
   const logout = useCallback(() => {
     keycloak.logout({ redirectUri: window.location.origin });
   }, []);
@@ -89,7 +101,7 @@ export default function AuthProvider({ children }) {
 
   /**
    * Determine the user's primary role for dashboard routing.
-   * Priority: super_admin > admin > sub_admin > course_coordinator > accounts > instructor > learner
+   * Priority: super_admin > admin > sub_admin > coursecoordinator > accounts > instructor > learner
    */
   const primaryRole = roles.includes('super_admin')
     ? 'super_admin'
@@ -97,8 +109,8 @@ export default function AuthProvider({ children }) {
     ? 'admin'
     : roles.includes('sub_admin')
     ? 'sub_admin'
-    : roles.includes('course_coordinator')
-    ? 'course_coordinator'
+    : roles.includes('coursecoordinator')
+    ? 'coursecoordinator'
     : roles.includes('accounts')
     ? 'accounts'
     : roles.includes('instructor')
@@ -112,16 +124,16 @@ export default function AuthProvider({ children }) {
         alignItems: 'center',
         justifyContent: 'center',
         height: '100vh',
-        background: '#0a0a1a',
-        color: '#f0f0ff',
+        background: '#F7F9FA',
+        color: '#1F1F1F',
         fontFamily: 'Inter, sans-serif',
       }}>
         <div style={{ textAlign: 'center' }}>
           <div style={{
             width: '48px',
             height: '48px',
-            border: '3px solid rgba(124, 58, 237, 0.3)',
-            borderTopColor: '#7c3aed',
+            border: '3px solid rgba(0, 86, 210, 0.15)',
+            borderTopColor: '#0056D2',
             borderRadius: '50%',
             animation: 'spin 0.8s linear infinite',
             margin: '0 auto 1rem',
@@ -142,6 +154,7 @@ export default function AuthProvider({ children }) {
         roles,
         primaryRole,
         login,
+        register,
         logout,
         hasRole,
       }}

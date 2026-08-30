@@ -1,0 +1,440 @@
+/* ═══════════════════════════════════════════════════════════════════════
+   SuperAdminDashboard.css — Styles for the Super Admin dashboard widgets
+   and sub-pages. Builds on top of RoleDashboard.css tokens.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* ── Widget grid ──────────────────────────────────────────────────────── */
+.sa-widgets-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: var(--space-xl);
+  margin-bottom: var(--space-3xl);
+}
+
+/* ── Widget card base ─────────────────────────────────────────────────── */
+.sa-widget {
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  padding: var(--space-xl);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  transition: box-shadow var(--transition-base), transform var(--transition-base);
+  opacity: 0;
+  animation: fadeInUp 0.5s ease forwards;
+}
+
+.sa-widget:hover {
+  box-shadow: var(--shadow-glow);
+  transform: translateY(-3px);
+}
+
+.sa-widget:nth-child(1) { animation-delay: 0.05s; }
+.sa-widget:nth-child(2) { animation-delay: 0.10s; }
+.sa-widget:nth-child(3) { animation-delay: 0.15s; }
+.sa-widget:nth-child(4) { animation-delay: 0.20s; }
+
+/* Accent top-border per widget type */
+.sa-widget--users {
+  border-top: 3px solid #6366F1;
+}
+.sa-widget--courses {
+  border-top: 3px solid #0056D2;
+}
+.sa-widget--enrollments {
+  border-top: 3px solid #00A65A;
+}
+.sa-widget--revenue {
+  border-top: 3px solid #F5A623;
+}
+
+/* ── Widget header ────────────────────────────────────────────────────── */
+.sa-widget-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.sa-widget-icon {
+  font-size: 1.25rem;
+  line-height: 1;
+}
+
+.sa-widget-header h3 {
+  font-family: var(--font-heading);
+  font-size: var(--text-base);
+  font-weight: 700;
+  color: var(--color-text-primary);
+  margin: 0;
+}
+
+/* ── Big number stat ──────────────────────────────────────────────────── */
+.sa-stat-number {
+  font-family: var(--font-heading);
+  font-size: 2.75rem;
+  font-weight: 800;
+  line-height: 1;
+  color: var(--color-text-primary);
+  margin-bottom: var(--space-xs);
+}
+
+.sa-widget--users .sa-stat-number {
+  color: #6366F1;
+}
+.sa-widget--courses .sa-stat-number {
+  color: #0056D2;
+}
+.sa-widget--enrollments .sa-stat-number {
+  color: #00A65A;
+}
+.sa-widget--revenue .sa-stat-number {
+  color: #F5A623;
+}
+
+.sa-stat-label {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  margin: 0;
+}
+
+/* ── Section label ────────────────────────────────────────────────────── */
+.sa-section-label {
+  font-family: var(--font-heading);
+  font-size: var(--text-base);
+  font-weight: 700;
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  margin-bottom: var(--space-lg);
+}
+
+/* ── Page header with back button ─────────────────────────────────────── */
+.sa-page-header {
+  margin-bottom: var(--space-xl);
+}
+
+.sa-page-header h2 {
+  font-family: var(--font-heading);
+  font-size: var(--text-2xl);
+  font-weight: 800;
+  color: var(--color-text-primary);
+  margin-bottom: var(--space-xs);
+}
+
+.sa-page-header p {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+/* ── Data table styling ──────────────────────────────────────────────── */
+.sa-table-wrapper {
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  margin-bottom: var(--space-lg);
+  animation: fadeInUp 0.4s ease forwards;
+}
+
+.sa-table-wrapper table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.sa-table-wrapper thead {
+  background: var(--color-bg-tertiary);
+}
+
+.sa-table-wrapper th {
+  padding: 0.75rem 1rem;
+  font-size: var(--text-xs);
+  font-weight: 700;
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  text-align: left;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.sa-table-wrapper td {
+  padding: 0.75rem 1rem;
+  font-size: var(--text-sm);
+  color: var(--color-text-primary);
+  border-bottom: 1px solid var(--color-border);
+  vertical-align: middle;
+}
+
+.sa-table-wrapper tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.sa-table-wrapper tbody tr {
+  transition: background var(--transition-fast);
+}
+
+.sa-table-wrapper tbody tr:hover {
+  background: rgba(0, 86, 210, 0.03);
+}
+
+/* ── Pagination ──────────────────────────────────────────────────────── */
+.sa-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-sm);
+  margin-top: var(--space-md);
+}
+
+.sa-pagination span {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+/* ── Filter bar ──────────────────────────────────────────────────────── */
+.sa-filter-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  margin-bottom: var(--space-lg);
+  flex-wrap: wrap;
+}
+
+.sa-filter-bar select,
+.sa-filter-bar input {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  background: var(--color-bg-input);
+  color: var(--color-text-primary);
+  min-width: 180px;
+  transition: border-color var(--transition-fast);
+}
+
+.sa-filter-bar select:focus,
+.sa-filter-bar input:focus {
+  outline: none;
+  border-color: var(--color-accent-primary);
+  box-shadow: var(--shadow-glow);
+}
+
+/* ── Demo data banner ────────────────────────────────────────────────── */
+.sa-demo-banner {
+  background: linear-gradient(135deg, #FFF7ED 0%, #FEF3C7 100%);
+  border: 1px solid #F5A623;
+  border-radius: var(--radius-md);
+  padding: var(--space-md) var(--space-lg);
+  margin-bottom: var(--space-xl);
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  font-size: var(--text-sm);
+  color: #92400E;
+}
+
+.sa-demo-banner .demo-icon {
+  font-size: 1.25rem;
+  flex-shrink: 0;
+}
+
+/* ── Permission matrix ───────────────────────────────────────────────── */
+.sa-permission-matrix th,
+.sa-permission-matrix td {
+  text-align: center;
+  padding: 0.6rem 0.5rem;
+}
+
+.sa-permission-matrix th:first-child,
+.sa-permission-matrix td:first-child {
+  text-align: left;
+  font-weight: 600;
+  min-width: 160px;
+}
+
+.sa-perm-check {
+  color: #00A65A;
+  font-weight: 700;
+  font-size: 1.1rem;
+}
+
+.sa-perm-x {
+  color: #D1D5DB;
+  font-size: 1.1rem;
+}
+
+/* ── Category form ───────────────────────────────────────────────────── */
+.sa-category-form {
+  display: flex;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-xl);
+  flex-wrap: wrap;
+}
+
+.sa-category-form input {
+  flex: 1;
+  min-width: 200px;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+}
+
+.sa-category-form input:focus {
+  outline: none;
+  border-color: var(--color-accent-primary);
+  box-shadow: var(--shadow-glow);
+}
+
+/* ── Placeholder section ─────────────────────────────────────────────── */
+.sa-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-3xl) var(--space-xl);
+  text-align: center;
+  animation: fadeInUp 0.5s ease forwards;
+}
+
+.sa-placeholder .placeholder-icon {
+  font-size: 4rem;
+  margin-bottom: var(--space-lg);
+  opacity: 0.5;
+}
+
+.sa-placeholder h2 {
+  font-family: var(--font-heading);
+  font-size: var(--text-2xl);
+  font-weight: 700;
+  color: var(--color-text-primary);
+  margin-bottom: var(--space-sm);
+}
+
+.sa-placeholder p {
+  font-size: var(--text-base);
+  color: var(--color-text-muted);
+  max-width: 420px;
+}
+
+/* ── Finance stat cards ──────────────────────────────────────────────── */
+.sa-finance-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: var(--space-lg);
+  margin-bottom: var(--space-2xl);
+}
+
+.sa-finance-card {
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-xl);
+  text-align: center;
+  transition: box-shadow var(--transition-base), transform var(--transition-base);
+  animation: fadeInUp 0.4s ease forwards;
+}
+
+.sa-finance-card:hover {
+  box-shadow: var(--shadow-glow);
+  transform: translateY(-2px);
+}
+
+.sa-finance-card .finance-value {
+  font-family: var(--font-heading);
+  font-size: var(--text-3xl);
+  font-weight: 800;
+  color: var(--color-accent-primary);
+  margin-bottom: var(--space-xs);
+}
+
+.sa-finance-card .finance-label {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+/* ── Audit log details ───────────────────────────────────────────────── */
+.sa-audit-action {
+  display: inline-block;
+  padding: 0.15rem 0.5rem;
+  border-radius: var(--radius-sm);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.sa-audit-action--role_change { background: #EDE9FE; color: #6D28D9; }
+.sa-audit-action--course_status_override { background: #DBEAFE; color: #1D4ED8; }
+.sa-audit-action--course_approved { background: #D1FAE5; color: #065F46; }
+.sa-audit-action--course_rejected { background: #FEE2E2; color: #991B1B; }
+.sa-audit-action--user_deactivated { background: #FEE2E2; color: #991B1B; }
+.sa-audit-action--user_reactivated { background: #D1FAE5; color: #065F46; }
+
+/* ── Role distribution ───────────────────────────────────────────────── */
+.sa-role-bars {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  margin-top: var(--space-lg);
+}
+
+.sa-role-row {
+  display: grid;
+  grid-template-columns: 130px 1fr 40px;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.sa-role-name {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  text-transform: capitalize;
+}
+
+.sa-role-bar-track {
+  height: 10px;
+  background: var(--color-bg-tertiary);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+}
+
+.sa-role-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #6366F1, #0056D2);
+  border-radius: var(--radius-full);
+  min-width: 4px;
+  transition: width 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.sa-role-count {
+  font-size: var(--text-xs);
+  font-weight: 700;
+  color: var(--color-text-secondary);
+  text-align: right;
+}
+
+/* ── Responsive ──────────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .sa-widgets-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .sa-stat-number {
+    font-size: 2rem;
+  }
+
+  .sa-finance-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .sa-filter-bar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .sa-category-form {
+    flex-direction: column;
+  }
+}

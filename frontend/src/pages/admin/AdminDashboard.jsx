@@ -71,6 +71,12 @@ export default function AdminDashboard() {
             {metrics?.flagged_reviews > 0 && <span className="badge badge-danger">{metrics.flagged_reviews} flagged</span>}
           </div>
         </Link>
+
+        <Link to="/admin/audit-logs" className="card flex-col gap-sm">
+          <div style={{ fontSize: '2rem' }}>📜</div>
+          <h4>Audit Logs</h4>
+          <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>View system and administrative actions.</p>
+        </Link>
       </div>
     </div>
   );

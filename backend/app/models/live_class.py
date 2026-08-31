@@ -53,6 +53,13 @@ class LiveClass(Base):
     # ── Relationships ──────────────────────────────────────────────────
     course = relationship("Course", back_populates="live_classes")
     instructor = relationship("User", back_populates="live_classes")
+    transcript = relationship(
+        "Transcript",
+        back_populates="live_class",
+        uselist=False,
+        cascade="all, delete-orphan",
+    )
 
     def __repr__(self):
         return f"<LiveClass {self.title!r} status={self.status}>"
+

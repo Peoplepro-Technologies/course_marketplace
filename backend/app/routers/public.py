@@ -32,6 +32,7 @@ from app.schemas.live_class import JoinInfoRead
 from app.redis_client import get_cache, set_cache
 from app.auth.keycloak import get_current_user
 from app.auth.roles import require_role
+from app.auth.access import ensure_live_class_access
 
 router = APIRouter(prefix="/api/v1/public", tags=["Public"])
 
@@ -260,38 +261,14 @@ def get_live_class_join_info(
     if not live_class:
         raise HTTPException(status_code=404, detail="Live class not found")
 
-    roles = getattr(current_user, "_realm_roles", [])
+    ensure_live_class_access(current_user, live_class, db)
 
-    # Instructor check
-    if "instructor" in roles and live_class.instructor_id == current_user.id:
-        return JoinInfoRead(
-            id=live_class.id,
-            room_name=live_class.room_name,
-            title=live_class.title,
-            scheduled_at=live_class.scheduled_at,
-            duration_minutes=live_class.duration_minutes,
-            status=live_class.status,
-        )
-
-    # Learner with approved enrollment check
-    if "learner" in roles:
-        enrollment = db.query(Enrollment).filter(
-            Enrollment.learner_id == current_user.id,
-            Enrollment.course_id == live_class.course_id,
-            Enrollment.status == "approved",
-        ).first()
-        if enrollment:
-            return JoinInfoRead(
-                id=live_class.id,
-                room_name=live_class.room_name,
-                title=live_class.title,
-                scheduled_at=live_class.scheduled_at,
-                duration_minutes=live_class.duration_minutes,
-                status=live_class.status,
-            )
-
-    raise HTTPException(
-        status_code=status.HTTP_403_FORBIDDEN,
-        detail="You do not have access to this live class",
+    return JoinInfoRead(
+        id=live_class.id,
+        room_name=live_class.room_name,
+        title=live_class.title,
+        scheduled_at=live_class.scheduled_at,
+        duration_minutes=live_class.duration_minutes,
+        status=live_class.status,
     )
 

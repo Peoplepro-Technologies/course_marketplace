@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import videojs from "video.js";
 import "video.js/dist/video-js.css";
 
-export default function VideoPlayer({ src }) {
+export default function VideoPlayer({ src, onPlayerReady }) {
   const containerRef = useRef(null);
   const playerRef = useRef(null);
   const [loading, setLoading] = useState(true);
@@ -25,6 +25,10 @@ export default function VideoPlayer({ src }) {
         playbackRates: [0.5, 1, 1.25, 1.5, 2],
         sources: [{ src, type: "video/mp4" }],
       }));
+
+      if (onPlayerReady) {
+        onPlayerReady(player);
+      }
 
       // Loading state listeners
       player.on("loadstart", () => {
@@ -49,8 +53,12 @@ export default function VideoPlayer({ src }) {
       // Player already exists — just update the source
       const player = playerRef.current;
       player.src({ src, type: "video/mp4" });
+      if (onPlayerReady) {
+        onPlayerReady(player);
+      }
     }
   }, [src]);
+
 
   // Dispose the player on unmount
   useEffect(() => {

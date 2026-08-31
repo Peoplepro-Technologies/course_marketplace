@@ -37,13 +37,41 @@ export default function CourseDetail() {
 
   const isEnrolledAndApproved = enrollmentStatus === 'approved';
 
+  const normalizeId = (id) => String(id || '').replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+
+  // Fetch enrollment status — called on mount and after enroll/re-enroll
+  const fetchEnrollmentStatus = () => {
+    if (!authenticated) return;
+    api.get('/learner/courses')
+      .then((res) => {
+        const target = normalizeId(courseId);
+        const enrollment = res.data.find(
+          (e) => normalizeId(e.course_id) === target
+        );
+        if (enrollment && (enrollment.status === 'approved' || !enrollment.status)) {
+          setEnrollmentStatus('approved');
+        } else if (enrollment) {
+          setEnrollmentStatus(enrollment.status);
+        } else {
+          // Double check with progress endpoint (returns 200 if enrolled & approved, 403 if not)
+          api.get(`/learner/courses/${courseId}/progress`)
+            .then(() => setEnrollmentStatus('approved'))
+            .catch(() => setEnrollmentStatus(null));
+        }
+      })
+      .catch(() => {
+        api.get(`/learner/courses/${courseId}/progress`)
+          .then(() => setEnrollmentStatus('approved'))
+          .catch(() => setEnrollmentStatus(null));
+      });
+  };
+
   useEffect(() => {
     api.get(`/public/courses/${courseId}`)
       .then((res) => {
         setCourse(res.data.course);
         setSections(res.data.sections);
         setReviews(res.data.reviews);
-        // Auto-expand first section
         if (res.data.sections.length > 0) {
           setExpandedSections({ [res.data.sections[0].id]: true });
         }
@@ -51,30 +79,30 @@ export default function CourseDetail() {
       .catch(console.error)
       .finally(() => setLoading(false));
 
-    // Check enrollment status (only if authenticated learner)
-    if (authenticated && primaryRole === 'learner') {
-      api.get('/learner/courses')
-        .then((res) => {
-          const enrollment = res.data.find((e) => e.course_id === courseId);
-          setEnrollmentStatus(enrollment?.status || null);
-        })
-        .catch(() => {});
-        
+    fetchEnrollmentStatus();
+
+    if (authenticated) {
       api.get('/learner/wishlist')
         .then((res) => {
-          setIsWishlisted(res.data.some(w => w.course_id === courseId));
+          const target = normalizeId(courseId);
+          setIsWishlisted(res.data.some(w => normalizeId(w.course_id) === target));
         })
         .catch(() => {});
     }
-  }, [courseId, primaryRole, authenticated]);
+  }, [courseId, authenticated]);
 
   const handleEnroll = async () => {
     setEnrolling(true);
     try {
       await api.post(`/learner/enroll/${courseId}`);
-      setEnrollmentStatus('pending');
+      await fetchEnrollmentStatus();
     } catch (err) {
-      alert(err.response?.data?.detail || 'Enrollment failed');
+      const detail = err.response?.data?.detail || '';
+      if (detail.toLowerCase().includes('already enrolled')) {
+        setEnrollmentStatus('approved');
+      } else {
+        alert(detail || 'Enrollment failed');
+      }
     } finally {
       setEnrolling(false);
     }
@@ -115,7 +143,7 @@ export default function CourseDetail() {
       return;
     }
     if (isEnrolledAndApproved) {
-      navigate(`/learner/courses/${courseId}`);
+      navigate(`/learner/course/${course?.id || courseId}/learn`);
       return;
     }
     // Not accessible — scroll to enroll CTA
@@ -353,7 +381,7 @@ export default function CourseDetail() {
                   <button
                     className="btn btn-success"
                     style={{ width: '100%' }}
-                    onClick={() => navigate(`/learner/courses/${courseId}`)}
+                    onClick={() => navigate(`/learner/course/${course?.id || courseId}/learn`)}
                   >
                     ✓ Enrolled — Start Learning
                   </button>

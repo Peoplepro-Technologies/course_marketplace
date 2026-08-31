@@ -79,6 +79,7 @@ export default function App() {
             {/* ── Public Routes ──────────────────────────────────────── */}
             <Route path="/" element={<HomePage />} />
             <Route path="/course/:courseId" element={<CourseDetail />} />
+            <Route path="/courses/:courseId" element={<CourseDetail />} />
 
             {/* ── Learner Routes ─────────────────────────────────────── */}
             <Route 
@@ -91,6 +92,14 @@ export default function App() {
             />
             <Route 
               path="/learner/course/:courseId/learn" 
+              element={
+                <ProtectedRoute role="learner">
+                  <LessonViewer />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/learner/courses/:courseId" 
               element={
                 <ProtectedRoute role="learner">
                   <LessonViewer />

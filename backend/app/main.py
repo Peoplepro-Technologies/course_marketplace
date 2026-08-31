@@ -17,7 +17,8 @@ from fastapi.staticfiles import StaticFiles
 
 from app.database import engine, Base
 from app.models import *  # noqa: F401, F403 — ensures all models are registered
-from app.routers import public, learner, instructor, admin, coordinator, superadmin, subadmin, accounts
+from app.routers import public, learner, instructor, admin, coordinator, superadmin, subadmin, accounts, transcripts
+
 
 # ── Media directory paths ─────────────────────────────────────────────
 # Resolve relative to this file so it works from any working directory.
@@ -80,6 +81,8 @@ app.include_router(coordinator.router)
 app.include_router(superadmin.router)
 app.include_router(accounts.router)
 app.include_router(subadmin.router)
+app.include_router(transcripts.router)
+
 
 
 # ── Health Check ──────────────────────────────────────────────────────

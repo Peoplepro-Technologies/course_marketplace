@@ -8,7 +8,7 @@ Courses are created by instructors and go through a lifecycle:
 import uuid
 from datetime import datetime, timezone
 from sqlalchemy import Column, String, Text, Float, DateTime, ForeignKey
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import relationship
 
 from app.database import Base
@@ -40,6 +40,8 @@ class Course(Base):
         default=lambda: datetime.now(timezone.utc),
         nullable=False,
     )
+    learning_outcomes = Column(JSONB, nullable=True, default=list)
+    skills = Column(JSONB, nullable=True, default=list)
 
     # ── Relationships ─────────────────────────────────────────────────
     instructor = relationship("User", back_populates="courses")

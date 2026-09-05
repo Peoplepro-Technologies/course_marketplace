@@ -15,6 +15,8 @@ class CourseBase(BaseModel):
     category: str = "General"
     thumbnail_url: Optional[str] = None
     price: float = 0.0
+    learning_outcomes: Optional[List[str]] = []
+    skills: Optional[List[str]] = []
 
 
 class CourseCreate(CourseBase):
@@ -29,6 +31,8 @@ class CourseUpdate(BaseModel):
     category: Optional[str] = None
     thumbnail_url: Optional[str] = None
     price: Optional[float] = None
+    learning_outcomes: Optional[List[str]] = None
+    skills: Optional[List[str]] = None
 
 
 class InstructorInfo(BaseModel):

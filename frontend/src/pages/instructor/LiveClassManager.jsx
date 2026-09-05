@@ -1,18 +1,22 @@
 /**
- * LiveClassManager.jsx — Instructor-side live class management.
+ * LiveClassManager.jsx — Instructor-side live class management with Recording capabilities.
  *
  * Features:
  *   - Schedule new live classes with a form (title, date/time, duration)
- *   - List all scheduled/live/ended classes with status badges
+ *   - List all scheduled/live/ended classes with status & recording badges
  *   - Start / End / Cancel actions per class
- *   - Launches Jitsi room when instructor clicks "Start" or "Re-join"
+ *   - Browser-based Live Recording using MediaRecorder API + getDisplayMedia
+ *   - Manual video file upload for ended sessions
+ *   - Preview uploaded recording using VideoPlayer
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../../api/axios';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import JitsiRoomModal from '../../components/JitsiRoomModal';
+import VideoPlayer from '../../components/VideoPlayer';
+import Modal from '../../components/Modal';
 import keycloak from '../../auth/keycloak';
 
 function formatDateTime(isoStr) {
@@ -41,6 +45,27 @@ function StatusBadge({ status }) {
   );
 }
 
+function RecordingBadge({ status }) {
+  const map = {
+    none: { bg: '#f8fafc', color: '#64748b', label: 'No Recording' },
+    recording: { bg: '#fef2f2', color: '#dc2626', label: '🔴 Recording' },
+    processing: { bg: '#fef3c7', color: '#d97706', label: '⏳ Processing' },
+    ready: { bg: '#dcfce7', color: '#15803d', label: '📹 Ready' },
+    failed: { bg: '#fee2e2', color: '#991b1b', label: '⚠️ Failed' },
+  };
+  const s = map[status] || { bg: '#f8fafc', color: '#64748b', label: status };
+  return (
+    <span style={{
+      background: s.bg, color: s.color,
+      padding: '3px 10px', borderRadius: '999px',
+      fontSize: 'var(--text-xs)', fontWeight: 700,
+      letterSpacing: '0.02em',
+    }}>
+      {s.label}
+    </span>
+  );
+}
+
 export default function LiveClassManager() {
   const [liveClasses, setLiveClasses] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -54,8 +79,22 @@ export default function LiveClassManager() {
   });
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState(null);
-  const [jitsiRoom, setJitsiRoom] = useState(null); // { roomName, displayName }
+  const [jitsiRoom, setJitsiRoom] = useState(null); // { roomName, displayName, liveClass }
   const [actionError, setActionError] = useState({});
+
+  // Recording State
+  const [isRecording, setIsRecording] = useState(false);
+  const [activeRecordingClassId, setActiveRecordingClassId] = useState(null);
+  const [uploadModalClass, setUploadModalClass] = useState(null); // LiveClass object for manual upload
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadError, setUploadError] = useState(null);
+  const [previewClass, setPreviewClass] = useState(null); // LiveClass object for previewing recording
+
+  const mediaRecorderRef = useRef(null);
+  const mediaStreamRef = useRef(null);
+  const recordedChunksRef = useRef([]);
 
   const displayName = keycloak.tokenParsed?.name || keycloak.tokenParsed?.preferred_username || 'Instructor';
 
@@ -82,6 +121,95 @@ export default function LiveClassManager() {
     fetchCourses();
   }, [fetchClasses, fetchCourses]);
 
+  const uploadRecordingFile = async (liveClassId, fileOrBlob, filename) => {
+    setUploading(true);
+    setUploadProgress(0);
+    setUploadError(null);
+
+    const formData = new FormData();
+    formData.append('video', fileOrBlob, filename || 'recording.mp4');
+
+    try {
+      await api.post(`/instructor/live-classes/${liveClassId}/recording`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+        onUploadProgress: (e) => {
+          if (e.total) {
+            const pct = Math.round((e.loaded * 100) / e.total);
+            setUploadProgress(pct);
+          }
+        },
+      });
+      setUploadModalClass(null);
+      setSelectedFile(null);
+      fetchClasses();
+    } catch (err) {
+      console.error('Upload error:', err);
+      setUploadError(err.response?.data?.detail || 'Failed to upload recording.');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const startBrowserRecording = async (liveClassId) => {
+    try {
+      const stream = await navigator.mediaDevices.getDisplayMedia({
+        video: { displaySurface: 'browser' },
+        audio: true,
+      });
+
+      mediaStreamRef.current = stream;
+      recordedChunksRef.current = [];
+
+      let options = { mimeType: 'video/webm;codecs=vp9,opus' };
+      if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+        options = { mimeType: 'video/webm' };
+      }
+
+      const recorder = new MediaRecorder(stream, options);
+      mediaRecorderRef.current = recorder;
+
+      recorder.ondataavailable = (e) => {
+        if (e.data && e.data.size > 0) {
+          recordedChunksRef.current.push(e.data);
+        }
+      };
+
+      recorder.onstop = async () => {
+        const blob = new Blob(recordedChunksRef.current, { type: recorder.mimeType || 'video/webm' });
+        if (stream) {
+          stream.getTracks().forEach(t => t.stop());
+        }
+        setIsRecording(false);
+        setActiveRecordingClassId(null);
+
+        if (blob.size > 0) {
+          alert('Class session recording captured! Uploading to server...');
+          await uploadRecordingFile(liveClassId, blob, `live_recording_${liveClassId}.webm`);
+        }
+      };
+
+      // If user stops sharing stream via browser bar
+      stream.getVideoTracks()[0].onended = () => {
+        if (recorder.state !== 'inactive') {
+          recorder.stop();
+        }
+      };
+
+      recorder.start(1000);
+      setIsRecording(true);
+      setActiveRecordingClassId(liveClassId);
+    } catch (err) {
+      console.error('Screen capture failed:', err);
+      alert('Screen/Tab capture failed or was cancelled: ' + err.message);
+    }
+  };
+
+  const stopBrowserRecording = () => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.stop();
+    }
+  };
+
   const handleSchedule = async (e) => {
     e.preventDefault();
     setFormError(null);
@@ -105,12 +233,14 @@ export default function LiveClassManager() {
     }
   };
 
-  const handleStart = async (lc) => {
+  const handleStart = async (lc, recordOption = false) => {
     try {
       await api.put(`/instructor/live-classes/${lc.id}/start`);
       fetchClasses();
-      // Open Jitsi room
-      setJitsiRoom({ roomName: lc.room_name, displayName });
+      setJitsiRoom({ roomName: lc.room_name, displayName, liveClass: lc });
+      if (recordOption) {
+        startBrowserRecording(lc.id);
+      }
     } catch (err) {
       setActionError(prev => ({ ...prev, [lc.id]: err.response?.data?.detail || 'Failed to start' }));
     }
@@ -119,6 +249,9 @@ export default function LiveClassManager() {
   const handleEnd = async (lc) => {
     if (!window.confirm('End this live session for all participants?')) return;
     try {
+      if (isRecording && activeRecordingClassId === lc.id) {
+        stopBrowserRecording();
+      }
       await api.put(`/instructor/live-classes/${lc.id}/end`);
       fetchClasses();
     } catch (err) {
@@ -137,13 +270,20 @@ export default function LiveClassManager() {
   };
 
   const handleRejoin = (lc) => {
-    setJitsiRoom({ roomName: lc.room_name, displayName });
+    setJitsiRoom({ roomName: lc.room_name, displayName, liveClass: lc });
+  };
+
+  const handleManualUploadSubmit = (e) => {
+    e.preventDefault();
+    if (!selectedFile || !uploadModalClass) return;
+    uploadRecordingFile(uploadModalClass.id, selectedFile, selectedFile.name);
   };
 
   if (loading) return <div className="page-wrapper"><LoadingSpinner /></div>;
 
   return (
     <>
+      {/* Jitsi Room Overlay */}
       {jitsiRoom && (
         <JitsiRoomModal
           roomName={jitsiRoom.roomName}
@@ -152,15 +292,114 @@ export default function LiveClassManager() {
         />
       )}
 
+      {/* Manual Recording Upload Modal */}
+      <Modal
+        isOpen={Boolean(uploadModalClass)}
+        onClose={() => { if (!uploading) setUploadModalClass(null); }}
+        title={`Upload Recording — ${uploadModalClass?.title || ''}`}
+      >
+        <form onSubmit={handleManualUploadSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)', margin: 0 }}>
+            Select a recorded MP4/WebM video file for this live class.
+          </p>
+
+          <div>
+            <label style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 600, marginBottom: '0.4rem' }}>
+              Video File (.mp4, .webm)
+            </label>
+            <input
+              type="file"
+              accept="video/mp4,video/webm,video/*"
+              onChange={(e) => setSelectedFile(e.target.files[0] || null)}
+              disabled={uploading}
+              style={{ width: '100%', fontSize: 'var(--text-sm)' }}
+            />
+          </div>
+
+          {uploading && (
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--text-xs)', marginBottom: '0.2rem' }}>
+                <span>Uploading video…</span>
+                <span>{uploadProgress}%</span>
+              </div>
+              <progress value={uploadProgress} max={100} style={{ width: '100%' }} />
+            </div>
+          )}
+
+          {uploadError && (
+            <p style={{ color: 'var(--color-danger)', fontSize: 'var(--text-sm)', margin: 0 }}>{uploadError}</p>
+          )}
+
+          <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm"
+              onClick={() => setUploadModalClass(null)}
+              disabled={uploading}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="btn btn-primary btn-sm"
+              disabled={!selectedFile || uploading}
+            >
+              {uploading ? 'Uploading...' : 'Upload Video'}
+            </button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Preview Recording Modal */}
+      <Modal
+        isOpen={Boolean(previewClass)}
+        onClose={() => setPreviewClass(null)}
+        title={`Recording Preview — ${previewClass?.title || ''}`}
+      >
+        {previewClass && (
+          <VideoPlayer
+            src={`http://localhost:8000/api/v1/learner/live-classes/${previewClass.id}/recording?token=${keycloak.token}`}
+          />
+        )}
+      </Modal>
+
       <div className="page-wrapper container">
+        {/* Active Recording Notice Banner */}
+        {isRecording && (
+          <div className="card box-glow" style={{
+            marginBottom: '1.5rem', background: '#fef2f2', border: '1.5px solid #ef4444',
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '1rem 1.25rem',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              <span style={{
+                width: 12, height: 12, borderRadius: '50%', background: '#dc2626',
+                boxShadow: '0 0 0 4px rgba(220,38,38,0.25)', display: 'inline-block',
+                animation: 'pulse-live 1.5s infinite',
+              }} />
+              <div>
+                <strong style={{ color: '#991b1b' }}>Session Recording Active</strong>
+                <p style={{ margin: 0, fontSize: 'var(--text-xs)', color: '#7f1d1d' }}>
+                  Capturing instructor browser/tab audio and video. Click "Stop & Upload" when class ends.
+                </p>
+              </div>
+            </div>
+            <button
+              className="btn btn-danger btn-sm"
+              onClick={stopBrowserRecording}
+            >
+              Stop & Upload Recording
+            </button>
+          </div>
+        )}
+
         {/* Header */}
         <div className="section-header flex-between">
           <div>
             <Link to="/instructor" className="btn btn-secondary btn-sm" style={{ marginBottom: '0.5rem' }}>
               ← Back to Dashboard
             </Link>
-            <h2 style={{ marginTop: '0.5rem' }}>🎥 Live Classes</h2>
-            <p>Schedule and host live video sessions for your students.</p>
+            <h2 style={{ marginTop: '0.5rem' }}>🎥 Live Classes & Recordings</h2>
+            <p>Schedule, host, record live video sessions, and upload class recordings for students.</p>
           </div>
           <button
             className="btn btn-primary"
@@ -283,7 +522,8 @@ export default function LiveClassManager() {
                   <th>Course</th>
                   <th>Scheduled At</th>
                   <th>Duration</th>
-                  <th>Status</th>
+                  <th>Session Status</th>
+                  <th>Recording Status</th>
                   <th style={{ textAlign: 'right' }}>Actions</th>
                 </tr>
               </thead>
@@ -299,16 +539,24 @@ export default function LiveClassManager() {
                     <td>{formatDateTime(lc.scheduled_at)}</td>
                     <td>{lc.duration_minutes} min</td>
                     <td><StatusBadge status={lc.status} /></td>
+                    <td><RecordingBadge status={lc.recording_status || 'none'} /></td>
                     <td style={{ textAlign: 'right' }}>
-                      <div className="flex" style={{ gap: '0.5rem', justifyContent: 'flex-end' }}>
+                      <div className="flex" style={{ gap: '0.5rem', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
                         {lc.status === 'scheduled' && (
                           <>
                             <button
                               id={`instructor-start-live-class-${lc.id}`}
                               className="btn btn-success btn-sm"
-                              onClick={() => handleStart(lc)}
+                              onClick={() => handleStart(lc, false)}
                             >
                               ▶ Start
+                            </button>
+                            <button
+                              className="btn btn-primary btn-sm"
+                              onClick={() => handleStart(lc, true)}
+                              title="Start session and capture browser screen/tab recording"
+                            >
+                              🎥 Start & Record
                             </button>
                             <button
                               id={`instructor-cancel-live-class-${lc.id}`}
@@ -328,6 +576,23 @@ export default function LiveClassManager() {
                             >
                               🔴 Re-join Room
                             </button>
+
+                            {!isRecording ? (
+                              <button
+                                className="btn btn-secondary btn-sm"
+                                onClick={() => startBrowserRecording(lc.id)}
+                              >
+                                🔴 Record Screen
+                              </button>
+                            ) : activeRecordingClassId === lc.id ? (
+                              <button
+                                className="btn btn-danger btn-sm"
+                                onClick={stopBrowserRecording}
+                              >
+                                ⏹ Stop Record
+                              </button>
+                            ) : null}
+
                             <button
                               id={`instructor-end-live-class-${lc.id}`}
                               className="btn btn-danger btn-sm"
@@ -338,9 +603,26 @@ export default function LiveClassManager() {
                           </>
                         )}
                         {lc.status === 'ended' && (
-                          <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>
-                            Session ended
-                          </span>
+                          <>
+                            {lc.recording_status === 'ready' && (
+                              <button
+                                className="btn btn-secondary btn-sm"
+                                onClick={() => setPreviewClass(lc)}
+                              >
+                                📹 Watch Recording
+                              </button>
+                            )}
+                            <button
+                              className="btn btn-primary btn-sm"
+                              onClick={() => {
+                                setUploadModalClass(lc);
+                                setUploadError(null);
+                                setSelectedFile(null);
+                              }}
+                            >
+                              {lc.recording_status === 'ready' ? 'Re-upload Recording' : '⬆ Upload Recording'}
+                            </button>
+                          </>
                         )}
                       </div>
                       {actionError[lc.id] && (

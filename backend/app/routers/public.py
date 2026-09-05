@@ -270,5 +270,7 @@ def get_live_class_join_info(
         scheduled_at=live_class.scheduled_at,
         duration_minutes=live_class.duration_minutes,
         status=live_class.status,
+        recording_status=live_class.recording_status or "none",
+        recording_url=live_class.recording_url,
     )
 

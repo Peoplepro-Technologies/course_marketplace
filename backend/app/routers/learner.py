@@ -39,7 +39,7 @@ from app.schemas.refund_request import RefundRequestCreate, RefundRequestRead
 from app.schemas.live_class import LiveClassRead
 from app.schemas.course import CourseRead
 from app.auth.keycloak import get_current_user, get_current_user_from_header_or_query
-from app.auth.access import ensure_lesson_access
+from app.auth.access import ensure_lesson_access, ensure_live_class_access
 from app.workers.tasks import recalculate_course_rating
 
 router = APIRouter(prefix="/api/v1/learner", tags=["Learner"])
@@ -673,6 +673,8 @@ async def request_refund(
 # ═══════════════════════════════════════════════════════════════════════
 #  LIVE CLASSES
 # ═══════════════════════════════════════════════════════════════════════
+#  LIVE CLASSES & RECORDINGS
+# ═══════════════════════════════════════════════════════════════════════
 
 @router.get("/courses/{course_id}/live-classes", response_model=list[LiveClassRead])
 async def list_course_live_classes(
@@ -681,9 +683,8 @@ async def list_course_live_classes(
     db: Session = Depends(get_db),
 ):
     """
-    List upcoming and live classes for an enrolled course.
+    List scheduled, live, and ended classes for an enrolled course.
     Only learners with an 'approved' enrollment for that course may access this.
-    Returns scheduled and live classes (not ended) ordered by scheduled_at ascending.
     """
     # Verify approved enrollment
     enrollment = db.query(Enrollment).filter(
@@ -701,9 +702,8 @@ async def list_course_live_classes(
         db.query(LiveClass)
         .filter(
             LiveClass.course_id == course_id,
-            LiveClass.status.in_(["scheduled", "live"]),
         )
-        .order_by(LiveClass.scheduled_at.asc())
+        .order_by(LiveClass.scheduled_at.desc())
         .all()
     )
 
@@ -712,3 +712,46 @@ async def list_course_live_classes(
         item = LiveClassRead.model_validate(lc)
         results.append(item)
     return results
+
+
+@router.get("/live-classes/{live_class_id}/recording")
+async def get_live_class_recording(
+    live_class_id: str,
+    current_user: User = Depends(get_current_user_from_header_or_query),
+    db: Session = Depends(get_db),
+):
+    """
+    Secure video streaming endpoint for live class recordings.
+    Supports Range requests for seeking in standard video players.
+    Only accessible to:
+    - Instructor who owns the class / staff roles
+    - Learners with an 'approved' enrollment in the parent course
+    Returns 403 if unauthorized, 404 if no recording exists.
+    """
+    live_class = db.query(LiveClass).filter(LiveClass.id == live_class_id).first()
+    if not live_class:
+        raise HTTPException(status_code=404, detail="Live class not found")
+
+    # Authorize access
+    ensure_live_class_access(current_user, live_class, db)
+
+    if live_class.recording_status != "ready":
+        raise HTTPException(status_code=404, detail="Recording is not available for this live class.")
+
+    _HERE = os.path.dirname(os.path.abspath(__file__))
+    _MEDIA_ROOT = os.path.normpath(os.path.join(_HERE, "..", "media"))
+    _RECORDINGS_DIR = os.path.join(_MEDIA_ROOT, "recordings")
+
+    video_path = os.path.join(_RECORDINGS_DIR, f"{live_class_id}.mp4")
+    media_type = "video/mp4"
+
+    if not os.path.exists(video_path):
+        webm_path = os.path.join(_RECORDINGS_DIR, f"{live_class_id}.webm")
+        if os.path.exists(webm_path):
+            video_path = webm_path
+            media_type = "video/webm"
+        else:
+            raise HTTPException(status_code=404, detail="Recording video file not found on server.")
+
+    return FileResponse(video_path, media_type=media_type)
+

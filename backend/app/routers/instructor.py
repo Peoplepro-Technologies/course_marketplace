@@ -26,7 +26,7 @@ from app.models.progress import Progress
 from app.models.transaction import Transaction
 from app.models.instructor_payout import InstructorPayout
 from app.models.live_class import LiveClass
-from app.utils.ffmpeg import get_ffmpeg_executable
+from app.utils.ffmpeg import get_ffmpeg_executable, run_ffmpeg_sync
 from app.services.transcription import transcribe_lesson_video
 from app.schemas.course import CourseCreate, CourseUpdate, CourseRead
 from app.schemas.section import SectionCreate, SectionUpdate, SectionRead
@@ -878,3 +878,94 @@ async def delete_live_class(
     db.delete(live_class)
     db.commit()
     return None
+
+
+@router.post("/live-classes/{live_class_id}/recording", response_model=LiveClassRead)
+async def upload_live_class_recording(
+    live_class_id: str,
+    video: UploadFile = File(...),
+    current_user: User = Depends(require_role("instructor")),
+    db: Session = Depends(get_db),
+):
+    """
+    Upload a recorded video file for a live class.
+    Only the instructor who owns the live class can upload its recording.
+    """
+    live_class = db.query(LiveClass).filter(
+        LiveClass.id == live_class_id,
+        LiveClass.instructor_id == current_user.id,
+    ).first()
+    if not live_class:
+        raise HTTPException(status_code=404, detail="Live class not found or not yours")
+
+    _HERE = os.path.dirname(os.path.abspath(__file__))
+    _MEDIA_ROOT = os.path.normpath(os.path.join(_HERE, "..", "media"))
+    _RECORDINGS_DIR = os.path.join(_MEDIA_ROOT, "recordings")
+    os.makedirs(_RECORDINGS_DIR, exist_ok=True)
+
+    unique_id = str(uuid_lib.uuid4())
+    raw_ext = os.path.splitext(video.filename or "recording.webm")[1] or ".webm"
+    raw_path = os.path.join(_RECORDINGS_DIR, f"{live_class_id}_raw{raw_ext}")
+    out_path = os.path.join(_RECORDINGS_DIR, f"{live_class_id}.mp4")
+
+    try:
+        with open(raw_path, "wb") as f:
+            while chunk := await video.read(1024 * 1024):
+                f.write(chunk)
+
+        # Transcode using FFmpeg if available
+        ffmpeg_executable = get_ffmpeg_executable()
+        if ffmpeg_executable:
+            import asyncio
+            ffmpeg_cmd = [
+                ffmpeg_executable, "-y",
+                "-i", raw_path,
+                "-c:v", "libx264",
+                "-preset", "fast",
+                "-crf", "23",
+                "-c:a", "aac",
+                "-movflags", "+faststart",
+                out_path
+            ]
+            loop = asyncio.get_event_loop()
+            try:
+                returncode, _, _ = await loop.run_in_executor(
+                    None, run_ffmpeg_sync, ffmpeg_cmd, 120
+                )
+                if returncode == 0:
+                    if os.path.exists(raw_path):
+                        os.remove(raw_path)
+                else:
+                    # Fallback: keep raw as output file
+                    if os.path.exists(out_path):
+                        os.remove(out_path)
+                    os.replace(raw_path, out_path)
+            except Exception:
+                if os.path.exists(out_path):
+                    os.remove(out_path)
+                os.replace(raw_path, out_path)
+        else:
+            if os.path.exists(out_path):
+                os.remove(out_path)
+            os.replace(raw_path, out_path)
+
+        live_class.recording_url = f"/learner/live-classes/{live_class_id}/recording"
+        live_class.recording_status = "ready"
+        live_class.recording_uploaded_at = datetime.now(timezone.utc)
+        if live_class.status != "ended":
+            live_class.status = "ended"
+
+        db.commit()
+        db.refresh(live_class)
+
+        result = LiveClassRead.model_validate(live_class)
+        if live_class.course:
+            result.course_title = live_class.course.title
+        return result
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to process recording upload: {str(e)}")
+

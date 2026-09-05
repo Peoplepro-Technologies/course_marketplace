@@ -1,11 +1,12 @@
 /**
- * LearnerLiveClasses.jsx — Learner-side view of live classes.
+ * LearnerLiveClasses.jsx — Learner-side view of live classes and recordings.
  *
  * Features:
- *   - Lists all approved-enrolled courses and their upcoming/live sessions
+ *   - Lists all approved-enrolled courses and their upcoming, live, and ended sessions
  *   - Countdown timer ("Starts in X minutes") for scheduled sessions
- *   - "Join" button enabled only when status is "live"
- *   - Opens Jitsi room in fullscreen modal when Join is clicked
+ *   - "Join" button enabled when status is "live"
+ *   - "Watch Recording" button enabled for ended sessions with a ready recording
+ *   - Opens VideoPlayer in modal to stream recording securely with token auth
  */
 
 import { useState, useEffect, useCallback } from 'react';
@@ -13,6 +14,8 @@ import { Link } from 'react-router-dom';
 import api from '../../api/axios';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import JitsiRoomModal from '../../components/JitsiRoomModal';
+import VideoPlayer from '../../components/VideoPlayer';
+import Modal from '../../components/Modal';
 import keycloak from '../../auth/keycloak';
 
 function useCountdown(scheduledAt) {
@@ -46,9 +49,11 @@ function useCountdown(scheduledAt) {
   return label;
 }
 
-function LiveClassCard({ lc, onJoin }) {
+function LiveClassCard({ lc, onJoin, onWatchRecording }) {
   const countdown = useCountdown(lc.scheduled_at);
   const isLive = lc.status === 'live';
+  const isEnded = lc.status === 'ended';
+  const hasRecording = lc.recording_status === 'ready';
 
   const scheduled = new Date(lc.scheduled_at);
   const dateStr = scheduled.toLocaleString(undefined, {
@@ -86,11 +91,11 @@ function LiveClassCard({ lc, onJoin }) {
       {/* Icon */}
       <div style={{
         width: 48, height: 48, borderRadius: 'var(--radius-md)',
-        background: isLive ? '#dcfce7' : 'var(--color-bg-tertiary)',
+        background: isLive ? '#dcfce7' : isEnded ? '#f1f5f9' : 'var(--color-bg-tertiary)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         fontSize: '1.5rem', flexShrink: 0,
       }}>
-        {isLive ? '🔴' : '🎥'}
+        {isLive ? '🔴' : isEnded ? '📹' : '🎥'}
       </div>
 
       {/* Info */}
@@ -101,28 +106,64 @@ function LiveClassCard({ lc, onJoin }) {
         <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', marginTop: '0.2rem' }}>
           {dateStr} · {lc.duration_minutes} min
         </div>
-        {!isLive && (
+        {lc.status === 'scheduled' && (
           <div style={{ fontSize: 'var(--text-xs)', color: '#0369a1', fontWeight: 600, marginTop: '0.3rem' }}>
             ⏱ {countdown}
           </div>
         )}
+        {isEnded && (
+          <div style={{ fontSize: 'var(--text-xs)', color: hasRecording ? '#15803d' : 'var(--color-text-muted)', fontWeight: 600, marginTop: '0.3rem' }}>
+            {hasRecording ? '✓ Recording Available' : 'Session ended'}
+          </div>
+        )}
       </div>
 
-      {/* Join button */}
-      <button
-        id={`learner-join-live-class-${lc.id}`}
-        className={`btn ${isLive ? 'btn-success' : 'btn-secondary'} btn-sm`}
-        disabled={!isLive}
-        onClick={() => isLive && onJoin(lc)}
-        title={isLive ? 'Join live session' : 'Session not started yet'}
-        style={{
-          minWidth: 90,
-          opacity: isLive ? 1 : 0.55,
-          cursor: isLive ? 'pointer' : 'not-allowed',
-        }}
-      >
-        {isLive ? '▶ Join Now' : 'Not Started'}
-      </button>
+      {/* Action Button */}
+      {isLive && (
+        <button
+          id={`learner-join-live-class-${lc.id}`}
+          className="btn btn-success btn-sm"
+          onClick={() => onJoin(lc)}
+          title="Join live session"
+          style={{ minWidth: 120, cursor: 'pointer' }}
+        >
+          ▶ Join Now
+        </button>
+      )}
+
+      {lc.status === 'scheduled' && (
+        <button
+          id={`learner-join-live-class-${lc.id}`}
+          className="btn btn-secondary btn-sm"
+          disabled
+          title="Session not started yet"
+          style={{ minWidth: 120, opacity: 0.55, cursor: 'not-allowed' }}
+        >
+          Not Started
+        </button>
+      )}
+
+      {isEnded && (
+        hasRecording ? (
+          <button
+            id={`learner-watch-recording-${lc.id}`}
+            className="btn btn-primary btn-sm"
+            onClick={() => onWatchRecording(lc)}
+            title="Watch recorded class session"
+            style={{ minWidth: 130 }}
+          >
+            ▶ Watch Recording
+          </button>
+        ) : (
+          <button
+            className="btn btn-secondary btn-sm"
+            disabled
+            style={{ minWidth: 150, opacity: 0.6, cursor: 'not-allowed' }}
+          >
+            Recording not available
+          </button>
+        )
+      )}
     </div>
   );
 }
@@ -132,6 +173,7 @@ export default function LearnerLiveClasses() {
   const [classesByCourse, setClassesByCourse] = useState({});
   const [loading, setLoading] = useState(true);
   const [jitsiRoom, setJitsiRoom] = useState(null);
+  const [recordingModalClass, setRecordingModalClass] = useState(null);
 
   const displayName = keycloak.tokenParsed?.name || keycloak.tokenParsed?.preferred_username || 'Student';
 
@@ -175,6 +217,10 @@ export default function LearnerLiveClasses() {
     setJitsiRoom({ roomName: lc.room_name, displayName });
   };
 
+  const handleWatchRecording = (lc) => {
+    setRecordingModalClass(lc);
+  };
+
   if (loading) return <div className="page-wrapper"><LoadingSpinner /></div>;
 
   const hasAnyClasses = enrollments.some(e =>
@@ -183,6 +229,7 @@ export default function LearnerLiveClasses() {
 
   return (
     <>
+      {/* Jitsi Meeting Modal */}
       {jitsiRoom && (
         <JitsiRoomModal
           roomName={jitsiRoom.roomName}
@@ -190,6 +237,19 @@ export default function LearnerLiveClasses() {
           onClose={() => setJitsiRoom(null)}
         />
       )}
+
+      {/* Watch Recording Video Modal */}
+      <Modal
+        isOpen={Boolean(recordingModalClass)}
+        onClose={() => setRecordingModalClass(null)}
+        title={`Class Recording — ${recordingModalClass?.title || ''}`}
+      >
+        {recordingModalClass && (
+          <VideoPlayer
+            src={`http://localhost:8000/api/v1/learner/live-classes/${recordingModalClass.id}/recording?token=${keycloak.token}`}
+          />
+        )}
+      </Modal>
 
       {/* Pulse animation */}
       <style>{`
@@ -205,8 +265,8 @@ export default function LearnerLiveClasses() {
             <Link to="/learner" className="btn btn-secondary btn-sm" style={{ marginBottom: '0.5rem' }}>
               ← Back to Dashboard
             </Link>
-            <h2 style={{ marginTop: '0.5rem' }}>🎥 Live Classes</h2>
-            <p>Join live sessions hosted by your instructors.</p>
+            <h2 style={{ marginTop: '0.5rem' }}>🎥 Live Classes & Recordings</h2>
+            <p>Join live sessions hosted by your instructors or watch past recorded sessions.</p>
           </div>
           <button
             className="btn btn-secondary btn-sm"
@@ -221,14 +281,14 @@ export default function LearnerLiveClasses() {
           <div className="empty-state card">
             <div className="empty-icon">🎒</div>
             <h3>No approved enrollments</h3>
-            <p>You need an approved enrollment to view live classes.</p>
+            <p>You need an approved enrollment to view live classes and recordings.</p>
             <Link to="/learner" className="btn btn-primary">Back to Dashboard</Link>
           </div>
         ) : !hasAnyClasses ? (
           <div className="empty-state card">
             <div className="empty-icon">🗓</div>
-            <h3>No upcoming live sessions</h3>
-            <p>Your instructors haven't scheduled any live classes yet. Check back soon!</p>
+            <h3>No live sessions or recordings</h3>
+            <p>Your instructors haven't scheduled any live classes or published recordings yet. Check back soon!</p>
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
@@ -263,7 +323,12 @@ export default function LearnerLiveClasses() {
 
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                     {classes.map(lc => (
-                      <LiveClassCard key={lc.id} lc={lc} onJoin={handleJoin} />
+                      <LiveClassCard
+                        key={lc.id}
+                        lc={lc}
+                        onJoin={handleJoin}
+                        onWatchRecording={handleWatchRecording}
+                      />
                     ))}
                   </div>
                 </div>

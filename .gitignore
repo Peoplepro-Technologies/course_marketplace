@@ -26,4 +26,5 @@ backend/app/media/thumbnails/*
 # Keycloak binary & data
 keycloak-*/
 *.mv.db
-*.trace.db
+*.trace.db
+keycloak-26.7.0/

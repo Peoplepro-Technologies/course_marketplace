@@ -3,7 +3,7 @@
  */
 
 import { useState, useEffect, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import api from '../../api/axios';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import Modal from '../../components/Modal';
@@ -15,6 +15,7 @@ import './LessonViewer.css';
 export default function LessonViewer() {
   const { courseId } = useParams();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const [course, setCourse] = useState(null);
   const [sections, setSections] = useState([]);
@@ -45,9 +46,23 @@ export default function LessonViewer() {
         const progressMap = {};
         completedIds.forEach((id) => { progressMap[id] = 'completed'; });
         setProgressData(progressMap);
-        // Default to first lesson
-        if (courseRes.data.sections.length > 0 && courseRes.data.sections[0].lessons.length > 0) {
-          setActiveLesson(courseRes.data.sections[0].lessons[0]);
+        // Default to lesson from URL or first lesson
+        let defaultLesson = null;
+        const initialLessonId = searchParams.get('lessonId');
+        if (initialLessonId && courseRes.data.sections) {
+          for (const sec of courseRes.data.sections) {
+            const found = sec.lessons?.find(l => String(l.id) === initialLessonId);
+            if (found) {
+              defaultLesson = found;
+              break;
+            }
+          }
+        }
+        if (!defaultLesson && courseRes.data.sections.length > 0 && courseRes.data.sections[0].lessons?.length > 0) {
+          defaultLesson = courseRes.data.sections[0].lessons[0];
+        }
+        if (defaultLesson) {
+          setActiveLesson(defaultLesson);
         }
       })
       .catch((err) => {
@@ -81,6 +96,11 @@ export default function LessonViewer() {
   const handleLessonSelect = (lesson) => {
     setActiveLesson(lesson);
     setSearchQuery('');
+    setSearchParams(params => {
+      params.set('lessonId', lesson.id);
+      params.delete('t');
+      return params;
+    }, { replace: true });
   };
 
   const formatTime = (seconds) => {
@@ -187,7 +207,18 @@ export default function LessonViewer() {
                       ? `http://localhost:8000/api/v1/learner/lessons/${activeLesson.id}/video?token=${keycloak.token}`
                       : `http://localhost:8000/api/v1${activeLesson.video_url}?token=${keycloak.token}`
                   }
-                  onPlayerReady={(p) => { playerRef.current = p; }}
+                  onPlayerReady={(p) => { 
+                    playerRef.current = p; 
+                    const initialSeekTime = searchParams.get('t');
+                    if (initialSeekTime) {
+                      p.currentTime(parseFloat(initialSeekTime));
+                      p.play();
+                      setSearchParams(params => {
+                        params.delete('t');
+                        return params;
+                      }, { replace: true });
+                    }
+                  }}
                 />
               )}
 

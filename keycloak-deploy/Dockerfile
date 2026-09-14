@@ -12,5 +12,6 @@ RUN /opt/keycloak/bin/kc.sh build --http-enabled=true --http-host=0.0.0.0 --prox
 
 EXPOSE 8080
 
-ENTRYPOINT ["/bin/sh", "-c", "/opt/keycloak/bin/kc.sh start --optimized --http-host=0.0.0.0 --http-enabled=true --hostname-strict=false --proxy-headers=xforwarded"]
+ENTRYPOINT ["/opt/keycloak/bin/kc.sh"]
+CMD ["start-dev", "--http-host=0.0.0.0"]
 

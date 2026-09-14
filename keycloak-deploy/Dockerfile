@@ -21,6 +21,5 @@ ENV KC_HOSTNAME_STRICT=false
 
 EXPOSE 8080
 
-ENTRYPOINT ["/opt/keycloak/bin/kc.sh"]
-CMD ["start", "--optimized"]
+ENTRYPOINT ["/opt/keycloak/bin/kc.sh", "start", "--optimized"]
 

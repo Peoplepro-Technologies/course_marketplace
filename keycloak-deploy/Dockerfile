@@ -5,9 +5,8 @@ ENV KC_HEALTH_ENABLED=true
 ENV KC_METRICS_ENABLED=false
 ENV KC_PROXY_HEADERS=xforwarded
 
-# Pre-build Keycloak so the heavy build step runs at IMAGE BUILD TIME
-# (not at container startup), saving RAM on the free hosting tier
-RUN /opt/keycloak/bin/kc.sh build
+# Pre-build Keycloak with HTTP enabled for cloud proxies
+RUN /opt/keycloak/bin/kc.sh build --http-enabled=true --proxy-headers=xforwarded
 
 # ── Runtime image ──────────────────────────────────────────────────────
 FROM quay.io/keycloak/keycloak:26.0.0
@@ -21,5 +20,6 @@ ENV KC_HOSTNAME_STRICT=false
 
 EXPOSE 8080
 
-ENTRYPOINT ["/opt/keycloak/bin/kc.sh", "start", "--optimized"]
+ENTRYPOINT ["/opt/keycloak/bin/kc.sh"]
+CMD ["start", "--optimized", "--http-enabled=true"]
 

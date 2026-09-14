@@ -8,7 +8,7 @@
 import Keycloak from 'keycloak-js';
 
 const keycloak = new Keycloak({
-  url: import.meta.env.VITE_KEYCLOAK_URL || 'https://course-marketplace-1.onrender.com',
+  url: import.meta.env.VITE_KEYCLOAK_URL || 'https://keycloak-26-0-0-96zz.onrender.com',
   realm: import.meta.env.VITE_KEYCLOAK_REALM || 'course-marketplace',
   clientId: import.meta.env.VITE_KEYCLOAK_CLIENT_ID || 'course-frontend',
 });

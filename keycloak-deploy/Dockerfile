@@ -1,12 +1,10 @@
 FROM quay.io/keycloak/keycloak:26.0.0 AS builder
 
-ENV KC_HTTP_ENABLED=true
 ENV KC_HEALTH_ENABLED=true
 ENV KC_METRICS_ENABLED=false
-ENV KC_PROXY_HEADERS=xforwarded
 
-# Pre-build Keycloak with HTTP enabled for cloud proxies
-RUN /opt/keycloak/bin/kc.sh build --http-enabled=true --proxy-headers=xforwarded
+# Pre-build Keycloak image
+RUN /opt/keycloak/bin/kc.sh build
 
 # ── Runtime image ──────────────────────────────────────────────────────
 FROM quay.io/keycloak/keycloak:26.0.0
@@ -21,5 +19,5 @@ ENV KC_HOSTNAME_STRICT=false
 EXPOSE 8080
 
 ENTRYPOINT ["/opt/keycloak/bin/kc.sh"]
-CMD ["start", "--optimized", "--http-enabled=true"]
+CMD ["start", "--http-enabled=true", "--hostname-strict=false", "--proxy-headers=xforwarded"]
 

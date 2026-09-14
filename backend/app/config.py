@@ -23,7 +23,7 @@ class Settings(BaseSettings):
     REDIS_ENABLED: bool = False
 
     # ── Keycloak ──────────────────────────────────────────────────────
-    KEYCLOAK_URL: str = "http://localhost:8080"
+    KEYCLOAK_URL: str = "https://course-marketplace-1.onrender.com"
     KEYCLOAK_REALM: str = "course-marketplace"
     KEYCLOAK_CLIENT_ID: str = "course-frontend"
 

@@ -22,7 +22,7 @@ export default function InstructorRoster() {
     <div className="page-wrapper container animate-fade-in">
       <div className="section-header flex-between">
         <div>
-          <h2>👨‍🏫 Instructor Roster</h2>
+          <h2>Instructor Roster</h2>
           <p>Monitor instructor performance and course statuses.</p>
         </div>
         <Link to="/coordinator" className="btn btn-secondary">
@@ -30,7 +30,7 @@ export default function InstructorRoster() {
         </Link>
       </div>
 
-      {error && <div className="alert alert-error">⚠️ {error}</div>}
+      {error && <div className="alert alert-error">! {error}</div>}
 
       {!error && instructors.length === 0 && (
         <div className="empty-state">

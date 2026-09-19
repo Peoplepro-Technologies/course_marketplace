@@ -17,6 +17,7 @@ import useAuth from '../hooks/useAuth';
 import StarRating from '../components/StarRating';
 import ProgressBar from '../components/ProgressBar';
 import LoadingSpinner from '../components/LoadingSpinner';
+import { Heart, Clock } from 'lucide-react';
 import './CourseDetail.css';
 
 export default function CourseDetail() {
@@ -29,6 +30,7 @@ export default function CourseDetail() {
   const [reviews, setReviews] = useState([]);
   const [loading, setLoading] = useState(true);
   const [enrolling, setEnrolling] = useState(false);
+  const [checkingEnrollment, setCheckingEnrollment] = useState(authenticated && primaryRole === 'learner');
   const [enrollmentStatus, setEnrollmentStatus] = useState(null); // null | "pending" | "approved" | "revoked" | etc.
   const [expandedSections, setExpandedSections] = useState({});
   const [previewLesson, setPreviewLesson] = useState(null); // lesson being previewed inline
@@ -58,7 +60,8 @@ export default function CourseDetail() {
           const enrollment = res.data.find((e) => e.course_id === courseId);
           setEnrollmentStatus(enrollment?.status || null);
         })
-        .catch(() => {});
+        .catch(() => {})
+        .finally(() => setCheckingEnrollment(false));
         
       api.get('/learner/wishlist')
         .then((res) => {
@@ -71,8 +74,8 @@ export default function CourseDetail() {
   const handleEnroll = async () => {
     setEnrolling(true);
     try {
-      await api.post(`/learner/enroll/${courseId}`);
-      setEnrollmentStatus('pending');
+      const res = await api.post(`/learner/enroll/${courseId}`);
+      setEnrollmentStatus(res.data.status || 'approved');
     } catch (err) {
       alert(err.response?.data?.detail || 'Enrollment failed');
     } finally {
@@ -159,7 +162,7 @@ export default function CourseDetail() {
               <h2>Curriculum</h2>
               {!isEnrolledAndApproved && (
                 <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)', marginBottom: '1rem' }}>
-                  🔓 Preview lessons are free. All other lessons require enrollment.
+                   Preview lessons are free. All other lessons require enrollment.
                 </p>
               )}
               {sections.length === 0 ? (
@@ -195,7 +198,7 @@ export default function CourseDetail() {
                                   style={{ cursor: canAccess ? 'pointer' : 'default' }}
                                 >
                                   <span className="lesson-icon">
-                                    {lesson.is_preview ? '▶' : isEnrolledAndApproved ? '📄' : '🔒'}
+                                    {lesson.is_preview ? '▶' : isEnrolledAndApproved ? '' : ''}
                                   </span>
                                   <span className="lesson-title">{lesson.title}</span>
                                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginLeft: 'auto' }}>
@@ -224,13 +227,29 @@ export default function CourseDetail() {
                                     <div style={{ fontWeight: '600', marginBottom: '0.75rem' }}>
                                       ▶ Preview: {lesson.title}
                                     </div>
-                                    {lesson.video_url ? (
-                                      <video
-                                        controls
-                                        style={{ width: '100%', borderRadius: '6px', maxHeight: '360px' }}
-                                        src={`http://localhost:8000/api/v1/public/lessons/${lesson.id}/preview/video`}
-                                      />
-                                    ) : lesson.content ? (
+                                    {lesson.video_url ? (() => {
+                                      const ytMatch = lesson.video_url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([A-Za-z0-9_-]{11})/);
+                                      if (ytMatch) {
+                                        return (
+                                          <div style={{ position: 'relative', paddingTop: '56.25%', borderRadius: '6px', overflow: 'hidden' }}>
+                                            <iframe
+                                              src={`https://www.youtube.com/embed/${ytMatch[1]}`}
+                                              title={lesson.title}
+                                              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                              allowFullScreen
+                                              style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 'none' }}
+                                            />
+                                          </div>
+                                        );
+                                      }
+                                      return (
+                                        <video
+                                          controls
+                                          style={{ width: '100%', borderRadius: '6px', maxHeight: '360px' }}
+                                          src={`http://localhost:8000/api/v1/public/lessons/${lesson.id}/preview/video`}
+                                        />
+                                      );
+                                    })() : lesson.content ? (
                                       <p style={{ whiteSpace: 'pre-wrap', fontSize: 'var(--text-sm)', margin: 0 }}>{lesson.content}</p>
                                     ) : (
                                       <p style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)', margin: 0 }}>
@@ -253,7 +272,7 @@ export default function CourseDetail() {
                               display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                               fontSize: 'var(--text-sm)'
                             }}>
-                              <span>🔒 {section.lessons.filter(l => !l.is_preview).length} lesson{section.lessons.filter(l => !l.is_preview).length !== 1 ? 's' : ''} locked</span>
+                              <span> {section.lessons.filter(l => !l.is_preview).length} lesson{section.lessons.filter(l => !l.is_preview).length !== 1 ? 's' : ''} locked</span>
                               <button
                                 className="btn btn-primary"
                                 style={{ padding: '4px 14px', fontSize: '0.8rem' }}
@@ -314,11 +333,11 @@ export default function CourseDetail() {
               {course.thumbnail_url ? (
                 <img src={course.thumbnail_url} alt={course.title} className="sidebar-thumb" />
               ) : (
-                <div className="sidebar-thumb-placeholder">📚</div>
+                <div className="sidebar-thumb-placeholder"></div>
               )}
 
               <div className="sidebar-price">
-                {course.price > 0 ? `$${course.price.toFixed(2)}` : 'Free'}
+                {course.price > 0 ? `₹${course.price.toFixed(2)}` : 'Free'}
               </div>
 
               <div style={{ marginBottom: '1rem' }}>
@@ -328,8 +347,8 @@ export default function CourseDetail() {
                   onClick={handleWishlistToggle}
                   disabled={togglingWishlist}
                 >
-                  <span style={{ color: isWishlisted ? 'red' : 'inherit' }}>
-                    {isWishlisted ? '❤️' : '🤍'}
+                  <span style={{ color: isWishlisted ? '#e53e3e' : 'inherit', display: 'flex' }}>
+                    <Heart size={16} fill={isWishlisted ? '#e53e3e' : 'transparent'} stroke={isWishlisted ? '#e53e3e' : 'currentColor'} />
                   </span>
                   {isWishlisted ? 'Wishlisted' : 'Add to Wishlist'}
                 </button>
@@ -349,7 +368,11 @@ export default function CourseDetail() {
 
               {/* Authenticated learner */}
               {authenticated && primaryRole === 'learner' && (
-                isEnrolledAndApproved ? (
+                checkingEnrollment ? (
+                  <button className="btn btn-secondary" style={{ width: '100%' }} disabled>
+                    Loading...
+                  </button>
+                ) : isEnrolledAndApproved ? (
                   <button
                     className="btn btn-success"
                     style={{ width: '100%' }}
@@ -359,7 +382,7 @@ export default function CourseDetail() {
                   </button>
                 ) : enrollmentStatus === 'pending' ? (
                   <div style={{ textAlign: 'center', padding: '0.75rem', background: 'rgba(255,150,0,0.1)', borderRadius: '8px', fontSize: 'var(--text-sm)' }}>
-                    ⏳ Enrollment pending approval
+                    Enrollment pending approval
                   </div>
                 ) : (
                   <button
@@ -376,13 +399,13 @@ export default function CourseDetail() {
 
               <div className="sidebar-stats">
                 <div className="sidebar-stat">
-                  <span>📚</span> {totalLessons} Lessons
+                  <span></span> {totalLessons} Lessons
                 </div>
                 <div className="sidebar-stat">
-                  <span>⏱️</span> {totalDuration} Minutes
+                  <span></span> {totalDuration} Minutes
                 </div>
                 <div className="sidebar-stat">
-                  <span>📂</span> {sections.length} Sections
+                  <span></span> {sections.length} Sections
                 </div>
                 <div className="sidebar-stat">
                   <span>⭐</span> {(course.avg_rating || 0).toFixed(1)} Rating

@@ -1,10 +1,32 @@
-"""
+﻿"""
 schemas/lesson.py — Pydantic schemas for Lesson endpoints.
 """
 
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List
 from uuid import UUID
+
+
+class QuizQuestionRead(BaseModel):
+    id: UUID
+    lesson_id: UUID
+    question_text: str
+    options: List[str]
+    correct_option_index: int
+    explanation: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
+class AssignmentRead(BaseModel):
+    id: UUID
+    lesson_id: UUID
+    title: str
+    instructions: str
+
+    class Config:
+        from_attributes = True
 
 
 class LessonBase(BaseModel):
@@ -38,6 +60,8 @@ class LessonRead(LessonBase):
     """Full lesson view."""
     id: UUID
     section_id: UUID
+    quiz_questions: List[QuizQuestionRead] = []
+    assignments: List[AssignmentRead] = []
 
     class Config:
         from_attributes = True

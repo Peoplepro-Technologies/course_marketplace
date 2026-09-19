@@ -14,6 +14,8 @@ import api from '../../api/axios';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import JitsiRoomModal from '../../components/JitsiRoomModal';
 import keycloak from '../../auth/keycloak';
+import { Video, RefreshCw, GraduationCap, Calendar, BookOpen, Clock, Play } from 'lucide-react';
+import EmptyState from '../../components/EmptyState';
 
 function useCountdown(scheduledAt) {
   const [label, setLabel] = useState('');
@@ -88,9 +90,10 @@ function LiveClassCard({ lc, onJoin }) {
         width: 48, height: 48, borderRadius: 'var(--radius-md)',
         background: isLive ? '#dcfce7' : 'var(--color-bg-tertiary)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: '1.5rem', flexShrink: 0,
+        color: isLive ? '#22c55e' : 'var(--color-text-muted)',
+        flexShrink: 0,
       }}>
-        {isLive ? '🔴' : '🎥'}
+        <Video size={24} />
       </div>
 
       {/* Info */}
@@ -102,8 +105,8 @@ function LiveClassCard({ lc, onJoin }) {
           {dateStr} · {lc.duration_minutes} min
         </div>
         {!isLive && (
-          <div style={{ fontSize: 'var(--text-xs)', color: '#0369a1', fontWeight: 600, marginTop: '0.3rem' }}>
-            ⏱ {countdown}
+          <div style={{ fontSize: 'var(--text-xs)', color: '#0369a1', fontWeight: 600, marginTop: '0.3rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <Clock size={12} /> {countdown}
           </div>
         )}
       </div>
@@ -111,17 +114,18 @@ function LiveClassCard({ lc, onJoin }) {
       {/* Join button */}
       <button
         id={`learner-join-live-class-${lc.id}`}
-        className={`btn ${isLive ? 'btn-success' : 'btn-secondary'} btn-sm`}
+        className={`btn ${isLive ? 'btn-success' : 'btn-secondary'} btn-sm flex-center`}
         disabled={!isLive}
         onClick={() => isLive && onJoin(lc)}
         title={isLive ? 'Join live session' : 'Session not started yet'}
         style={{
-          minWidth: 90,
+          minWidth: 100,
           opacity: isLive ? 1 : 0.55,
           cursor: isLive ? 'pointer' : 'not-allowed',
+          gap: '6px'
         }}
       >
-        {isLive ? '▶ Join Now' : 'Not Started'}
+        {isLive && <Play size={14} />} {isLive ? 'Join Now' : 'Not Started'}
       </button>
     </div>
   );
@@ -199,37 +203,34 @@ export default function LearnerLiveClasses() {
         }
       `}</style>
 
-      <div className="page-wrapper container">
-        <div className="section-header flex-between">
+      <div className="page-wrapper">
+        <div className="section-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
-            <Link to="/learner" className="btn btn-secondary btn-sm" style={{ marginBottom: '0.5rem' }}>
-              ← Back to Dashboard
-            </Link>
-            <h2 style={{ marginTop: '0.5rem' }}>🎥 Live Classes</h2>
+            <h2 style={{ marginTop: '0.5rem', display: 'flex', alignItems: 'center', gap: '8px' }}><Video size={24} /> Live Classes</h2>
             <p>Join live sessions hosted by your instructors.</p>
           </div>
           <button
             className="btn btn-secondary btn-sm"
+            style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
             onClick={fetchData}
             id="learner-refresh-live-classes-btn"
           >
-            🔄 Refresh
+            <RefreshCw size={14} /> Refresh
           </button>
         </div>
 
         {enrollments.length === 0 ? (
-          <div className="empty-state card">
-            <div className="empty-icon">🎒</div>
-            <h3>No approved enrollments</h3>
-            <p>You need an approved enrollment to view live classes.</p>
-            <Link to="/learner" className="btn btn-primary">Back to Dashboard</Link>
-          </div>
+          <EmptyState 
+            icon={GraduationCap}
+            title="No approved enrollments"
+            message="You need an approved enrollment to view live classes."
+          />
         ) : !hasAnyClasses ? (
-          <div className="empty-state card">
-            <div className="empty-icon">🗓</div>
-            <h3>No upcoming live sessions</h3>
-            <p>Your instructors haven't scheduled any live classes yet. Check back soon!</p>
-          </div>
+          <EmptyState 
+            icon={Calendar}
+            title="No upcoming live sessions"
+            message="Your instructors haven't scheduled any live classes yet. Check back soon!"
+          />
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
             {enrollments.map(enrollment => {
@@ -253,8 +254,8 @@ export default function LearnerLiveClasses() {
                         width: 36, height: 36, borderRadius: 6,
                         background: 'var(--color-bg-tertiary)',
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        fontSize: '1.1rem',
-                      }}>📚</div>
+                        color: 'var(--color-text-muted)'
+                      }}><BookOpen size={20} /></div>
                     )}
                     <h3 style={{ margin: 0, fontSize: 'var(--text-lg)', fontWeight: 700 }}>
                       {enrollment.course_title}

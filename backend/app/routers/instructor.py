@@ -29,7 +29,9 @@ from app.models.live_class import LiveClass
 from app.schemas.course import CourseCreate, CourseUpdate, CourseRead
 from app.schemas.section import SectionCreate, SectionUpdate, SectionRead
 from app.schemas.lesson import LessonCreate, LessonUpdate, LessonRead
+from app.schemas.lesson import LessonCreate, LessonUpdate, LessonRead
 from app.schemas.live_class import LiveClassCreate, LiveClassRead
+from app.schemas.user import UserRead, UserUpdate
 from app.redis_client import invalidate_cache
 
 router = APIRouter(prefix="/api/v1/instructor", tags=["Instructor"])
@@ -878,3 +880,182 @@ async def delete_live_class(
     db.delete(live_class)
     db.commit()
     return None
+
+
+# ═══════════════════════════════════════════════════════════════════════
+#  QUIZ QUESTIONS
+# ═══════════════════════════════════════════════════════════════════════
+
+@router.post("/lessons/{lesson_id}/quiz-questions")
+async def add_quiz_question(
+    lesson_id: str,
+    payload: dict,
+    current_user: User = Depends(require_role("instructor")),
+    db: Session = Depends(get_db),
+):
+    """Add a quiz question to a lesson the instructor owns."""
+    from app.models.quiz import QuizQuestion
+    lesson = db.query(Lesson).filter(Lesson.id == lesson_id).first()
+    if not lesson:
+        raise HTTPException(status_code=404, detail="Lesson not found")
+    # Verify ownership via section -> course
+    section = db.query(Section).filter(Section.id == lesson.section_id).first()
+    course = db.query(Course).filter(
+        Course.id == section.course_id,
+        Course.instructor_id == current_user.id
+    ).first()
+    if not course:
+        raise HTTPException(status_code=403, detail="Not your course")
+
+    q = QuizQuestion(
+        lesson_id=lesson_id,
+        question_text=payload.get("question_text", ""),
+        options=payload.get("options", []),
+        correct_option_index=payload.get("correct_option_index", 0),
+        explanation=payload.get("explanation", ""),
+    )
+    db.add(q)
+    db.commit()
+    db.refresh(q)
+    return {
+        "id": str(q.id),
+        "lesson_id": str(q.lesson_id),
+        "question_text": q.question_text,
+        "options": q.options,
+        "correct_option_index": q.correct_option_index,
+        "explanation": q.explanation,
+    }
+
+
+@router.get("/lessons/{lesson_id}/quiz-questions")
+async def list_quiz_questions(
+    lesson_id: str,
+    current_user: User = Depends(require_role("instructor")),
+    db: Session = Depends(get_db),
+):
+    """List quiz questions for a lesson."""
+    from app.models.quiz import QuizQuestion
+    questions = db.query(QuizQuestion).filter(QuizQuestion.lesson_id == lesson_id).all()
+    return [
+        {
+            "id": str(q.id),
+            "lesson_id": str(q.lesson_id),
+            "question_text": q.question_text,
+            "options": q.options,
+            "correct_option_index": q.correct_option_index,
+            "explanation": q.explanation,
+        }
+        for q in questions
+    ]
+
+
+@router.delete("/quiz-questions/{question_id}", status_code=204)
+async def delete_quiz_question(
+    question_id: str,
+    current_user: User = Depends(require_role("instructor")),
+    db: Session = Depends(get_db),
+):
+    """Delete a quiz question."""
+    from app.models.quiz import QuizQuestion
+    q = db.query(QuizQuestion).filter(QuizQuestion.id == question_id).first()
+    if not q:
+        raise HTTPException(status_code=404, detail="Question not found")
+    db.delete(q)
+    db.commit()
+    return None
+
+
+# ═══════════════════════════════════════════════════════════════════════
+#  ASSIGNMENTS
+# ═══════════════════════════════════════════════════════════════════════
+
+@router.post("/lessons/{lesson_id}/assignments")
+async def add_assignment(
+    lesson_id: str,
+    payload: dict,
+    current_user: User = Depends(require_role("instructor")),
+    db: Session = Depends(get_db),
+):
+    """Add an assignment to a lesson the instructor owns."""
+    from app.models.assignment import Assignment
+    lesson = db.query(Lesson).filter(Lesson.id == lesson_id).first()
+    if not lesson:
+        raise HTTPException(status_code=404, detail="Lesson not found")
+    section = db.query(Section).filter(Section.id == lesson.section_id).first()
+    course = db.query(Course).filter(
+        Course.id == section.course_id,
+        Course.instructor_id == current_user.id
+    ).first()
+    if not course:
+        raise HTTPException(status_code=403, detail="Not your course")
+
+    a = Assignment(
+        lesson_id=lesson_id,
+        title=payload.get("title", ""),
+        instructions=payload.get("instructions", ""),
+    )
+    db.add(a)
+    db.commit()
+    db.refresh(a)
+    return {"id": str(a.id), "lesson_id": str(a.lesson_id), "title": a.title, "instructions": a.instructions}
+
+
+@router.get("/lessons/{lesson_id}/assignments")
+async def list_assignments(
+    lesson_id: str,
+    current_user: User = Depends(require_role("instructor")),
+    db: Session = Depends(get_db),
+):
+    """List assignments for a lesson."""
+    from app.models.assignment import Assignment
+    assignments = db.query(Assignment).filter(Assignment.lesson_id == lesson_id).all()
+    return [{"id": str(a.id), "lesson_id": str(a.lesson_id), "title": a.title, "instructions": a.instructions} for a in assignments]
+
+
+@router.delete("/assignments/{assignment_id}", status_code=204)
+async def delete_assignment(
+    assignment_id: str,
+    current_user: User = Depends(require_role("instructor")),
+    db: Session = Depends(get_db),
+):
+    """Delete an assignment."""
+    from app.models.assignment import Assignment
+    a = db.query(Assignment).filter(Assignment.id == assignment_id).first()
+    if not a:
+        raise HTTPException(status_code=404, detail="Assignment not found")
+    db.delete(a)
+    db.commit()
+    return None
+
+# ═══════════════════════════════════════════════════════════════════════
+#  PROFILE & PAYOUT
+# ═══════════════════════════════════════════════════════════════════════
+
+@router.get("/profile", response_model=UserRead)
+async def get_instructor_profile(
+    current_user: User = Depends(require_role("instructor")),
+):
+    """Get instructor profile including payout info."""
+    return current_user
+
+@router.put("/profile", response_model=UserRead)
+async def update_instructor_profile(
+    update_data: UserUpdate,
+    current_user: User = Depends(require_role("instructor")),
+    db: Session = Depends(get_db),
+):
+    """Update instructor profile and payout info."""
+    if update_data.name is not None:
+        current_user.name = update_data.name
+    if update_data.bio is not None:
+        current_user.bio = update_data.bio
+    if update_data.profile_pic is not None:
+        current_user.profile_pic = update_data.profile_pic
+    if update_data.payout_account_name is not None:
+        current_user.payout_account_name = update_data.payout_account_name
+    if update_data.payout_account_number is not None:
+        current_user.payout_account_number = update_data.payout_account_number
+        
+    db.commit()
+    db.refresh(current_user)
+    return current_user

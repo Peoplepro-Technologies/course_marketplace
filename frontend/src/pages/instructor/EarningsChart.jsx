@@ -18,6 +18,7 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import api from '../../api/axios';
+import { DollarSign, AlertTriangle, BarChart } from 'lucide-react';
 import './EarningsChart.css';
 
 // ── Placeholder months shown in the empty / loading chart ──────────────
@@ -92,7 +93,9 @@ export default function EarningsChart() {
       {/* ── Header ─────────────────────────────────────────────────── */}
       <div className="section-header flex-between">
         <div>
-          <h2>💰 Earnings</h2>
+          <h2 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <DollarSign size={24} /> Earnings
+          </h2>
           <p>Track your revenue and upcoming payouts.</p>
         </div>
         <Link to="/instructor" className="btn btn-secondary">
@@ -102,8 +105,8 @@ export default function EarningsChart() {
 
       {/* ── Error State ──────────────────────────────────────────────── */}
       {error && (
-        <div className="ec-error-banner">
-          <span>⚠️</span> {error}
+        <div className="ec-error-banner" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <AlertTriangle size={18} /> {error}
         </div>
       )}
 
@@ -142,7 +145,7 @@ export default function EarningsChart() {
         {/* Empty-state overlay — shown only when loaded and no data */}
         {!hasData && !loading && !error && (
           <div className="ec-chart-overlay">
-            <div className="ec-overlay-icon">📊</div>
+            <div className="ec-overlay-icon" style={{ display: 'flex', justifyContent: 'center', marginBottom: '1rem', color: 'var(--color-primary)' }}><BarChart size={48} /></div>
             <h4>No earnings data yet</h4>
             <p>Your revenue chart will populate once you get your first enrollment on a paid course.</p>
           </div>
@@ -205,8 +208,8 @@ export default function EarningsChart() {
         {payoutsLoading ? (
           <p style={{ padding: '20px', textAlign: 'center' }}>Loading payouts...</p>
         ) : payoutsError ? (
-          <div className="ec-error-banner" style={{ margin: '20px' }}>
-            <span>⚠️</span> {payoutsError}
+          <div className="ec-error-banner" style={{ margin: '20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <AlertTriangle size={18} /> {payoutsError}
           </div>
         ) : (
           <div className="table-responsive" style={{ padding: '0 20px 20px' }}>

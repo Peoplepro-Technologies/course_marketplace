@@ -14,6 +14,8 @@ import api from '../../api/axios';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import JitsiRoomModal from '../../components/JitsiRoomModal';
 import keycloak from '../../auth/keycloak';
+import { Video, Calendar, Plus, X, Play, Square, RefreshCcw } from 'lucide-react';
+import EmptyState from '../../components/EmptyState';
 
 function formatDateTime(isoStr) {
   return new Date(isoStr).toLocaleString(undefined, {
@@ -24,9 +26,9 @@ function formatDateTime(isoStr) {
 
 function StatusBadge({ status }) {
   const map = {
-    scheduled: { bg: '#e0f2fe', color: '#0369a1', label: '📅 Scheduled' },
-    live: { bg: '#dcfce7', color: '#166534', label: '🔴 Live' },
-    ended: { bg: '#f1f5f9', color: '#475569', label: '✔ Ended' },
+    scheduled: { bg: '#e0f2fe', color: '#0369a1', label: 'Scheduled' },
+    live: { bg: '#dcfce7', color: '#166534', label: 'Live' },
+    ended: { bg: '#f1f5f9', color: '#475569', label: 'Ended' },
   };
   const s = map[status] || { bg: '#f1f5f9', color: '#475569', label: status };
   return (
@@ -154,20 +156,20 @@ export default function LiveClassManager() {
 
       <div className="page-wrapper container">
         {/* Header */}
-        <div className="section-header flex-between">
+        <div className="section-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
-            <Link to="/instructor" className="btn btn-secondary btn-sm" style={{ marginBottom: '0.5rem' }}>
-              ← Back to Dashboard
-            </Link>
-            <h2 style={{ marginTop: '0.5rem' }}>🎥 Live Classes</h2>
+            <h2 style={{ marginTop: '0.5rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Video size={24} /> Live Classes
+            </h2>
             <p>Schedule and host live video sessions for your students.</p>
           </div>
           <button
-            className="btn btn-primary"
+            className="btn btn-primary flex-center"
+            style={{ gap: '6px' }}
             onClick={() => setShowForm(s => !s)}
             id="instructor-schedule-live-class-btn"
           >
-            {showForm ? '✕ Cancel' : '+ Schedule Live Class'}
+            {showForm ? <><X size={16} /> Cancel</> : <><Plus size={16} /> Schedule Live Class</>}
           </button>
         </div>
 
@@ -244,10 +246,11 @@ export default function LiveClassManager() {
                 <button
                   id="live-class-schedule-submit-btn"
                   type="submit"
-                  className="btn btn-primary"
+                  className="btn btn-primary flex-center"
+                  style={{ gap: '6px' }}
                   disabled={submitting || courses.length === 0}
                 >
-                  {submitting ? 'Scheduling…' : '📅 Schedule Session'}
+                  {submitting ? 'Scheduling…' : <><Calendar size={16} /> Schedule Session</>}
                 </button>
                 <button
                   type="button"
@@ -269,11 +272,11 @@ export default function LiveClassManager() {
 
         {/* Live Classes Table */}
         {liveClasses.length === 0 ? (
-          <div className="empty-state card">
-            <div className="empty-icon">🎥</div>
-            <h3>No live classes yet</h3>
-            <p>Click "Schedule Live Class" to get started.</p>
-          </div>
+          <EmptyState 
+            icon={Video}
+            title="No live classes yet"
+            message="Click 'Schedule Live Class' to get started."
+          />
         ) : (
           <div className="table-wrapper box-glow">
             <table>
@@ -305,10 +308,11 @@ export default function LiveClassManager() {
                           <>
                             <button
                               id={`instructor-start-live-class-${lc.id}`}
-                              className="btn btn-success btn-sm"
+                              className="btn btn-success btn-sm flex-center"
+                              style={{ gap: '4px' }}
                               onClick={() => handleStart(lc)}
                             >
-                              ▶ Start
+                              <Play size={14} /> Start
                             </button>
                             <button
                               id={`instructor-cancel-live-class-${lc.id}`}
@@ -323,17 +327,19 @@ export default function LiveClassManager() {
                           <>
                             <button
                               id={`instructor-rejoin-live-class-${lc.id}`}
-                              className="btn btn-primary btn-sm"
+                              className="btn btn-primary btn-sm flex-center"
+                              style={{ gap: '4px' }}
                               onClick={() => handleRejoin(lc)}
                             >
-                              🔴 Re-join Room
+                              <RefreshCcw size={14} /> Re-join Room
                             </button>
                             <button
                               id={`instructor-end-live-class-${lc.id}`}
-                              className="btn btn-danger btn-sm"
+                              className="btn btn-danger btn-sm flex-center"
+                              style={{ gap: '4px' }}
                               onClick={() => handleEnd(lc)}
                             >
-                              ■ End Session
+                              <Square size={14} /> End Session
                             </button>
                           </>
                         )}

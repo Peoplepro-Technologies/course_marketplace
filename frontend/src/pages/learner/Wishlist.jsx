@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../../api/axios';
 import LoadingSpinner from '../../components/LoadingSpinner';
+import EmptyState from '../../components/EmptyState';
+import { BookOpen, HeartOff } from 'lucide-react';
 
 export default function Wishlist() {
   const [wishlist, setWishlist] = useState([]);
@@ -35,29 +37,30 @@ export default function Wishlist() {
 
   return (
     <div className="page-wrapper">
-      <div className="container animate-fade-in">
-        <h1 style={{ marginBottom: '2rem' }}>My Wishlist</h1>
-        
-        {wishlist.length === 0 ? (
-          <div className="card text-center" style={{ padding: '3rem' }}>
-            <p>Your wishlist is empty.</p>
-            <Link to="/courses" className="btn btn-primary" style={{ marginTop: '1rem', display: 'inline-block' }}>
-              Explore Courses
-            </Link>
-          </div>
-        ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1.5rem' }}>
-            {wishlist.map(item => (
-              <div key={item.id} className="card-glass" style={{ display: 'flex', flexDirection: 'column' }}>
-                {item.course_thumbnail ? (
-                  <img src={item.course_thumbnail} alt={item.course_title} style={{ width: '100%', height: '160px', objectFit: 'cover', borderRadius: '8px 8px 0 0' }} />
-                ) : (
-                  <div style={{ width: '100%', height: '160px', background: 'var(--color-bg-secondary)', borderRadius: '8px 8px 0 0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <span style={{ fontSize: '2rem' }}>📚</span>
-                  </div>
-                )}
-                
-                <div style={{ padding: '1rem', display: 'flex', flexDirection: 'column', flexGrow: 1 }}>
+      <div className="section-header">
+        <h2>My Wishlist</h2>
+        <p>Courses you've saved for later</p>
+      </div>
+      
+      {wishlist.length === 0 ? (
+        <EmptyState 
+          icon={HeartOff}
+          title="Your wishlist is empty"
+          message="Save courses you're interested in by clicking the heart icon on the course page."
+        />
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1.5rem' }}>
+          {wishlist.map(item => (
+            <div key={item.id} className="dashboard-card" style={{ display: 'flex', flexDirection: 'column', padding: 0, overflow: 'hidden' }}>
+              {item.course_thumbnail ? (
+                <img src={item.course_thumbnail} alt={item.course_title} style={{ width: '100%', height: '160px', objectFit: 'cover' }} />
+              ) : (
+                <div style={{ width: '100%', height: '160px', background: 'var(--color-bg-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-muted)' }}>
+                  <BookOpen size={48} strokeWidth={1} />
+                </div>
+              )}
+              
+              <div style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', flexGrow: 1 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
                     <span className="badge badge-primary" style={{ fontSize: '0.75rem' }}>{item.course_category}</span>
                     <span style={{ fontWeight: 'bold' }}>${item.course_price}</span>
@@ -71,12 +74,12 @@ export default function Wishlist() {
                       View Course
                     </Link>
                     <button 
-                      className="btn btn-outline" 
+                      className="btn btn-outline flex-center" 
                       onClick={() => removeFromWishlist(item.course_id)}
-                      style={{ padding: '0.5rem 1rem' }}
+                      style={{ padding: '0.5rem', width: '40px' }}
                       title="Remove from Wishlist"
                     >
-                      ❤️
+                      <HeartOff size={18} />
                     </button>
                   </div>
                 </div>
@@ -84,7 +87,6 @@ export default function Wishlist() {
             ))}
           </div>
         )}
-      </div>
     </div>
   );
 }

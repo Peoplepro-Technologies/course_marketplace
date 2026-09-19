@@ -6,6 +6,7 @@
  */
 
 import SASidebarLayout from './SASidebarLayout';
+import { Lock, Check } from 'lucide-react';
 
 const ROLES = [
   'Learner',
@@ -43,7 +44,7 @@ export default function SARolesPermissions() {
   return (
     <SASidebarLayout>
       <div className="sa-page-header">
-        <h2>🔐 Roles & Permissions</h2>
+        <h2>Roles & Permissions</h2>
         <p>Read-only view of what each role can access on the platform.</p>
       </div>
 
@@ -64,7 +65,7 @@ export default function SARolesPermissions() {
                 {roleKeys.map(key => (
                   <td key={key}>
                     {perm[key]
-                      ? <span className="sa-perm-check">✓</span>
+                      ? <span className="sa-perm-check"><Check size={14} strokeWidth={3} /></span>
                       : <span className="sa-perm-x">—</span>
                     }
                   </td>

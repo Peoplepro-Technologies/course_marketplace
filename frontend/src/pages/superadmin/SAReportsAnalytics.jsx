@@ -31,7 +31,7 @@ export default function SAReportsAnalytics() {
   return (
     <SASidebarLayout>
       <div className="sa-page-header">
-        <h2>📈 Reports & Analytics</h2>
+        <h2>Reports & Analytics</h2>
         <p>In-depth metrics and distribution stats across the platform.</p>
       </div>
 

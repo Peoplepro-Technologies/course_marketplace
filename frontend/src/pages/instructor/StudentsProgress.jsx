@@ -10,6 +10,8 @@ import { useState, useEffect } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import api from '../../api/axios';
 import LoadingSpinner from '../../components/LoadingSpinner';
+import EmptyState from '../../components/EmptyState';
+import { Users, GraduationCap, AlertTriangle } from 'lucide-react';
 import './StudentsProgress.css';
 
 function ProgressBar({ pct }) {
@@ -50,12 +52,14 @@ export default function StudentsProgress() {
   if (loading) return <div className="page-wrapper"><LoadingSpinner /></div>;
 
   return (
-    <div className="page-wrapper container animate-fade-in">
+    <div className="page-wrapper">
 
       {/* ── Header ─────────────────────────────────────────────────── */}
       <div className="section-header flex-between">
         <div>
-          <h2>👥 Students & Progress</h2>
+          <h2 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Users size={24} /> Students & Progress
+          </h2>
           {data && (
             <p>
               <strong>{data.course_title}</strong> &nbsp;·&nbsp;
@@ -71,16 +75,18 @@ export default function StudentsProgress() {
 
       {/* ── Error ──────────────────────────────────────────────────── */}
       {error && (
-        <div className="sp-alert sp-alert-error">⚠️ {error}</div>
+        <div className="sp-alert sp-alert-error" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <AlertTriangle size={18} /> {error}
+        </div>
       )}
 
       {/* ── Empty state ─────────────────────────────────────────────── */}
       {!error && data?.students.length === 0 && (
-        <div className="empty-state sp-empty">
-          <div className="empty-icon">🎓</div>
-          <h3>No students enrolled yet</h3>
-          <p>Learners will appear here once they enrol in this course.</p>
-        </div>
+        <EmptyState 
+          icon={GraduationCap}
+          title="No students enrolled yet"
+          message="Learners will appear here once they enrol in this course."
+        />
       )}
 
       {/* ── Table ───────────────────────────────────────────────────── */}

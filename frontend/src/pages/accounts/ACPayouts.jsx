@@ -4,7 +4,7 @@
  * Shows per-instructor estimated earnings with a "Mark as Paid" button
  * that records a payout timestamp in the DB (no real payment processed).
  *
- * ⚠️ SIMPLIFIED: Earnings = course.price × approved enrollments, 20% flat fee.
+ * ! SIMPLIFIED: Earnings = course.price × approved enrollments, 20% flat fee.
  */
 
 import { useState, useEffect, useCallback } from 'react';
@@ -66,7 +66,7 @@ export default function ACPayouts() {
       )}
 
       <div className="role-welcome">
-        <h1>🏦 <span>Instructor Payouts</span></h1>
+        <h1> <span>Instructor Payouts</span></h1>
         <p>Estimated earnings per instructor — 20% platform fee</p>
       </div>
 
@@ -76,7 +76,7 @@ export default function ACPayouts() {
         padding: 'var(--space-md) var(--space-lg)', marginBottom: 'var(--space-xl)',
         display: 'flex', gap: 'var(--space-sm)', alignItems: 'flex-start',
       }}>
-        <span style={{ fontSize: '1.2rem' }}>⚠️</span>
+        <span style={{ fontSize: '1.2rem' }}>!</span>
         <div>
           <strong>Simplified View</strong> — Earnings are estimated (sum of course prices × approved
           enrollments). Platform fee is a flat 20% placeholder. "Mark as Paid" records a timestamp
@@ -87,10 +87,10 @@ export default function ACPayouts() {
       {loading ? (
         <LoadingSpinner />
       ) : error ? (
-        <div className="alert alert-error">⚠️ {error}</div>
+        <div className="alert alert-error">! {error}</div>
       ) : data?.payouts?.length === 0 ? (
         <div className="empty-state card">
-          <div className="empty-icon">🏦</div>
+          <div className="empty-icon"></div>
           <h3>No payout data available</h3>
           <p>No instructors have approved enrollments yet.</p>
         </div>

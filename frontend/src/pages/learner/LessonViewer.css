@@ -122,3 +122,20 @@
     border-bottom: 1px solid var(--color-border);
   }
 }
+
+.reset-radio, .reset-checkbox {
+  width: auto !important;
+  height: auto !important;
+  appearance: auto !important;
+  -webkit-appearance: radio !important;
+  border: none !important;
+  background: transparent !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  box-shadow: none !important;
+}
+.reset-checkbox {
+  -webkit-appearance: checkbox !important;
+  width: 1.25rem !important;
+  height: 1.25rem !important;
+}

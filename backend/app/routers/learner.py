@@ -201,7 +201,7 @@ async def enroll_in_course(
     db.commit()
     db.refresh(enrollment)
 
-    return {"message": "Successfully enrolled", "enrollment_id": str(enrollment.id)}
+    return {"message": "Successfully enrolled", "enrollment_id": str(enrollment.id), "status": enrollment.status}
 
 
 @router.get("/transactions")
@@ -520,7 +520,7 @@ async def get_lesson_video(
         authorized = True
 
     # Check admin/staff privileges
-    elif any(r in roles for r in ["super_admin", "admin", "sub_admin", "course_coordinator"]):
+    elif any(r in roles for r in ["super_admin", "sub_admin", "course_coordinator"]):
         authorized = True
 
     # Check instructor ownership
@@ -592,13 +592,13 @@ async def get_invoice(
 
 from pydantic import BaseModel
 
-class RefundRequest(BaseModel):
+class RefundRequestPayload(BaseModel):
     reason: str
 
 @router.post("/transactions/{transaction_id}/request-refund")
 async def request_refund(
     transaction_id: str,
-    data: RefundRequest,
+    data: RefundRequestPayload,
     current_user: User = Depends(require_role("learner")),
     db: Session = Depends(get_db),
 ):
@@ -666,3 +666,139 @@ async def list_course_live_classes(
         item = LiveClassRead.model_validate(lc)
         results.append(item)
     return results
+
+
+@router.get("/courses/{course_id}/detail")
+async def get_enrolled_course_detail(
+    course_id: str,
+    current_user: User = Depends(require_role("learner")),
+    db: Session = Depends(get_db),
+):
+    """
+    Returns full course detail (sections + lessons with video_url + quiz/assignments)
+    for an enrolled+approved learner only.
+    """
+    from sqlalchemy.orm import joinedload as jl
+    from app.models.enrollment import Enrollment
+    from app.models.quiz import QuizQuestion
+    from app.models.assignment import Assignment
+
+    enrollment = db.query(Enrollment).filter(
+        Enrollment.learner_id == current_user.id,
+        Enrollment.course_id == course_id,
+        Enrollment.status == "approved",
+    ).first()
+    if not enrollment:
+        raise HTTPException(status_code=403, detail="Not enrolled in this course")
+
+    course = (
+        db.query(Course)
+        .options(
+            jl(Course.instructor),
+            jl(Course.sections).joinedload(Section.lessons).joinedload(Lesson.quiz_questions),
+            jl(Course.sections).joinedload(Section.lessons).joinedload(Lesson.assignments),
+        )
+        .filter(Course.id == course_id)
+        .first()
+    )
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found")
+
+    from app.schemas.course import CourseRead
+    sections_data = []
+    for section in sorted(course.sections, key=lambda s: s.order_index):
+        section_dict = {
+            "id": str(section.id),
+            "title": section.title,
+            "order_index": section.order_index,
+            "lessons": [
+                {
+                    "id": str(l.id),
+                    "title": l.title,
+                    "order_index": l.order_index,
+                    "duration": l.duration,
+                    "is_preview": l.is_preview,
+                    "video_url": l.video_url,
+                    "content": l.content,
+                    "thumbnail_url": l.thumbnail_url,
+                    "quiz_questions": [
+                        {
+                            "id": str(q.id),
+                            "lesson_id": str(q.lesson_id),
+                            "question_text": q.question_text,
+                            "options": q.options,
+                            "correct_option_index": q.correct_option_index,
+                            "explanation": q.explanation,
+                        }
+                        for q in l.quiz_questions
+                    ],
+                    "assignments": [
+                        {
+                            "id": str(a.id),
+                            "lesson_id": str(a.lesson_id),
+                            "title": a.title,
+                            "instructions": a.instructions,
+                        }
+                        for a in l.assignments
+                    ],
+                }
+                for l in sorted(section.lessons, key=lambda x: x.order_index)
+            ],
+        }
+        sections_data.append(section_dict)
+
+    return {
+        "course": CourseRead.model_validate(course),
+        "sections": sections_data,
+    }
+
+
+# ═══════════════════════════════════════════════════════════════════════
+#  REVIEWS & PROGRESS OVERVIEW
+# ═══════════════════════════════════════════════════════════════════════
+
+@router.get("/my-reviews")
+async def get_my_reviews(
+    current_user: User = Depends(require_role("learner")),
+    db: Session = Depends(get_db),
+):
+    """Get all reviews submitted by the current learner."""
+    reviews = (
+        db.query(Review)
+        .options(joinedload(Review.course))
+        .filter(Review.learner_id == current_user.id)
+        .order_by(Review.created_at.desc())
+        .all()
+    )
+    return [
+        {
+            "id": str(r.id),
+            "rating": r.rating,
+            "comment": r.comment,
+            "created_at": r.created_at,
+            "course_id": str(r.course_id),
+            "course_title": r.course.title if r.course else "Unknown Course",
+        }
+        for r in reviews
+    ]
+
+
+@router.get("/progress-overview")
+async def get_progress_overview(
+    current_user: User = Depends(require_role("learner")),
+    db: Session = Depends(get_db),
+):
+    """Get high-level progress overview across all enrolled courses."""
+    enrollments = db.query(Enrollment).filter(Enrollment.learner_id == current_user.id).all()
+    
+    total_enrolled = len(enrollments)
+    completed_courses = sum(1 for e in enrollments if e.completion_percentage >= 100)
+    
+    total_progress = sum(e.completion_percentage for e in enrollments)
+    avg_progress = (total_progress / total_enrolled) if total_enrolled > 0 else 0
+    
+    return {
+        "total_enrolled": total_enrolled,
+        "completed_courses": completed_courses,
+        "average_progress": round(avg_progress, 1),
+    }

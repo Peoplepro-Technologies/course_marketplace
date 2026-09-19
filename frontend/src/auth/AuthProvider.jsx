@@ -101,12 +101,12 @@ export default function AuthProvider({ children }) {
 
   /**
    * Determine the user's primary role for dashboard routing.
-   * Priority: super_admin > admin > sub_admin > coursecoordinator > accounts > instructor > learner
+   * Priority: super_admin > sub_admin > coursecoordinator > accounts > instructor > learner
+   * Note: legacy 'admin' role is no longer used — all super_admin functionality
+   * is now gated with require_role('super_admin') in the backend.
    */
   const primaryRole = roles.includes('super_admin')
     ? 'super_admin'
-    : roles.includes('admin')
-    ? 'admin'
     : roles.includes('sub_admin')
     ? 'sub_admin'
     : roles.includes('coursecoordinator')

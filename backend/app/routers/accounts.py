@@ -32,6 +32,8 @@ from app.models.refund_request import RefundRequest
 from app.models.instructor_payout import InstructorPayout
 from app.models.transaction import Transaction
 from app.schemas.refund_request import RefundRequestRead, RefundRequestResolve
+from app.models.support_ticket import SupportTicket, TicketReply
+from app.schemas.support_ticket import SupportTicketOut, SupportTicketUpdate, TicketReplyCreate, TicketReplyOut
 
 router = APIRouter(prefix="/api/v1/accounts", tags=["Accounts"])
 
@@ -577,6 +579,88 @@ async def list_invoices(
         "page_size": page_size,
         "note": "Simplified view — no real invoice system or PDF generation.",
     }
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# ── Support Tickets (Billing only) ─────────────────────────────────────
+# ═══════════════════════════════════════════════════════════════════════
+
+@router.get("/support-tickets", response_model=list[SupportTicketOut])
+def accounts_get_support_tickets(
+    status: Optional[str] = None,
+    priority: Optional[str] = None,
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_role("accounts")),
+):
+    query = db.query(SupportTicket).filter(SupportTicket.category == "billing")
+    if status:
+        query = query.filter(SupportTicket.status == status)
+    if priority:
+        query = query.filter(SupportTicket.priority == priority)
+    
+    tickets = query.order_by(SupportTicket.updated_at.desc()).all()
+    for t in tickets:
+        t.raised_by_name = t.raised_by.name if t.raised_by else "Unknown"
+        if t.assigned_to:
+            t.assigned_to_name = t.assigned_to.name
+    return tickets
+
+@router.put("/support-tickets/{ticket_id}", response_model=SupportTicketOut)
+def accounts_update_support_ticket(
+    ticket_id: str,
+    update_data: SupportTicketUpdate,
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_role("accounts")),
+):
+    ticket = db.query(SupportTicket).filter(
+        SupportTicket.id == ticket_id, 
+        SupportTicket.category == "billing"
+    ).first()
+    if not ticket:
+        raise HTTPException(status_code=404, detail="Ticket not found or not in billing category")
+        
+    if update_data.status:
+        ticket.status = update_data.status
+    if update_data.priority:
+        ticket.priority = update_data.priority
+    if update_data.assigned_to_id is not None:
+        ticket.assigned_to_id = update_data.assigned_to_id
+        
+    db.commit()
+    db.refresh(ticket)
+    
+    ticket.raised_by_name = ticket.raised_by.name if ticket.raised_by else "Unknown"
+    if ticket.assigned_to:
+        ticket.assigned_to_name = ticket.assigned_to.name
+    return ticket
+
+@router.post("/support-tickets/{ticket_id}/reply", response_model=TicketReplyOut)
+def accounts_reply_support_ticket(
+    ticket_id: str,
+    reply_in: TicketReplyCreate,
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_role("accounts")),
+):
+    ticket = db.query(SupportTicket).filter(
+        SupportTicket.id == ticket_id,
+        SupportTicket.category == "billing"
+    ).first()
+    if not ticket:
+        raise HTTPException(status_code=404, detail="Ticket not found or not in billing category")
+        
+    new_reply = TicketReply(
+        ticket_id=ticket.id,
+        author_id=admin.id,
+        message=reply_in.message
+    )
+    db.add(new_reply)
+    if ticket.status in ["resolved", "closed"]:
+        ticket.status = "open"
+    db.commit()
+    db.refresh(new_reply)
+    
+    new_reply.author_name = admin.name
+    return new_reply
 
 
 # ─────────────────────────────────────────────────────────────────────────────

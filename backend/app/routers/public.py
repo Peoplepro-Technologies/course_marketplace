@@ -9,11 +9,7 @@ These endpoints are accessible to anyone and include:
 The catalog endpoint uses Redis caching with a 5-minute TTL.
 """
 
-<<<<<<< HEAD
-from fastapi import APIRouter, Depends, HTTPException, Query
-=======
 from fastapi import APIRouter, Depends, Query, HTTPException, status
->>>>>>> feature/accounts-dashboard
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func, or_
 from typing import Optional
@@ -206,7 +202,6 @@ def list_categories(db: Session = Depends(get_db)):
     return [c[0] for c in categories if c[0]]
 
 
-<<<<<<< HEAD
 @router.get("/lessons/{lesson_id}/preview/video")
 def get_lesson_preview_video(
     lesson_id: str,
@@ -239,7 +234,7 @@ def get_lesson_preview_video(
         raise HTTPException(status_code=404, detail="Video file not found on server.")
 
     return FileResponse(video_path, media_type="video/mp4")
-=======
+
 # ═══════════════════════════════════════════════════════════════════════
 #  LIVE CLASS JOIN INFO (shared, authenticated)
 # ═══════════════════════════════════════════════════════════════════════
@@ -298,4 +293,3 @@ def get_live_class_join_info(
         status_code=status.HTTP_403_FORBIDDEN,
         detail="You do not have access to this live class",
     )
->>>>>>> feature/accounts-dashboard

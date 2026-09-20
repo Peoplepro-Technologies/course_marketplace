@@ -169,7 +169,7 @@ export default function LessonViewer() {
   const [transcript, setTranscript] = useState(null);
   const [transcriptLoading, setTranscriptLoading] = useState(false);
   const playerRef = useRef(null);
-  const [searchParams, setSearchParams] = useSearchParams();
+
 
   useEffect(() => {
     // Use the learner detail endpoint (returns full video_url + quiz + assignment)

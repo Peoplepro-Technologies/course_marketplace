@@ -37,12 +37,12 @@ api.interceptors.request.use(
 );
 
 // ── Response Interceptor ─────────────────────────────────────────────
-// Handle 401 responses by redirecting to login.
+// Handle 401 responses gracefully without triggering an infinite redirect loop.
 api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      keycloak.login();
+      console.warn('API returned 401 Unauthorized:', error.config?.url);
     }
     return Promise.reject(error);
   }

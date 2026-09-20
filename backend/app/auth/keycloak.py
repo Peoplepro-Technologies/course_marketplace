@@ -91,10 +91,7 @@ async def get_current_user(
             token,
             rsa_key,
             algorithms=["RS256"],
-            issuer=settings.KEYCLOAK_ISSUER,
-            # Keycloak tokens may not include 'aud' for public clients,
-            # so we don't enforce audience validation here.
-            options={"verify_aud": False},
+            options={"verify_aud": False, "verify_iss": False},
         )
     except JWTError as e:
         raise HTTPException(
@@ -263,8 +260,7 @@ async def get_current_user_from_header_or_query(
             token_str,
             rsa_key,
             algorithms=["RS256"],
-            issuer=settings.KEYCLOAK_ISSUER,
-            options={"verify_aud": False},
+            options={"verify_aud": False, "verify_iss": False},
         )
     except JWTError as e:
         raise HTTPException(

@@ -26,4 +26,18 @@ backend/app/media/thumbnails/*
 # Keycloak binary & data
 keycloak-*/
 *.mv.db
-*.trace.db
+*.trace.db
+
+# Cloudflare tunnel binary
+cloudflared.exe
+
+# Scratch / debug scripts
+scratch/
+
+# Keycloak realm export files
+*.json
+!package.json
+!package-lock.json
+!tsconfig*.json
+!jsconfig*.json
+!vite.config.*

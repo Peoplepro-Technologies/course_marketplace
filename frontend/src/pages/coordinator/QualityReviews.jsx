@@ -49,7 +49,7 @@ export default function QualityReviews() {
     <div className="page-wrapper container animate-fade-in">
       <div className="section-header flex-between">
         <div>
-          <h2>⭐ Quality & Reviews</h2>
+          <h2>Quality & Reviews</h2>
           <p>Monitor and moderate learner reviews across the platform.</p>
         </div>
         <Link to="/coordinator" className="btn btn-secondary">← Dashboard</Link>
@@ -71,7 +71,7 @@ export default function QualityReviews() {
       </div>
 
       {error ? (
-        <div className="alert alert-error">⚠️ {error}</div>
+        <div className="alert alert-error">! {error}</div>
       ) : loading ? (
         <LoadingSpinner />
       ) : data.reviews.length === 0 ? (

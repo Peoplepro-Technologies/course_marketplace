@@ -31,9 +31,12 @@ from app.services.transcription import transcribe_lesson_video
 from app.schemas.course import CourseCreate, CourseUpdate, CourseRead
 from app.schemas.section import SectionCreate, SectionUpdate, SectionRead
 from app.schemas.lesson import LessonCreate, LessonUpdate, LessonRead
+from app.schemas.lesson import LessonCreate, LessonUpdate, LessonRead
 from app.schemas.live_class import LiveClassCreate, LiveClassRead
+from app.schemas.user import UserRead, UserUpdate
 from app.redis_client import invalidate_cache
 from app.config import get_settings
+
 
 router = APIRouter(prefix="/api/v1/instructor", tags=["Instructor"])
 
@@ -880,92 +883,182 @@ async def delete_live_class(
     return None
 
 
-@router.post("/live-classes/{live_class_id}/recording", response_model=LiveClassRead)
-async def upload_live_class_recording(
-    live_class_id: str,
-    video: UploadFile = File(...),
+# ═══════════════════════════════════════════════════════════════════════
+#  QUIZ QUESTIONS
+# ═══════════════════════════════════════════════════════════════════════
+
+@router.post("/lessons/{lesson_id}/quiz-questions")
+async def add_quiz_question(
+    lesson_id: str,
+    payload: dict,
     current_user: User = Depends(require_role("instructor")),
     db: Session = Depends(get_db),
 ):
-    """
-    Upload a recorded video file for a live class.
-    Only the instructor who owns the live class can upload its recording.
-    """
-    live_class = db.query(LiveClass).filter(
-        LiveClass.id == live_class_id,
-        LiveClass.instructor_id == current_user.id,
+    """Add a quiz question to a lesson the instructor owns."""
+    from app.models.quiz import QuizQuestion
+    lesson = db.query(Lesson).filter(Lesson.id == lesson_id).first()
+    if not lesson:
+        raise HTTPException(status_code=404, detail="Lesson not found")
+    # Verify ownership via section -> course
+    section = db.query(Section).filter(Section.id == lesson.section_id).first()
+    course = db.query(Course).filter(
+        Course.id == section.course_id,
+        Course.instructor_id == current_user.id
     ).first()
-    if not live_class:
-        raise HTTPException(status_code=404, detail="Live class not found or not yours")
+    if not course:
+        raise HTTPException(status_code=403, detail="Not your course")
 
-    _HERE = os.path.dirname(os.path.abspath(__file__))
-    _MEDIA_ROOT = os.path.normpath(os.path.join(_HERE, "..", "media"))
-    _RECORDINGS_DIR = os.path.join(_MEDIA_ROOT, "recordings")
-    os.makedirs(_RECORDINGS_DIR, exist_ok=True)
+    q = QuizQuestion(
+        lesson_id=lesson_id,
+        question_text=payload.get("question_text", ""),
+        options=payload.get("options", []),
+        correct_option_index=payload.get("correct_option_index", 0),
+        explanation=payload.get("explanation", ""),
+    )
+    db.add(q)
+    db.commit()
+    db.refresh(q)
+    return {
+        "id": str(q.id),
+        "lesson_id": str(q.lesson_id),
+        "question_text": q.question_text,
+        "options": q.options,
+        "correct_option_index": q.correct_option_index,
+        "explanation": q.explanation,
+    }
 
-    unique_id = str(uuid_lib.uuid4())
-    raw_ext = os.path.splitext(video.filename or "recording.webm")[1] or ".webm"
-    raw_path = os.path.join(_RECORDINGS_DIR, f"{live_class_id}_raw{raw_ext}")
-    out_path = os.path.join(_RECORDINGS_DIR, f"{live_class_id}.mp4")
 
-    try:
-        with open(raw_path, "wb") as f:
-            while chunk := await video.read(1024 * 1024):
-                f.write(chunk)
+@router.get("/lessons/{lesson_id}/quiz-questions")
+async def list_quiz_questions(
+    lesson_id: str,
+    current_user: User = Depends(require_role("instructor")),
+    db: Session = Depends(get_db),
+):
+    """List quiz questions for a lesson."""
+    from app.models.quiz import QuizQuestion
+    questions = db.query(QuizQuestion).filter(QuizQuestion.lesson_id == lesson_id).all()
+    return [
+        {
+            "id": str(q.id),
+            "lesson_id": str(q.lesson_id),
+            "question_text": q.question_text,
+            "options": q.options,
+            "correct_option_index": q.correct_option_index,
+            "explanation": q.explanation,
+        }
+        for q in questions
+    ]
 
-        # Transcode using FFmpeg if available
-        ffmpeg_executable = get_ffmpeg_executable()
-        if ffmpeg_executable:
-            import asyncio
-            ffmpeg_cmd = [
-                ffmpeg_executable, "-y",
-                "-i", raw_path,
-                "-c:v", "libx264",
-                "-preset", "fast",
-                "-crf", "23",
-                "-c:a", "aac",
-                "-movflags", "+faststart",
-                out_path
-            ]
-            loop = asyncio.get_event_loop()
-            try:
-                returncode, _, _ = await loop.run_in_executor(
-                    None, run_ffmpeg_sync, ffmpeg_cmd, 120
-                )
-                if returncode == 0:
-                    if os.path.exists(raw_path):
-                        os.remove(raw_path)
-                else:
-                    # Fallback: keep raw as output file
-                    if os.path.exists(out_path):
-                        os.remove(out_path)
-                    os.replace(raw_path, out_path)
-            except Exception:
-                if os.path.exists(out_path):
-                    os.remove(out_path)
-                os.replace(raw_path, out_path)
-        else:
-            if os.path.exists(out_path):
-                os.remove(out_path)
-            os.replace(raw_path, out_path)
 
-        live_class.recording_url = f"/learner/live-classes/{live_class_id}/recording"
-        live_class.recording_status = "ready"
-        live_class.recording_uploaded_at = datetime.now(timezone.utc)
-        if live_class.status != "ended":
-            live_class.status = "ended"
+@router.delete("/quiz-questions/{question_id}", status_code=204)
+async def delete_quiz_question(
+    question_id: str,
+    current_user: User = Depends(require_role("instructor")),
+    db: Session = Depends(get_db),
+):
+    """Delete a quiz question."""
+    from app.models.quiz import QuizQuestion
+    q = db.query(QuizQuestion).filter(QuizQuestion.id == question_id).first()
+    if not q:
+        raise HTTPException(status_code=404, detail="Question not found")
+    db.delete(q)
+    db.commit()
+    return None
 
-        db.commit()
-        db.refresh(live_class)
 
-        result = LiveClassRead.model_validate(live_class)
-        if live_class.course:
-            result.course_title = live_class.course.title
-        return result
-    except HTTPException:
-        db.rollback()
-        raise
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(status_code=500, detail=f"Failed to process recording upload: {str(e)}")
+# ═══════════════════════════════════════════════════════════════════════
+#  ASSIGNMENTS
+# ═══════════════════════════════════════════════════════════════════════
+
+@router.post("/lessons/{lesson_id}/assignments")
+async def add_assignment(
+    lesson_id: str,
+    payload: dict,
+    current_user: User = Depends(require_role("instructor")),
+    db: Session = Depends(get_db),
+):
+    """Add an assignment to a lesson the instructor owns."""
+    from app.models.assignment import Assignment
+    lesson = db.query(Lesson).filter(Lesson.id == lesson_id).first()
+    if not lesson:
+        raise HTTPException(status_code=404, detail="Lesson not found")
+    section = db.query(Section).filter(Section.id == lesson.section_id).first()
+    course = db.query(Course).filter(
+        Course.id == section.course_id,
+        Course.instructor_id == current_user.id
+    ).first()
+    if not course:
+        raise HTTPException(status_code=403, detail="Not your course")
+
+    a = Assignment(
+        lesson_id=lesson_id,
+        title=payload.get("title", ""),
+        instructions=payload.get("instructions", ""),
+    )
+    db.add(a)
+    db.commit()
+    db.refresh(a)
+    return {"id": str(a.id), "lesson_id": str(a.lesson_id), "title": a.title, "instructions": a.instructions}
+
+
+@router.get("/lessons/{lesson_id}/assignments")
+async def list_assignments(
+    lesson_id: str,
+    current_user: User = Depends(require_role("instructor")),
+    db: Session = Depends(get_db),
+):
+    """List assignments for a lesson."""
+    from app.models.assignment import Assignment
+    assignments = db.query(Assignment).filter(Assignment.lesson_id == lesson_id).all()
+    return [{"id": str(a.id), "lesson_id": str(a.lesson_id), "title": a.title, "instructions": a.instructions} for a in assignments]
+
+
+@router.delete("/assignments/{assignment_id}", status_code=204)
+async def delete_assignment(
+    assignment_id: str,
+    current_user: User = Depends(require_role("instructor")),
+    db: Session = Depends(get_db),
+):
+    """Delete an assignment."""
+    from app.models.assignment import Assignment
+    a = db.query(Assignment).filter(Assignment.id == assignment_id).first()
+    if not a:
+        raise HTTPException(status_code=404, detail="Assignment not found")
+    db.delete(a)
+    db.commit()
+    return None
+
+# ═══════════════════════════════════════════════════════════════════════
+#  PROFILE & PAYOUT
+# ═══════════════════════════════════════════════════════════════════════
+
+@router.get("/profile", response_model=UserRead)
+async def get_instructor_profile(
+    current_user: User = Depends(require_role("instructor")),
+):
+    """Get instructor profile including payout info."""
+    return current_user
+
+@router.put("/profile", response_model=UserRead)
+async def update_instructor_profile(
+    update_data: UserUpdate,
+    current_user: User = Depends(require_role("instructor")),
+    db: Session = Depends(get_db),
+):
+    """Update instructor profile and payout info."""
+    if update_data.name is not None:
+        current_user.name = update_data.name
+    if update_data.bio is not None:
+        current_user.bio = update_data.bio
+    if update_data.profile_pic is not None:
+        current_user.profile_pic = update_data.profile_pic
+    if update_data.payout_account_name is not None:
+        current_user.payout_account_name = update_data.payout_account_name
+    if update_data.payout_account_number is not None:
+        current_user.payout_account_number = update_data.payout_account_number
+        
+    db.commit()
+    db.refresh(current_user)
+    return current_user
+
 

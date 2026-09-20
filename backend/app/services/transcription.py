@@ -9,9 +9,121 @@ import uuid
 from datetime import datetime, timezone
 from app.database import SessionLocal
 from app.models.transcript import Transcript
+import re
 from app.utils.ffmpeg import extract_audio
 
 
+def get_youtube_id(url: str) -> str:
+    if not url: return None
+    patterns = [
+        r'(?:youtube\.com/watch\?v=|youtu\.be/|youtube\.com/embed/)([A-Za-z0-9_-]{11})'
+    ]
+    for p in patterns:
+        m = re.search(p, url)
+        if m: return m.group(1)
+    return None
+
+def parse_pasted_transcript(lesson_id: str, raw_text: str) -> None:
+    """
+    Parses manually pasted transcript text from YouTube and saves it as segments.
+    The raw_text format can be:
+    - Alternating lines of timestamps (M:SS) and text
+    - Timestamps with text on the same line like: 0:000 secondsTEXT
+    - Markdown links like: [00:00](https://youtube.com/...) TEXT
+    """
+    db = SessionLocal()
+    try:
+        lines = [line.strip() for line in raw_text.splitlines() if line.strip()]
+        
+        segments = []
+        full_text_parts = []
+        current_time_str = None
+        current_text = []
+        
+        # Regex to match timestamps like "0:04", "1:23", "01:05:22"
+        # Also handles "[00:00](url) Text" and "0:000 secondsText"
+        time_pattern = re.compile(
+            r'^\[?(\d{1,2}:(?:[0-5]\d:)?[0-5]\d)\]?(?:\(https?://[^\)]+\))?(?:\d*\s*(?:seconds?|minutes?(?:,\s*\d+\s*seconds?)?))?\s*(.*)$'
+        )
+        
+        def time_to_seconds(t_str: str) -> float:
+            parts = t_str.split(':')
+            if len(parts) == 2:
+                return int(parts[0]) * 60 + int(parts[1])
+            elif len(parts) == 3:
+                return int(parts[0]) * 3600 + int(parts[1]) * 60 + int(parts[2])
+            return 0.0
+
+        def save_current_segment():
+            if current_time_str is not None and current_text:
+                start_sec = time_to_seconds(current_time_str)
+                joined_text = " ".join(current_text).strip()
+                if joined_text:
+                    segments.append({
+                        "start": start_sec,
+                        "text": joined_text
+                    })
+                    full_text_parts.append(joined_text)
+
+        for line in lines:
+            m = time_pattern.match(line)
+            if m:
+                # We found a timestamp!
+                save_current_segment()
+                
+                # Start new segment
+                current_time_str = m.group(1)
+                current_text = []
+                
+                # If there is text on the same line, add it
+                inline_text = m.group(2).strip()
+                if inline_text:
+                    current_text.append(inline_text)
+            else:
+                # Accumulate text for the current segment
+                if current_time_str is not None:
+                    current_text.append(line)
+                    
+        # Don't forget the last segment
+        save_current_segment()
+            
+        # Calculate end times for segments based on the next segment's start time
+        for i in range(len(segments)):
+            if i < len(segments) - 1:
+                segments[i]['end'] = segments[i+1]['start']
+            else:
+                # For the last segment, assume it lasts a bit longer (e.g., 5 seconds)
+                segments[i]['end'] = segments[i]['start'] + 5.0
+                
+        # Save to DB
+        transcript = db.query(Transcript).filter(Transcript.lesson_id == lesson_id).first()
+        if not transcript:
+            transcript = Transcript(
+                lesson_id=lesson_id,
+                source_type="lesson",
+                whisper_model="manual-paste",
+            )
+            db.add(transcript)
+            
+        transcript.full_text = " ".join(full_text_parts)
+        transcript.segments = segments
+        transcript.language = "en"
+        transcript.duration_seconds = segments[-1]['end'] if segments else 0
+        transcript.status = "completed"
+        transcript.error_message = None
+        transcript.updated_at = datetime.now(timezone.utc)
+        
+        db.commit()
+        print(f"[TRANSCRIPTION] Manually pasted transcript saved for lesson_id={lesson_id}.")
+        
+    except Exception as e:
+        import traceback
+        print(f"[TRANSCRIPTION] Error parsing pasted transcript for lesson_id={lesson_id}: {e}")
+        print(traceback.format_exc())
+        db.rollback()
+        raise e
+    finally:
+        db.close()
 def transcribe_lesson_video(lesson_id: str, video_path: str) -> None:
     """
     Background worker function that extracts audio from an uploaded lesson video

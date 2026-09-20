@@ -45,7 +45,7 @@ export default function SubAdminCourseManagement() {
   return (
     <SubAdminSidebarLayout>
       <div className="sa-page-header">
-        <h2>📚 Course Management</h2>
+        <h2>Course Management</h2>
         <p>View and manage all courses on the platform (delegated permissions).</p>
       </div>
 

@@ -116,16 +116,9 @@ async def get_current_user(
     roles = [r.lower() for r in realm_access.get("roles", [])]
 
     # Determine the highest-priority role for this user.
-    # Priority: super_admin > admin > sub_admin > coursecoordinator > accounts > instructor > learner
-    # Note: super_admin is stored as "admin" in the local DB for backward compatibility
-    # with existing admin queries/logic, but the full realm_roles list is preserved.
+    # Priority: super_admin > sub_admin > coursecoordinator > accounts > instructor > learner
     if "super_admin" in roles:
-        role = "admin"  # DB compatibility — super_admin is treated as admin locally
-        # Inject "admin" into the roles list so require_role("admin") passes
-        if "admin" not in roles:
-            roles = list(roles) + ["admin"]
-    elif "admin" in roles:
-        role = "admin"
+        role = "super_admin"
     elif "sub_admin" in roles:
         role = "sub_admin"
     elif "coursecoordinator" in roles:
@@ -245,11 +238,7 @@ async def get_current_user_from_header_or_query(
     roles = realm_access.get("roles", [])
 
     if "super_admin" in roles:
-        role = "admin"
-        if "admin" not in roles:
-            roles = list(roles) + ["admin"]
-    elif "admin" in roles:
-        role = "admin"
+        role = "super_admin"
     elif "sub_admin" in roles:
         role = "sub_admin"
     elif "course_coordinator" in roles:

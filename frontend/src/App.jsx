@@ -6,8 +6,10 @@ import ProtectedRoute from './components/ProtectedRoute';
 // Public Pages
 import HomePage from './pages/HomePage';
 import CourseDetail from './pages/CourseDetail';
+import CategoriesPage from './pages/CategoriesPage';
 
 // Learner Pages
+import LearnerSidebarLayout from './pages/learner/LearnerSidebarLayout';
 import LearnerDashboard from './pages/learner/LearnerDashboard';
 import LessonViewer from './pages/learner/LessonViewer';
 import Wishlist from './pages/learner/Wishlist';
@@ -15,8 +17,11 @@ import Profile from './pages/learner/Profile';
 import PurchasesHistory from './pages/learner/PurchasesHistory';
 import InvoiceView from './pages/learner/InvoiceView';
 import LearnerLiveClasses from './pages/learner/LearnerLiveClasses';
+import MyReviews from './pages/learner/MyReviews';
+import LearnerProgress from './pages/learner/LearnerProgress';
 
 // Instructor Pages
+import InstructorSidebarLayout from './pages/instructor/InstructorSidebarLayout';
 import InstructorDashboard from './pages/instructor/InstructorDashboard';
 import CourseForm from './pages/instructor/CourseForm';
 import SectionManager from './pages/instructor/SectionManager';
@@ -24,13 +29,9 @@ import ReviewInbox from './pages/instructor/ReviewInbox';
 import EarningsChart from './pages/instructor/EarningsChart';
 import StudentsProgress from './pages/instructor/StudentsProgress';
 import LiveClassManager from './pages/instructor/LiveClassManager';
+import SubmissionsStatus from './pages/instructor/SubmissionsStatus';
+import InstructorProfile from './pages/instructor/InstructorProfile';
 
-// Admin Pages
-import AdminDashboard from './pages/admin/AdminDashboard';
-import UserManagement from './pages/admin/UserManagement';
-import CourseModeration from './pages/admin/CourseModeration';
-import ReviewModeration from './pages/admin/ReviewModeration';
-import AuditLogs from './pages/admin/AuditLogs';
 
 // New Role Dashboards
 import SuperAdminDashboard from './pages/superadmin/SuperAdminDashboard';
@@ -60,6 +61,7 @@ import SAPaymentsFinance from './pages/superadmin/SAPaymentsFinance';
 import SAReportsAnalytics from './pages/superadmin/SAReportsAnalytics';
 import SAReviewsModeration from './pages/superadmin/SAReviewsModeration';
 import SAAuditLogs from './pages/superadmin/SAAuditLogs';
+import SASettings from './pages/superadmin/SASettings';
 
 // Sub Admin Sub-pages
 import SubAdminUserManagement from './pages/subadmin/SubAdminUserManagement';
@@ -68,6 +70,13 @@ import SubAdminCategories from './pages/subadmin/SubAdminCategories';
 import SubAdminApprovals from './pages/subadmin/SubAdminApprovals';
 import SubAdminReviewsModeration from './pages/subadmin/SubAdminReviewsModeration';
 import SubAdminReports from './pages/subadmin/SubAdminReports';
+
+// Support Tickets Shared Components
+import SupportTickets from './pages/shared/SupportTickets';
+import SupportTicketDetail from './pages/shared/SupportTicketDetail';
+import SASupportTickets from './pages/superadmin/SASupportTickets';
+import SubAdminSupportTickets from './pages/subadmin/SubAdminSupportTickets';
+import ACSupportTickets from './pages/accounts/ACSupportTickets';
 
 export default function App() {
   return (
@@ -79,14 +88,27 @@ export default function App() {
             {/* ── Public Routes ──────────────────────────────────────── */}
             <Route path="/" element={<HomePage />} />
             <Route path="/course/:courseId" element={<CourseDetail />} />
-            <Route path="/courses/:courseId" element={<CourseDetail />} />
+            <Route path="/categories" element={<CategoriesPage />} />
 
             {/* ── Learner Routes ─────────────────────────────────────── */}
+            <Route 
+              path="/learner/dashboard" 
+              element={
+                <ProtectedRoute role="learner">
+                  <LearnerSidebarLayout>
+                    <LearnerDashboard />
+                  </LearnerSidebarLayout>
+                </ProtectedRoute>
+              } 
+            />
+            {/* Kept original /learner path mapped to dashboard for compatibility */}
             <Route 
               path="/learner" 
               element={
                 <ProtectedRoute role="learner">
-                  <LearnerDashboard />
+                  <LearnerSidebarLayout>
+                    <LearnerDashboard />
+                  </LearnerSidebarLayout>
                 </ProtectedRoute>
               } 
             />
@@ -110,7 +132,9 @@ export default function App() {
               path="/learner/wishlist" 
               element={
                 <ProtectedRoute role="learner">
-                  <Wishlist />
+                  <LearnerSidebarLayout>
+                    <Wishlist />
+                  </LearnerSidebarLayout>
                 </ProtectedRoute>
               } 
             />
@@ -118,7 +142,29 @@ export default function App() {
               path="/learner/profile" 
               element={
                 <ProtectedRoute role="learner">
-                  <Profile />
+                  <LearnerSidebarLayout>
+                    <Profile />
+                  </LearnerSidebarLayout>
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/learner/purchases" 
+              element={
+                <ProtectedRoute role="learner">
+                  <LearnerSidebarLayout>
+                    <PurchasesHistory />
+                  </LearnerSidebarLayout>
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/learner/transactions/:transactionId/invoice" 
+              element={
+                <ProtectedRoute role="learner">
+                  <LearnerSidebarLayout>
+                    <InvoiceView />
+                  </LearnerSidebarLayout>
                 </ProtectedRoute>
               } 
             />
@@ -126,17 +172,92 @@ export default function App() {
               path="/learner/live-classes" 
               element={
                 <ProtectedRoute role="learner">
-                  <LearnerLiveClasses />
+                  <LearnerSidebarLayout>
+                    <LearnerLiveClasses />
+                  </LearnerSidebarLayout>
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/learner/support" 
+              element={
+                <ProtectedRoute role="learner">
+                  <LearnerSidebarLayout>
+                    <SupportTickets />
+                  </LearnerSidebarLayout>
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/learner/support/:id" 
+              element={
+                <ProtectedRoute role="learner">
+                  <LearnerSidebarLayout>
+                    <SupportTicketDetail />
+                  </LearnerSidebarLayout>
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/learner/progress" 
+              element={
+                <ProtectedRoute role="learner">
+                  <LearnerSidebarLayout>
+                    <LearnerProgress />
+                  </LearnerSidebarLayout>
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/learner/my-reviews" 
+              element={
+                <ProtectedRoute role="learner">
+                  <LearnerSidebarLayout>
+                    <MyReviews />
+                  </LearnerSidebarLayout>
                 </ProtectedRoute>
               } 
             />
 
             {/* ── Instructor Routes ──────────────────────────────────── */}
             <Route 
+              path="/instructor/dashboard" 
+              element={
+                <ProtectedRoute role="instructor">
+                  <InstructorSidebarLayout>
+                    <InstructorDashboard />
+                  </InstructorSidebarLayout>
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
               path="/instructor" 
               element={
                 <ProtectedRoute role="instructor">
-                  <InstructorDashboard />
+                  <InstructorSidebarLayout>
+                    <InstructorDashboard />
+                  </InstructorSidebarLayout>
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/instructor/courses" 
+              element={
+                <ProtectedRoute role="instructor">
+                  <InstructorSidebarLayout>
+                    {/* Placeholder for now until we have an explicit Courses list page separate from Dashboard */}
+                    <InstructorDashboard />
+                  </InstructorSidebarLayout>
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/instructor/submissions" 
+              element={
+                <ProtectedRoute role="instructor">
+                  <InstructorSidebarLayout>
+                    <SubmissionsStatus />
+                  </InstructorSidebarLayout>
                 </ProtectedRoute>
               } 
             />
@@ -168,7 +289,9 @@ export default function App() {
               path="/instructor/reviews" 
               element={
                 <ProtectedRoute role="instructor">
-                  <ReviewInbox />
+                  <InstructorSidebarLayout>
+                    <ReviewInbox />
+                  </InstructorSidebarLayout>
                 </ProtectedRoute>
               } 
             />
@@ -176,7 +299,19 @@ export default function App() {
               path="/instructor/earnings" 
               element={
                 <ProtectedRoute role="instructor">
-                  <EarningsChart />
+                  <InstructorSidebarLayout>
+                    <EarningsChart />
+                  </InstructorSidebarLayout>
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/instructor/students" 
+              element={
+                <ProtectedRoute role="instructor">
+                  <InstructorSidebarLayout>
+                    <StudentsProgress />
+                  </InstructorSidebarLayout>
                 </ProtectedRoute>
               } 
             />
@@ -184,7 +319,9 @@ export default function App() {
               path="/instructor/course/:courseId/students" 
               element={
                 <ProtectedRoute role="instructor">
-                  <StudentsProgress />
+                  <InstructorSidebarLayout>
+                    <StudentsProgress />
+                  </InstructorSidebarLayout>
                 </ProtectedRoute>
               } 
             />
@@ -192,49 +329,39 @@ export default function App() {
               path="/instructor/live-classes" 
               element={
                 <ProtectedRoute role="instructor">
-                  <LiveClassManager />
-                </ProtectedRoute>
-              } 
-            />
-
-            {/* ── Admin Routes ───────────────────────────────────────── */}
-            <Route 
-              path="/admin" 
-              element={
-                <ProtectedRoute role="admin">
-                  <AdminDashboard />
+                  <InstructorSidebarLayout>
+                    <LiveClassManager />
+                  </InstructorSidebarLayout>
                 </ProtectedRoute>
               } 
             />
             <Route 
-              path="/admin/users" 
+              path="/instructor/support" 
               element={
-                <ProtectedRoute role="admin">
-                  <UserManagement />
+                <ProtectedRoute role="instructor">
+                  <InstructorSidebarLayout>
+                    <SupportTickets />
+                  </InstructorSidebarLayout>
                 </ProtectedRoute>
               } 
             />
             <Route 
-              path="/admin/courses" 
+              path="/instructor/support/:id" 
               element={
-                <ProtectedRoute role="admin">
-                  <CourseModeration />
+                <ProtectedRoute role="instructor">
+                  <InstructorSidebarLayout>
+                    <SupportTicketDetail />
+                  </InstructorSidebarLayout>
                 </ProtectedRoute>
               } 
             />
             <Route 
-              path="/admin/reviews" 
+              path="/instructor/profile" 
               element={
-                <ProtectedRoute role="admin">
-                  <ReviewModeration />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/admin/audit-logs" 
-              element={
-                <ProtectedRoute role="admin">
-                  <AuditLogs />
+                <ProtectedRoute role="instructor">
+                  <InstructorSidebarLayout>
+                    <InstructorProfile />
+                  </InstructorSidebarLayout>
                 </ProtectedRoute>
               } 
             />
@@ -256,8 +383,8 @@ export default function App() {
             <Route path="/super-admin/finance" element={<ProtectedRoute role="super_admin"><SAPaymentsFinance /></ProtectedRoute>} />
             <Route path="/super-admin/analytics" element={<ProtectedRoute role="super_admin"><SAReportsAnalytics /></ProtectedRoute>} />
             <Route path="/super-admin/reviews" element={<ProtectedRoute role="super_admin"><SAReviewsModeration /></ProtectedRoute>} />
-            <Route path="/super-admin/support" element={<ProtectedRoute role="super_admin"><SuperAdminDashboard /></ProtectedRoute>} />
-            <Route path="/super-admin/settings" element={<ProtectedRoute role="super_admin"><SuperAdminDashboard /></ProtectedRoute>} />
+            <Route path="/super-admin/support" element={<ProtectedRoute role="super_admin"><SASupportTickets /></ProtectedRoute>} />
+            <Route path="/super-admin/settings" element={<ProtectedRoute role="super_admin"><SASettings /></ProtectedRoute>} />
             <Route path="/super-admin/audit-logs" element={<ProtectedRoute role="super_admin"><SAAuditLogs /></ProtectedRoute>} />
 
             {/* ── Sub Admin Routes ───────────────────────────────────── */}
@@ -275,7 +402,7 @@ export default function App() {
             <Route path="/sub-admin/approvals" element={<ProtectedRoute role="sub_admin"><SubAdminApprovals /></ProtectedRoute>} />
             <Route path="/sub-admin/reviews" element={<ProtectedRoute role="sub_admin"><SubAdminReviewsModeration /></ProtectedRoute>} />
             <Route path="/sub-admin/reports" element={<ProtectedRoute role="sub_admin"><SubAdminReports /></ProtectedRoute>} />
-            <Route path="/sub-admin/support" element={<ProtectedRoute role="sub_admin"><SubAdminDashboard /></ProtectedRoute>} />
+            <Route path="/sub-admin/support" element={<ProtectedRoute role="sub_admin"><SubAdminSupportTickets /></ProtectedRoute>} />
 
             {/* ── Course Coordinator Routes ──────────────────────────── */}
             <Route 
@@ -350,6 +477,7 @@ export default function App() {
             <Route path="/accounts/invoices" element={<ProtectedRoute role="accounts"><ACInvoices /></ProtectedRoute>} />
             <Route path="/accounts/reports" element={<ProtectedRoute role="accounts"><ACFinancialReports /></ProtectedRoute>} />
             <Route path="/accounts/reconciliation" element={<ProtectedRoute role="accounts"><ACReconciliation /></ProtectedRoute>} />
+            <Route path="/accounts/support" element={<ProtectedRoute role="accounts"><ACSupportTickets /></ProtectedRoute>} />
           </Routes>
         </main>
       </BrowserRouter>

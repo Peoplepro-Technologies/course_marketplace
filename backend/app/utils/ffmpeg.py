@@ -1,3 +1,4 @@
+from typing import Optional
 """
 utils/ffmpeg.py — Centralized FFmpeg binary discovery and media processing utilities.
 """
@@ -8,7 +9,7 @@ import subprocess
 from app.config import get_settings
 
 
-def get_ffmpeg_executable() -> str | None:
+def get_ffmpeg_executable() -> Optional[str]:
     """
     Locates the FFmpeg binary in the environment:
       1. Configured FFMPEG_PATH in settings (.env)

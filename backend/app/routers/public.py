@@ -9,7 +9,7 @@ These endpoints are accessible to anyone and include:
 The catalog endpoint uses Redis caching with a 5-minute TTL.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, Query, HTTPException, status
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func, or_
 from typing import Optional
@@ -24,6 +24,8 @@ from app.models.user import User
 from app.models.category import Category
 from app.models.enrollment import Enrollment
 from app.models.live_class import LiveClass
+from app.models.quiz import QuizQuestion
+from app.models.assignment import Assignment
 from app.schemas.course import CourseRead, CourseListRead
 from app.schemas.section import SectionRead
 from app.schemas.lesson import LessonRead
@@ -110,7 +112,12 @@ def get_course_detail(course_id: str, db: Session = Depends(get_db)):
         db.query(Course)
         .options(
             joinedload(Course.instructor),
-            joinedload(Course.sections).joinedload(Section.lessons),
+            joinedload(Course.sections)
+            .joinedload(Section.lessons)
+            .joinedload(Lesson.quiz_questions),
+            joinedload(Course.sections)
+            .joinedload(Section.lessons)
+            .joinedload(Lesson.assignments),
         )
         .filter(Course.id == course_id, Course.status == "published")
         .first()
@@ -153,6 +160,26 @@ def get_course_detail(course_id: str, db: Session = Depends(get_db)):
                     "video_url": l.video_url if l.is_preview else None,
                     "content": l.content if l.is_preview else None,
                     "thumbnail_url": l.thumbnail_url,
+                    "quiz_questions": [
+                        {
+                            "id": str(q.id),
+                            "lesson_id": str(q.lesson_id),
+                            "question_text": q.question_text,
+                            "options": q.options,
+                            "correct_option_index": q.correct_option_index,
+                            "explanation": q.explanation,
+                        }
+                        for q in l.quiz_questions
+                    ],
+                    "assignments": [
+                        {
+                            "id": str(a.id),
+                            "lesson_id": str(a.lesson_id),
+                            "title": a.title,
+                            "instructions": a.instructions,
+                        }
+                        for a in l.assignments
+                    ],
                 }
                 for l in sorted(section.lessons, key=lambda x: x.order_index)
             ],
@@ -203,6 +230,20 @@ def list_categories(db: Session = Depends(get_db)):
     return [c[0] for c in categories if c[0]]
 
 
+@router.get("/categories-with-count")
+def list_categories_with_count(db: Session = Depends(get_db)):
+    """Return categories with published course counts."""
+    categories = db.query(Category).order_by(Category.name.asc()).all()
+    result = []
+    for cat in categories:
+        count = db.query(func.count(Course.id)).filter(
+            Course.category == cat.name,
+            Course.status == "published"
+        ).scalar()
+        result.append({"name": cat.name, "course_count": count or 0})
+    return result
+
+
 @router.get("/lessons/{lesson_id}/preview/video")
 def get_lesson_preview_video(
     lesson_id: str,
@@ -235,7 +276,6 @@ def get_lesson_preview_video(
         raise HTTPException(status_code=404, detail="Video file not found on server.")
 
     return FileResponse(video_path, media_type="video/mp4")
-
 
 # ═══════════════════════════════════════════════════════════════════════
 #  LIVE CLASS JOIN INFO (shared, authenticated)
@@ -273,4 +313,3 @@ def get_live_class_join_info(
         recording_status=live_class.recording_status or "none",
         recording_url=live_class.recording_url,
     )
-

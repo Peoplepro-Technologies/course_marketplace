@@ -78,7 +78,7 @@ export default function ACPaymentsRefunds() {
       )}
 
       <div className="role-welcome">
-        <h1>💳 <span>Payments &amp; Refunds</span></h1>
+        <h1> <span>Payments &amp; Refunds</span></h1>
         <p>Review and resolve learner refund requests</p>
       </div>
 
@@ -99,10 +99,10 @@ export default function ACPaymentsRefunds() {
       {loading ? (
         <LoadingSpinner />
       ) : error ? (
-        <div className="alert alert-error">⚠️ {error}</div>
+        <div className="alert alert-error">! {error}</div>
       ) : data?.refunds?.length === 0 ? (
         <div className="empty-state card">
-          <div className="empty-icon">✅</div>
+          <div className="empty-icon"></div>
           <h3>No refund requests found</h3>
           <p>{filter ? `No ${filter} requests.` : 'No refund requests have been submitted yet.'}</p>
         </div>

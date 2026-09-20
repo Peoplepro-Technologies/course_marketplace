@@ -205,7 +205,7 @@ async def enroll_in_course(
     db.commit()
     db.refresh(enrollment)
 
-    return {"message": "Successfully enrolled", "enrollment_id": str(enrollment.id)}
+    return {"message": "Successfully enrolled", "enrollment_id": str(enrollment.id), "status": enrollment.status}
 
 
 @router.get("/transactions")
@@ -583,7 +583,40 @@ async def get_lesson_video(
     if not lesson:
         raise HTTPException(status_code=404, detail="Lesson not found")
 
-    ensure_lesson_access(current_user, lesson, db)
+    section = db.query(Section).filter(Section.id == lesson.section_id).first()
+    if not section:
+        raise HTTPException(status_code=404, detail="Section not found")
+
+    course = db.query(Course).filter(Course.id == section.course_id).first()
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found")
+
+    roles = getattr(current_user, "_realm_roles", [])
+    authorized = False
+
+    # Preview lessons are accessible to any authenticated user (regardless of enrollment)
+    if lesson.is_preview:
+        authorized = True
+
+    # Check admin/staff privileges
+    elif any(r in roles for r in ["super_admin", "sub_admin", "course_coordinator"]):
+        authorized = True
+
+    # Check instructor ownership
+    elif "instructor" in roles and course.instructor_id == current_user.id:
+        authorized = True
+
+    # Check approved learner enrollment
+    else:
+        enrollment = db.query(Enrollment).filter(
+            Enrollment.learner_id == current_user.id,
+            Enrollment.course_id == course.id,
+        ).first()
+        if enrollment and enrollment.status == "approved":
+            authorized = True
+
+    if not authorized:
+        raise HTTPException(status_code=403, detail="You do not have access to this video.")
 
     # Resolve video path
     _HERE = os.path.dirname(os.path.abspath(__file__))
@@ -638,13 +671,13 @@ async def get_invoice(
 
 from pydantic import BaseModel
 
-class RefundRequest(BaseModel):
+class RefundRequestPayload(BaseModel):
     reason: str
 
 @router.post("/transactions/{transaction_id}/request-refund")
 async def request_refund(
     transaction_id: str,
-    data: RefundRequest,
+    data: RefundRequestPayload,
     current_user: User = Depends(require_role("learner")),
     db: Session = Depends(get_db),
 ):
@@ -714,44 +747,137 @@ async def list_course_live_classes(
     return results
 
 
-@router.get("/live-classes/{live_class_id}/recording")
-async def get_live_class_recording(
-    live_class_id: str,
-    current_user: User = Depends(get_current_user_from_header_or_query),
+@router.get("/courses/{course_id}/detail")
+async def get_enrolled_course_detail(
+    course_id: str,
+    current_user: User = Depends(require_role("learner")),
     db: Session = Depends(get_db),
 ):
     """
-    Secure video streaming endpoint for live class recordings.
-    Supports Range requests for seeking in standard video players.
-    Only accessible to:
-    - Instructor who owns the class / staff roles
-    - Learners with an 'approved' enrollment in the parent course
-    Returns 403 if unauthorized, 404 if no recording exists.
+    Returns full course detail (sections + lessons with video_url + quiz/assignments)
+    for an enrolled+approved learner only.
     """
-    live_class = db.query(LiveClass).filter(LiveClass.id == live_class_id).first()
-    if not live_class:
-        raise HTTPException(status_code=404, detail="Live class not found")
+    from sqlalchemy.orm import joinedload as jl
+    from app.models.enrollment import Enrollment
+    from app.models.quiz import QuizQuestion
+    from app.models.assignment import Assignment
 
-    # Authorize access
-    ensure_live_class_access(current_user, live_class, db)
+    enrollment = db.query(Enrollment).filter(
+        Enrollment.learner_id == current_user.id,
+        Enrollment.course_id == course_id,
+        Enrollment.status == "approved",
+    ).first()
+    if not enrollment:
+        raise HTTPException(status_code=403, detail="Not enrolled in this course")
 
-    if live_class.recording_status != "ready":
-        raise HTTPException(status_code=404, detail="Recording is not available for this live class.")
+    course = (
+        db.query(Course)
+        .options(
+            jl(Course.instructor),
+            jl(Course.sections).joinedload(Section.lessons).joinedload(Lesson.quiz_questions),
+            jl(Course.sections).joinedload(Section.lessons).joinedload(Lesson.assignments),
+        )
+        .filter(Course.id == course_id)
+        .first()
+    )
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found")
 
-    _HERE = os.path.dirname(os.path.abspath(__file__))
-    _MEDIA_ROOT = os.path.normpath(os.path.join(_HERE, "..", "media"))
-    _RECORDINGS_DIR = os.path.join(_MEDIA_ROOT, "recordings")
+    from app.schemas.course import CourseRead
+    sections_data = []
+    for section in sorted(course.sections, key=lambda s: s.order_index):
+        section_dict = {
+            "id": str(section.id),
+            "title": section.title,
+            "order_index": section.order_index,
+            "lessons": [
+                {
+                    "id": str(l.id),
+                    "title": l.title,
+                    "order_index": l.order_index,
+                    "duration": l.duration,
+                    "is_preview": l.is_preview,
+                    "video_url": l.video_url,
+                    "content": l.content,
+                    "thumbnail_url": l.thumbnail_url,
+                    "quiz_questions": [
+                        {
+                            "id": str(q.id),
+                            "lesson_id": str(q.lesson_id),
+                            "question_text": q.question_text,
+                            "options": q.options,
+                            "correct_option_index": q.correct_option_index,
+                            "explanation": q.explanation,
+                        }
+                        for q in l.quiz_questions
+                    ],
+                    "assignments": [
+                        {
+                            "id": str(a.id),
+                            "lesson_id": str(a.lesson_id),
+                            "title": a.title,
+                            "instructions": a.instructions,
+                        }
+                        for a in l.assignments
+                    ],
+                }
+                for l in sorted(section.lessons, key=lambda x: x.order_index)
+            ],
+        }
+        sections_data.append(section_dict)
 
-    video_path = os.path.join(_RECORDINGS_DIR, f"{live_class_id}.mp4")
-    media_type = "video/mp4"
+    return {
+        "course": CourseRead.model_validate(course),
+        "sections": sections_data,
+    }
 
-    if not os.path.exists(video_path):
-        webm_path = os.path.join(_RECORDINGS_DIR, f"{live_class_id}.webm")
-        if os.path.exists(webm_path):
-            video_path = webm_path
-            media_type = "video/webm"
-        else:
-            raise HTTPException(status_code=404, detail="Recording video file not found on server.")
 
-    return FileResponse(video_path, media_type=media_type)
+# ═══════════════════════════════════════════════════════════════════════
+#  REVIEWS & PROGRESS OVERVIEW
+# ═══════════════════════════════════════════════════════════════════════
 
+@router.get("/my-reviews")
+async def get_my_reviews(
+    current_user: User = Depends(require_role("learner")),
+    db: Session = Depends(get_db),
+):
+    """Get all reviews submitted by the current learner."""
+    reviews = (
+        db.query(Review)
+        .options(joinedload(Review.course))
+        .filter(Review.learner_id == current_user.id)
+        .order_by(Review.created_at.desc())
+        .all()
+    )
+    return [
+        {
+            "id": str(r.id),
+            "rating": r.rating,
+            "comment": r.comment,
+            "created_at": r.created_at,
+            "course_id": str(r.course_id),
+            "course_title": r.course.title if r.course else "Unknown Course",
+        }
+        for r in reviews
+    ]
+
+
+@router.get("/progress-overview")
+async def get_progress_overview(
+    current_user: User = Depends(require_role("learner")),
+    db: Session = Depends(get_db),
+):
+    """Get high-level progress overview across all enrolled courses."""
+    enrollments = db.query(Enrollment).filter(Enrollment.learner_id == current_user.id).all()
+    
+    total_enrolled = len(enrollments)
+    completed_courses = sum(1 for e in enrollments if e.completion_percentage >= 100)
+    
+    total_progress = sum(e.completion_percentage for e in enrollments)
+    avg_progress = (total_progress / total_enrolled) if total_enrolled > 0 else 0
+    
+    return {
+        "total_enrolled": total_enrolled,
+        "completed_courses": completed_courses,
+        "average_progress": round(avg_progress, 1),
+    }

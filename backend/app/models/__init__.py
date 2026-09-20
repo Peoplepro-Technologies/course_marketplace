@@ -16,6 +16,11 @@ from app.models.refund_request import RefundRequest
 from app.models.instructor_payout import InstructorPayout
 from app.models.transaction import Transaction
 from app.models.live_class import LiveClass
+from app.models.live_class import LiveClass
+from app.models.quiz import QuizQuestion
+from app.models.assignment import Assignment
+from app.models.support_ticket import SupportTicket, TicketReply
+from app.models.platform_setting import PlatformSetting
 from app.models.transcript import Transcript
 
 __all__ = [
@@ -33,5 +38,10 @@ __all__ = [
     "InstructorPayout",
     "Transaction",
     "LiveClass",
+    "QuizQuestion",
+    "Assignment",
+    "SupportTicket",
+    "TicketReply",
+    "PlatformSetting",
     "Transcript",
 ]

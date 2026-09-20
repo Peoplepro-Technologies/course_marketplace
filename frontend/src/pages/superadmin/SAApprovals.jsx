@@ -59,7 +59,7 @@ export default function SAApprovals() {
   return (
     <SASidebarLayout>
       <div className="sa-page-header">
-        <h2>✅ Course Approvals</h2>
+        <h2>Course Approvals</h2>
         <p>Review and approve courses submitted by instructors.</p>
       </div>
 
@@ -67,7 +67,7 @@ export default function SAApprovals() {
         <LoadingSpinner />
       ) : data.courses.length === 0 ? (
         <div className="sa-placeholder">
-          <div className="placeholder-icon">🎉</div>
+          <div className="placeholder-icon"></div>
           <h2>All Caught Up!</h2>
           <p>There are currently no courses pending approval.</p>
         </div>

@@ -86,7 +86,7 @@ export default function SAReviewsModeration() {
                     <td>
                       <div>
                         <span style={{ color: '#F5A623', fontSize: '1.2rem' }}>
-                          {'★'.repeat(review.rating)}{'☆'.repeat(5 - review.rating)}
+                          {`${review.rating}/5 ★`}
                         </span>
                       </div>
                       <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', marginTop: '4px', maxWidth: '300px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>

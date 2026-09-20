@@ -13,6 +13,10 @@ import api from '../../api/axios';
 import ProgressBar from '../../components/ProgressBar';
 import LoadingSpinner from '../../components/LoadingSpinner';
 
+import { BookOpen, Banknote, Clock, Play, GraduationCap } from 'lucide-react';
+import EmptyState from '../../components/EmptyState';
+import StatusBadge from '../../components/StatusBadge';
+
 /** Inline refund request form rendered below a course card. */
 function RefundRequestForm({ enrollmentId, onSuccess, onCancel }) {
   const [reason, setReason] = useState('');
@@ -108,7 +112,7 @@ export default function LearnerDashboard() {
   if (loading) return <div className="page-wrapper"><LoadingSpinner /></div>;
 
   return (
-    <div className="page-wrapper container">
+    <div className="page-wrapper">
       {/* Toast notification */}
       {toast && (
         <div style={{
@@ -118,32 +122,21 @@ export default function LearnerDashboard() {
           boxShadow: 'var(--shadow-lg)', fontWeight: 600, fontSize: 'var(--text-sm)',
           maxWidth: 360,
         }}>
-          ✓ {toast}
+          {toast}
         </div>
       )}
 
-      <div className="section-header flex-between">
-        <div>
-          <h2>My Learning</h2>
-          <p>Pick up where you left off</p>
-        </div>
-        <div className="flex" style={{ gap: '0.75rem' }}>
-          <Link to="/learner/live-classes" className="btn btn-secondary" id="learner-nav-live-classes">
-            🎥 Live Classes
-          </Link>
-          <Link to="/learner/purchases" className="btn btn-secondary">
-            🧾 Purchases
-          </Link>
-        </div>
+      <div className="section-header">
+        <h2>My Enrolled Courses</h2>
+        <p>Pick up where you left off</p>
       </div>
 
       {enrollments.length === 0 ? (
-        <div className="empty-state card">
-          <div className="empty-icon">🎒</div>
-          <h3>You aren't enrolled in any courses</h3>
-          <p style={{ marginBottom: '1.5rem' }}>Start exploring the catalog to find your next course.</p>
-          <Link to="/" className="btn btn-primary">Browse Catalog</Link>
-        </div>
+        <EmptyState 
+          icon={GraduationCap}
+          title="You aren't enrolled in any courses"
+          message="Start exploring the catalog to find your next course."
+        />
       ) : (
         <div className="grid grid-3">
           {enrollments.map((enrollment) => {
@@ -159,15 +152,17 @@ export default function LearnerDashboard() {
                   {enrollment.course_thumbnail ? (
                     <img src={enrollment.course_thumbnail} alt={enrollment.course_title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                   ) : (
-                    <div className="flex-center" style={{ width: '100%', height: '100%', fontSize: '2rem' }}>📚</div>
+                    <div className="flex-center" style={{ width: '100%', height: '100%', color: 'var(--color-text-muted)' }}>
+                      <BookOpen size={48} strokeWidth={1} />
+                    </div>
                   )}
-                  <div style={{ position: 'absolute', bottom: '0.5rem', left: '0.5rem', background: 'rgba(0,0,0,0.6)', padding: '0.25rem 0.5rem', borderRadius: '4px', fontSize: '0.75rem' }}>
+                  <div style={{ position: 'absolute', bottom: '0.5rem', left: '0.5rem', background: 'rgba(0,0,0,0.6)', padding: '0.25rem 0.5rem', borderRadius: '4px', fontSize: '0.75rem', color: '#fff' }}>
                     {enrollment.course_category}
                   </div>
                   {/* Refunded badge */}
                   {isRefunded && (
-                    <div style={{ position: 'absolute', top: '0.5rem', right: '0.5rem', background: '#dc3545', color: '#fff', padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 700 }}>
-                      Refunded
+                    <div style={{ position: 'absolute', top: '0.5rem', right: '0.5rem' }}>
+                      <StatusBadge status="refunded" />
                     </div>
                   )}
                 </div>
@@ -189,7 +184,8 @@ export default function LearnerDashboard() {
                     {isRefunded ? (
                       <span style={{ fontSize: 'var(--text-xs)', color: '#dc3545', fontWeight: 600 }}>Access revoked</span>
                     ) : (
-                      <Link to={`/learner/course/${enrollment.course_id}/learn`} className="btn btn-primary btn-sm">
+                      <Link to={`/learner/course/${enrollment.course_id}/learn`} className="btn btn-primary btn-sm flex-center" style={{ gap: '4px' }}>
+                        <Play size={14} />
                         {enrollment.progress_percent === 0 ? 'Start' : 'Resume'}
                       </Link>
                     )}
@@ -199,19 +195,19 @@ export default function LearnerDashboard() {
                   {!isRefunded && (
                     <div style={{ borderTop: '1px solid var(--color-border)', paddingTop: 'var(--space-sm)' }}>
                       {isPendingRefund ? (
-                        <div style={{ fontSize: 'var(--text-xs)', color: '#856404', background: '#FFF3CD', padding: '4px 10px', borderRadius: 'var(--radius-sm)', textAlign: 'center' }}>
-                          ⏳ Refund request pending review
+                        <div style={{ fontSize: 'var(--text-xs)', display: 'flex', alignItems: 'center', gap: '6px', color: '#856404', background: '#FFF3CD', padding: '6px 10px', borderRadius: 'var(--radius-sm)' }}>
+                          <Clock size={14} /> Refund request pending review
                         </div>
                       ) : canRefund ? (
                         <>
                           {!showRefundForm ? (
                             <button
                               id={`learner-refund-btn-${enrollment.enrollment_id}`}
-                              className="btn btn-secondary btn-sm"
+                              className="btn btn-secondary btn-sm flex-center"
                               onClick={() => setRefundOpen((prev) => ({ ...prev, [enrollment.enrollment_id]: true }))}
-                              style={{ width: '100%', fontSize: '12px', color: '#dc3545', borderColor: '#dc3545' }}
+                              style={{ width: '100%', fontSize: '12px', color: '#dc3545', borderColor: '#dc3545', gap: '6px' }}
                             >
-                              💸 Request Refund
+                              <Banknote size={14} /> Request Refund
                             </button>
                           ) : (
                             <RefundRequestForm

@@ -88,14 +88,22 @@ function RefundRequestForm({ enrollmentId, onSuccess, onCancel }) {
 export default function LearnerDashboard() {
   const [enrollments, setEnrollments] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [apiError, setApiError] = useState(null);
   const [refundOpen, setRefundOpen] = useState({}); // { [enrollmentId]: bool }
   const [refundSuccess, setRefundSuccess] = useState({}); // { [enrollmentId]: bool }
   const [toast, setToast] = useState(null);
 
   const loadEnrollments = () => {
+    setApiError(null);
     api.get('/learner/courses')
-      .then((res) => setEnrollments(res.data))
-      .catch(console.error)
+      .then((res) => {
+        console.log('[LearnerDashboard] courses response:', res.data);
+        setEnrollments(res.data);
+      })
+      .catch((err) => {
+        console.error('[LearnerDashboard] courses error:', err.response?.status, err.response?.data || err.message);
+        setApiError(err.response?.data?.detail || err.message || 'Failed to load courses');
+      })
       .finally(() => setLoading(false));
   };
 

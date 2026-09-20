@@ -259,6 +259,8 @@ async def list_enrolled_courses(
     result = []
     for enrollment in enrollments:
         course = enrollment.course
+        if not course:
+            continue
 
         # Count total lessons in the course
         total_lessons = (
@@ -671,13 +673,21 @@ async def get_invoice(
 
 from pydantic import BaseModel
 
+<<<<<<< Updated upstream
 class RefundRequestPayload(BaseModel):
+=======
+class TransactionRefundPayload(BaseModel):
+>>>>>>> Stashed changes
     reason: str
 
 @router.post("/transactions/{transaction_id}/request-refund")
 async def request_refund(
     transaction_id: str,
+<<<<<<< Updated upstream
     data: RefundRequestPayload,
+=======
+    data: TransactionRefundPayload,
+>>>>>>> Stashed changes
     current_user: User = Depends(require_role("learner")),
     db: Session = Depends(get_db),
 ):

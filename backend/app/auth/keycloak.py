@@ -110,28 +110,67 @@ async def get_current_user(
             detail="Token missing 'sub' claim.",
         )
 
-    name = payload.get("name", payload.get("preferred_username", ""))
+    preferred_username = payload.get("preferred_username", "")
+    name = payload.get("name", preferred_username)
     email = payload.get("email", "")
-    realm_access = payload.get("realm_access", {})
-    roles = [r.lower() for r in realm_access.get("roles", [])]
 
-    # Determine the highest-priority role for this user.
-    # Priority: super_admin > sub_admin > coursecoordinator > accounts > instructor > learner
-    if "super_admin" in roles:
-        role = "super_admin"
-    elif "sub_admin" in roles:
-        role = "sub_admin"
-    elif "coursecoordinator" in roles:
-        role = "coursecoordinator"
+    # Extract roles from realm_access AND resource_access
+    realm_access = payload.get("realm_access", {})
+    resource_access = payload.get("resource_access", {})
+    client_access = resource_access.get("course-frontend", {})
+
+    raw_roles = set(
+        [r.lower() for r in realm_access.get("roles", [])] +
+        [r.lower() for r in client_access.get("roles", [])]
+    )
+
+    # Normalize role aliases (e.g., course_coordinator <-> coursecoordinator)
+    roles = set(raw_roles)
+    if "course_coordinator" in raw_roles or "coursecoordinator" in raw_roles:
+        roles.add("course_coordinator")
+        roles.add("coursecoordinator")
+    if "super_admin" in raw_roles or "superadmin" in raw_roles:
+        roles.add("super_admin")
+        roles.add("superadmin")
+        roles.add("admin")
+    if "sub_admin" in raw_roles or "subadmin" in raw_roles:
+        roles.add("sub_admin")
+        roles.add("subadmin")
+
+    roles_list = list(roles)
+
+    # Determine role from Keycloak roles
+    keycloak_role = None
+    if "super_admin" in roles or "superadmin" in roles:
+        keycloak_role = "super_admin"
+    elif "admin" in roles:
+        keycloak_role = "super_admin"
+    elif "sub_admin" in roles or "subadmin" in roles:
+        keycloak_role = "sub_admin"
+    elif "coursecoordinator" in roles or "course_coordinator" in roles:
+        keycloak_role = "coursecoordinator"
     elif "accounts" in roles:
-        role = "accounts"
+        keycloak_role = "accounts"
     elif "instructor" in roles:
-        role = "instructor"
-    else:
-        role = "learner"
+        keycloak_role = "instructor"
+    elif "learner" in roles:
+        keycloak_role = "learner"
 
     # ── Find or create the local User row ─────────────────────────────
     user = db.query(User).filter(User.keycloak_sub == sub).first()
+    if not user:
+        # Match existing database user by email, preferred_username, or name
+        for identifier in [email, preferred_username, name]:
+            if identifier:
+                user = db.query(User).filter(
+                    (User.email.ilike(identifier)) |
+                    (User.name.ilike(identifier))
+                ).first()
+                if user:
+                    user.keycloak_sub = sub
+                    db.commit()
+                    db.refresh(user)
+                    break
 
     if user is None:
         # Auto-create a new user on first login
@@ -139,24 +178,24 @@ async def get_current_user(
             keycloak_sub=sub,
             name=name,
             email=email,
-            role=role,
+            role=keycloak_role or "learner",
         )
         db.add(user)
         db.commit()
         db.refresh(user)
     else:
-        # Update role and email if they changed in Keycloak
+        # Update role and email if they changed in Keycloak, but preserve DB role if Keycloak didn't specify a specialized role
         changed = False
-        if user.role != role:
+        if keycloak_role and keycloak_role != "learner" and user.role != keycloak_role:
             record_audit_log(
                 db,
                 actor_id=user.id,
                 action="role_changed",
                 target_type="user",
                 target_id=str(user.id),
-                details={"old_role": user.role, "new_role": role}
+                details={"old_role": user.role, "new_role": keycloak_role}
             )
-            user.role = role
+            user.role = keycloak_role
             changed = True
         if user.email != email and email:
             user.email = email
@@ -168,8 +207,16 @@ async def get_current_user(
             db.commit()
             db.refresh(user)
 
-    # Attach the roles list for use in role-checking dependencies
-    user._realm_roles = roles
+    # Attach the complete roles list (including DB role) for use in authorization dependencies
+    effective_roles = list(roles)
+    if user.role:
+        effective_roles.append(user.role.lower())
+        if user.role.lower() == "coursecoordinator":
+            effective_roles.append("course_coordinator")
+        if user.role.lower() == "super_admin":
+            effective_roles.append("admin")
+
+    user._realm_roles = list(set(effective_roles))
 
     if not user.is_active:
         raise HTTPException(
@@ -232,7 +279,8 @@ async def get_current_user_from_header_or_query(
             detail="Token missing 'sub' claim.",
         )
 
-    name = payload.get("name", payload.get("preferred_username", ""))
+    preferred_username = payload.get("preferred_username", "")
+    name = payload.get("name", preferred_username)
     email = payload.get("email", "")
     realm_access = payload.get("realm_access", {})
     roles = realm_access.get("roles", [])
@@ -251,6 +299,18 @@ async def get_current_user_from_header_or_query(
         role = "learner"
 
     user = db.query(User).filter(User.keycloak_sub == sub).first()
+    if not user:
+        for identifier in [email, preferred_username, name]:
+            if identifier:
+                user = db.query(User).filter(
+                    (User.email.ilike(identifier)) |
+                    (User.name.ilike(identifier))
+                ).first()
+                if user:
+                    user.keycloak_sub = sub
+                    db.commit()
+                    db.refresh(user)
+                    break
 
     if user is None:
         user = User(

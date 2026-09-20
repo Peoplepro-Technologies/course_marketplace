@@ -55,11 +55,11 @@ def list_courses(
     - Results are paginated (default 12 per page).
     - Cached in Redis for 5 minutes.
     """
-    # ── Check Redis cache ─────────────────────────────────────────────
-    cache_key = f"courses:list:{search}:{category}:{page}:{page_size}"
-    cached = get_cache(cache_key)
-    if cached:
-        return cached
+    # ── Check Redis cache (bypassed for local dev accuracy) ───────────
+    # cache_key = f"courses:list:{search}:{category}:{page}:{page_size}"
+    # cached = get_cache(cache_key)
+    # if cached:
+    #     return cached
 
     # ── Build query ───────────────────────────────────────────────────
     query = db.query(Course).options(
@@ -95,7 +95,7 @@ def list_courses(
     )
 
     # ── Cache the result ──────────────────────────────────────────────
-    set_cache(cache_key, result.model_dump(mode="json"), ttl=300)
+    # set_cache(cache_key, result.model_dump(mode="json"), ttl=300)
 
     return result
 

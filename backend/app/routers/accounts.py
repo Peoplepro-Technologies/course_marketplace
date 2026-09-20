@@ -57,11 +57,11 @@ async def get_dashboard_kpis(
       - pending_refunds_count: number of refund requests with status "pending"
       - recent_transactions_count: approved enrollments in the last 30 days
     """
-    # Estimated total revenue: sum of course.price for approved enrollments
+    # Estimated total revenue: sum of course.price for approved/active enrollments
     revenue_rows = (
         db.query(Course.price)
         .join(Enrollment, Enrollment.course_id == Course.id)
-        .filter(Enrollment.status == "approved")
+        .filter(Enrollment.status.in_(["approved", "active", "completed"]))
         .all()
     )
     total_revenue = sum(r[0] if isinstance(r, (tuple, list)) else getattr(r, 'price', 0.0) for r in revenue_rows if (r[0] if isinstance(r, (tuple, list)) else getattr(r, 'price', None)))
@@ -73,12 +73,12 @@ async def get_dashboard_kpis(
         .scalar() or 0
     )
 
-    # Recent transactions: approved enrollments in last 30 days
+    # Recent transactions: enrollments in last 30 days
     cutoff = datetime.now(timezone.utc) - timedelta(days=30)
     recent_transactions = (
         db.query(func.count(Enrollment.id))
         .filter(
-            Enrollment.status == "approved",
+            Enrollment.status.in_(["approved", "active", "completed"]),
             func.coalesce(Enrollment.approved_at, Enrollment.enrolled_at) >= cutoff,
         )
         .scalar() or 0
@@ -87,7 +87,7 @@ async def get_dashboard_kpis(
     # Total approved enrollments
     total_approved = (
         db.query(func.count(Enrollment.id))
-        .filter(Enrollment.status == "approved")
+        .filter(Enrollment.status.in_(["approved", "active", "completed"]))
         .scalar() or 0
     )
 
@@ -118,7 +118,7 @@ async def list_transactions(
         db.query(Enrollment, User, Course)
         .join(User, Enrollment.learner_id == User.id)
         .join(Course, Enrollment.course_id == Course.id)
-        .filter(Enrollment.status == "approved")
+        .filter(Enrollment.status.in_(["approved", "active", "completed"]))
         .order_by(func.coalesce(Enrollment.approved_at, Enrollment.enrolled_at).desc())
     )
 

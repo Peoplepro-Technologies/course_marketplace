@@ -35,13 +35,22 @@ def require_role(required_role: str):
     async def role_checker(
         current_user: User = Depends(get_current_user),
     ) -> User:
-        # _realm_roles is attached by get_current_user
         roles = getattr(current_user, "_realm_roles", [])
-        if required_role not in roles:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Access denied. Required role: {required_role}",
-            )
-        return current_user
+        user_db_role = (current_user.role or "").lower()
+        req_role = required_role.lower()
+
+        if (
+            req_role in roles
+            or user_db_role == req_role
+            or user_db_role in ["admin", "super_admin"]
+            or "super_admin" in roles
+            or "admin" in roles
+        ):
+            return current_user
+
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Access denied. Required role: {required_role}",
+        )
 
     return role_checker

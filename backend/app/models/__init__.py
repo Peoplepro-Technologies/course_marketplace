@@ -21,6 +21,7 @@ from app.models.quiz import QuizQuestion
 from app.models.assignment import Assignment
 from app.models.support_ticket import SupportTicket, TicketReply
 from app.models.platform_setting import PlatformSetting
+from app.models.transcript import Transcript
 
 __all__ = [
     "User",
@@ -42,4 +43,5 @@ __all__ = [
     "SupportTicket",
     "TicketReply",
     "PlatformSetting",
+    "Transcript",
 ]

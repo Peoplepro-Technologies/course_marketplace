@@ -1,17 +1,20 @@
 /**
  * StudentsProgress.jsx — Instructor view of enrolled students and their progress.
  *
- * Route: /instructor/course/:courseId/students
+ * Two modes:
+ *  1. /instructor/students           → no courseId → show a course picker
+ *  2. /instructor/course/:courseId/students → show students for that course
+ *
  * Shows: learner name, email, enrolled date, progress bar, lesson count.
  * Read-only — no DB schema changes required.
  */
 
 import { useState, useEffect } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams, useNavigate } from 'react-router-dom';
 import api from '../../api/axios';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import EmptyState from '../../components/EmptyState';
-import { Users, GraduationCap, AlertTriangle } from 'lucide-react';
+import { Users, GraduationCap, AlertTriangle, BookOpen, ChevronRight } from 'lucide-react';
 import './StudentsProgress.css';
 
 function ProgressBar({ pct }) {
@@ -34,13 +37,92 @@ function ProgressBar({ pct }) {
   );
 }
 
-export default function StudentsProgress() {
-  const { courseId } = useParams();
-  const [data, setData]     = useState(null);   // { course_title, total_lessons, students[] }
+// ── Course picker (no courseId in URL) ──────────────────────────────────────
+function CoursePicker() {
+  const [courses, setCourses] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError]   = useState(null);
+  const [error, setError]     = useState(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
+    api.get('/instructor/courses')
+      .then((res) => setCourses(res.data || []))
+      .catch((err) => setError(err.response?.data?.detail || 'Failed to load courses'))
+      .finally(() => setLoading(false));
+  }, []);
+
+  if (loading) return <div className="page-wrapper"><LoadingSpinner /></div>;
+
+  return (
+    <div className="page-wrapper">
+      <div className="section-header">
+        <div>
+          <h2 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Users size={24} /> Students &amp; Progress
+          </h2>
+          <p>Select a course to view its enrolled students.</p>
+        </div>
+      </div>
+
+      {error && (
+        <div className="sp-alert sp-alert-error" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <AlertTriangle size={18} /> {error}
+        </div>
+      )}
+
+      {!error && courses.length === 0 && (
+        <EmptyState
+          icon={BookOpen}
+          title="No courses yet"
+          message="Create a course first to view student progress."
+        />
+      )}
+
+      {courses.length > 0 && (
+        <div className="sp-course-picker">
+          {courses.map((course, idx) => (
+            <button
+              key={course.id}
+              className="sp-course-card animate-fade-in-up"
+              style={{ animationDelay: `${idx * 0.04}s` }}
+              onClick={() => navigate(`/instructor/course/${course.id}/students`)}
+              id={`sp-course-${course.id}`}
+            >
+              <div className="sp-course-icon">
+                <BookOpen size={22} />
+              </div>
+              <div className="sp-course-info">
+                <span className="sp-course-title">{course.title}</span>
+                <span className="sp-course-status">{course.status || 'draft'}</span>
+              </div>
+              <ChevronRight size={18} className="sp-course-arrow" />
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Main component ───────────────────────────────────────────────────────────
+export default function StudentsProgress() {
+  const { courseId } = useParams();
+
+  // No courseId → show course picker instead of crashing
+  if (!courseId) return <CoursePicker />;
+
+  return <StudentsTable courseId={courseId} />;
+}
+
+// ── Per-course student table ─────────────────────────────────────────────────
+function StudentsTable({ courseId }) {
+  const [data, setData]       = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError]     = useState(null);
+
+  useEffect(() => {
+    setLoading(true);
+    setError(null);
     api.get(`/instructor/courses/${courseId}/students`)
       .then((res) => setData(res.data))
       .catch((err) =>
@@ -58,7 +140,7 @@ export default function StudentsProgress() {
       <div className="section-header flex-between">
         <div>
           <h2 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Users size={24} /> Students & Progress
+            <Users size={24} /> Students &amp; Progress
           </h2>
           {data && (
             <p>
@@ -68,8 +150,8 @@ export default function StudentsProgress() {
             </p>
           )}
         </div>
-        <Link to="/instructor" className="btn btn-secondary">
-          ← Dashboard
+        <Link to="/instructor/students" className="btn btn-secondary">
+          ← All Courses
         </Link>
       </div>
 

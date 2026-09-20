@@ -34,6 +34,7 @@ from app.schemas.live_class import LiveClassCreate, LiveClassRead
 from app.schemas.user import UserRead, UserUpdate
 from app.redis_client import invalidate_cache
 
+
 router = APIRouter(prefix="/api/v1/instructor", tags=["Instructor"])
 
 # ── Media paths (mirrors main.py resolution) ──────────────────────────
@@ -1059,3 +1060,5 @@ async def update_instructor_profile(
     db.commit()
     db.refresh(current_user)
     return current_user
+
+

@@ -1,13 +1,21 @@
-import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useState, useEffect, useRef } from 'react';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import api from '../../api/axios';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import Modal from '../../components/Modal';
 import ReviewForm from './ReviewForm';
 import keycloak from '../../auth/keycloak';
-import { PenTool, ClipboardList, CheckCircle2, Star, BookOpen } from 'lucide-react';
+import { PenTool, ClipboardList, CheckCircle2, Star, BookOpen, FileText, ChevronUp, ChevronDown, Clock, Search } from 'lucide-react';
 import EmptyState from '../../components/EmptyState';
+import VideoPlayer from '../../components/VideoPlayer';
 import './LessonViewer.css';
+
+function formatTime(seconds) {
+  if (!seconds) return '0:00';
+  const m = Math.floor(seconds / 60);
+  const s = Math.floor(seconds % 60);
+  return `${m}:${s.toString().padStart(2, '0')}`;
+}
 
 /** Extract YouTube video ID from a URL (watch?v=, youtu.be/, /embed/) */
 function getYouTubeId(url) {
@@ -23,7 +31,7 @@ function getYouTubeId(url) {
 }
 
 /** Renders either a YouTube iframe or a local <video> tag based on URL */
-function LessonVideoPlayer({ url, lessonId, token }) {
+function LessonVideoPlayer({ url, lessonId, token, onPlayerReady }) {
   const ytId = getYouTubeId(url);
   if (ytId) {
     return (
@@ -43,7 +51,7 @@ function LessonVideoPlayer({ url, lessonId, token }) {
     ? `http://localhost:8000/api/v1/learner/lessons/${lessonId}/video?token=${token}`
     : `http://localhost:8000/api/v1${url}?token=${token}`;
   return (
-    <video controls style={{ width: '100%', borderRadius: '8px', marginBottom: '1.5rem' }} src={src} />
+    <VideoPlayer src={src} onPlayerReady={onPlayerReady} />
   );
 }
 
@@ -153,6 +161,14 @@ export default function LessonViewer() {
   const [loading, setLoading] = useState(true);
   const [reviewModalOpen, setReviewModalOpen] = useState(false);
   const [token, setToken] = useState(keycloak.token || '');
+  
+  const [transcriptOpen, setTranscriptOpen] = useState(false);
+  const [transcriptTab, setTranscriptTab] = useState('timestamps');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [transcript, setTranscript] = useState(null);
+  const [transcriptLoading, setTranscriptLoading] = useState(false);
+  const playerRef = useRef(null);
+  const [searchParams, setSearchParams] = useSearchParams();
 
   useEffect(() => {
     // Use the learner detail endpoint (returns full video_url + quiz + assignment)
@@ -184,6 +200,22 @@ export default function LessonViewer() {
       .finally(() => setLoading(false));
   }, [courseId, navigate]);
 
+  useEffect(() => {
+    if (!activeLesson?.id) return;
+    setTranscript(null);
+    setTranscriptLoading(true);
+    setTranscriptOpen(false);
+    
+    api.get(`/transcripts/lesson/${activeLesson.id}`)
+      .then(res => setTranscript(res.data))
+      .catch(err => {
+        if (err.response?.status !== 404) {
+          console.error("Failed to load transcript", err);
+        }
+      })
+      .finally(() => setTranscriptLoading(false));
+  }, [activeLesson]);
+
   const handleLessonSelect = lesson => setActiveLesson(lesson);
 
   const markComplete = async () => {
@@ -197,8 +229,27 @@ export default function LessonViewer() {
     }
   };
 
+  const handleSeek = (time) => {
+    if (playerRef.current) {
+      if (typeof playerRef.current.currentTime === 'function') {
+        playerRef.current.currentTime(time);
+      } else {
+        playerRef.current.currentTime = time;
+      }
+      
+      if (typeof playerRef.current.play === 'function') {
+        playerRef.current.play();
+      }
+    }
+  };
+
   if (loading) return <div className="page-wrapper"><LoadingSpinner /></div>;
   if (!course) return null;
+
+  const filteredSegments = (transcript?.segments || []).filter((seg) => {
+    if (!searchQuery.trim()) return true;
+    return seg.text.toLowerCase().includes(searchQuery.toLowerCase());
+  });
 
   return (
     <div className="lesson-viewer-layout">
@@ -252,7 +303,160 @@ export default function LessonViewer() {
           {activeLesson ? (
             <div className="lesson-text-content">
               {activeLesson.video_url && (
-                <LessonVideoPlayer url={activeLesson.video_url} lessonId={activeLesson.id} token={token} />
+                <LessonVideoPlayer 
+                  url={activeLesson.video_url} 
+                  lessonId={activeLesson.id} 
+                  token={token} 
+                  onPlayerReady={(p) => { 
+                    playerRef.current = p; 
+                    const initialSeekTime = searchParams.get('t');
+                    if (initialSeekTime) {
+                      if (typeof p.currentTime === 'function') p.currentTime(parseFloat(initialSeekTime));
+                      else p.currentTime = parseFloat(initialSeekTime);
+                      
+                      if (typeof p.play === 'function') p.play();
+                      
+                      setSearchParams(params => {
+                        params.delete('t');
+                        return params;
+                      }, { replace: true });
+                    }
+                  }}
+                />
+              )}
+              {/* Transcript Panel */}
+              {activeLesson.video_url && (
+                <div className="transcript-panel card-glass">
+                  <div className="transcript-header-bar">
+                    <button
+                      id={`transcript-toggle-${activeLesson.id}`}
+                      className="transcript-toggle-btn"
+                      style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'none', border: 'none', color: '#0056D2', fontWeight: '600', cursor: 'pointer', padding: '0.5rem', width: '100%', justifyContent: 'space-between' }}
+                      onClick={() => setTranscriptOpen((prev) => !prev)}
+                      aria-expanded={transcriptOpen}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <FileText size={18} />
+                        <span>Transcript & Timestamps</span>
+                        {transcript?.status === 'completed' && (
+                          <span className="badge badge-success" style={{ marginLeft: '8px' }}>Ready</span>
+                        )}
+                        {transcript?.status === 'processing' && (
+                          <span className="badge badge-warning" style={{ marginLeft: '8px' }}>Processing…</span>
+                        )}
+                        {transcript?.status === 'failed' && (
+                          <span className="badge badge-danger" style={{ marginLeft: '8px' }}>Failed</span>
+                        )}
+                        {transcriptLoading && (
+                          <span className="badge badge-muted" style={{ marginLeft: '8px' }}>Loading…</span>
+                        )}
+                      </div>
+                      <span className="transcript-chevron">{transcriptOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}</span>
+                    </button>
+
+                    {transcriptOpen && transcript?.status === 'completed' && (
+                      <div className="transcript-controls">
+                        <div className="transcript-tab-buttons" style={{ display: 'flex', gap: '1rem', marginTop: '1rem', paddingBottom: '0.5rem', borderBottom: '1px solid #e0e0e0' }}>
+                          <button
+                            type="button"
+                            className={`transcript-tab-btn ${transcriptTab === 'timestamps' ? 'active' : ''}`}
+                            style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'none', border: 'none', padding: '0.5rem 1rem', cursor: 'pointer', color: transcriptTab === 'timestamps' ? '#0056D2' : '#666', borderBottom: transcriptTab === 'timestamps' ? '2px solid #0056D2' : 'none', fontWeight: transcriptTab === 'timestamps' ? '600' : '400' }}
+                            onClick={() => setTranscriptTab('timestamps')}
+                          >
+                            <Clock size={16} /> Timestamps
+                          </button>
+                          <button
+                            type="button"
+                            className={`transcript-tab-btn ${transcriptTab === 'text' ? 'active' : ''}`}
+                            style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'none', border: 'none', padding: '0.5rem 1rem', cursor: 'pointer', color: transcriptTab === 'text' ? '#0056D2' : '#666', borderBottom: transcriptTab === 'text' ? '2px solid #0056D2' : 'none', fontWeight: transcriptTab === 'text' ? '600' : '400' }}
+                            onClick={() => setTranscriptTab('text')}
+                          >
+                            <FileText size={16} /> Full Text
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {transcriptOpen && (
+                    <div className="transcript-body">
+                      {!transcript && !transcriptLoading && (
+                        <p className="transcript-empty">
+                          No transcript available yet. It will appear here once the video is processed.
+                        </p>
+                      )}
+                      {transcript?.status === 'processing' && (
+                        <p className="transcript-empty">Transcription is currently processing — check back in a moment.</p>
+                      )}
+                      {transcript?.status === 'failed' && (
+                        <p className="transcript-empty transcript-error">
+                          Transcription failed: {transcript.error_message || 'Unknown error'}
+                        </p>
+                      )}
+                      {transcript?.status === 'completed' && (
+                        <div className="transcript-content">
+                          <div className="transcript-meta-row">
+                            {transcript.language && (
+                              <span className="transcript-meta-tag">
+                                Language: <strong>{transcript.language.toUpperCase()}</strong>
+                              </span>
+                            )}
+                            {transcript.duration_seconds && (
+                              <span className="transcript-meta-tag">
+                                Duration: <strong>{formatTime(transcript.duration_seconds)}</strong>
+                              </span>
+                            )}
+                            {transcriptTab === 'timestamps' && (
+                              <div style={{ position: 'relative', flex: 1, maxWidth: '300px', marginLeft: 'auto' }}>
+                                <Search size={16} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#999' }} />
+                                <input
+                                  type="text"
+                                  className="transcript-search-input"
+                                  style={{ width: '100%', padding: '0.5rem 1rem 0.5rem 2rem', borderRadius: '20px', border: '1px solid #ddd' }}
+                                  placeholder="Search transcript..."
+                                  value={searchQuery}
+                                  onChange={(e) => setSearchQuery(e.target.value)}
+                                />
+                              </div>
+                            )}
+                          </div>
+
+                          {transcriptTab === 'timestamps' ? (
+                            <div className="transcript-timeline">
+                              {filteredSegments.length > 0 ? (
+                                filteredSegments.map((seg, idx) => (
+                                  <div
+                                    key={idx}
+                                    className="transcript-cue-row"
+                                    onClick={() => handleSeek(seg.start)}
+                                  >
+                                    <button
+                                      type="button"
+                                      className="transcript-timestamp-btn"
+                                      style={{ display: 'flex', alignItems: 'center', gap: '4px', background: '#eef3fa', color: '#0056D2', border: 'none', padding: '0.25rem 0.5rem', borderRadius: '4px', cursor: 'pointer', fontSize: '0.85rem' }}
+                                      title={`Seek to ${formatTime(seg.start)}`}
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleSeek(seg.start);
+                                      }}
+                                    >
+                                      <Clock size={14} /> {formatTime(seg.start)}
+                                    </button>
+                                    <span className="transcript-cue-text">{seg.text}</span>
+                                  </div>
+                                ))
+                              ) : (
+                                <p className="transcript-empty">No matching lines found.</p>
+                              )}
+                            </div>
+                          ) : (
+                            <p className="transcript-full-text">{transcript.full_text}</p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
               )}
               {activeLesson.content && (
                 <p style={{ whiteSpace: 'pre-wrap' }}>{activeLesson.content}</p>

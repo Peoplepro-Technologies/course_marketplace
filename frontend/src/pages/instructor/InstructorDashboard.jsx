@@ -32,12 +32,12 @@ export default function InstructorDashboard() {
 
       // Fetch students for all courses
       const studentPromises = fetchedCourses.map(c => 
-        api.get(`/instructor/courses/${c.id}/students`).catch(() => ({ data: [] }))
+        api.get(`/instructor/courses/${c.id}/students`).catch(() => ({ data: { students: [] } }))
       );
       const studentResponses = await Promise.all(studentPromises);
       let studentCount = 0;
       studentResponses.forEach(res => {
-        studentCount += (res.data ? res.data.length : 0);
+        studentCount += (res.data?.students?.length ?? 0);
       });
       setTotalStudents(studentCount);
 

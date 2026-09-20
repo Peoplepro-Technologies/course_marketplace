@@ -873,11 +873,34 @@ async def get_progress_overview(
     enrollments = db.query(Enrollment).filter(Enrollment.learner_id == current_user.id).all()
     
     total_enrolled = len(enrollments)
-    completed_courses = sum(1 for e in enrollments if e.completion_percentage >= 100)
-    
-    total_progress = sum(e.completion_percentage for e in enrollments)
-    avg_progress = (total_progress / total_enrolled) if total_enrolled > 0 else 0
-    
+    completed_courses = 0
+    total_progress = 0.0
+
+    for enrollment in enrollments:
+        total_lessons = (
+            db.query(func.count(Lesson.id))
+            .join(Section, Lesson.section_id == Section.id)
+            .filter(Section.course_id == enrollment.course_id)
+            .scalar() or 0
+        )
+        completed_lessons = (
+            db.query(func.count(Progress.id))
+            .join(Lesson, Progress.lesson_id == Lesson.id)
+            .join(Section, Lesson.section_id == Section.id)
+            .filter(
+                Section.course_id == enrollment.course_id,
+                Progress.learner_id == current_user.id,
+                Progress.status == "completed",
+            )
+            .scalar() or 0
+        )
+        pct = (completed_lessons / total_lessons * 100) if total_lessons > 0 else 0.0
+        total_progress += pct
+        if pct >= 100 and total_lessons > 0:
+            completed_courses += 1
+
+    avg_progress = (total_progress / total_enrolled) if total_enrolled > 0 else 0.0
+
     return {
         "total_enrolled": total_enrolled,
         "completed_courses": completed_courses,

@@ -37,9 +37,13 @@ from app.schemas.wishlist import WishlistRead
 from app.models.wishlist import Wishlist
 from app.schemas.refund_request import RefundRequestCreate, RefundRequestRead
 from app.schemas.live_class import LiveClassRead
+from app.schemas.course import CourseRead
+from app.auth.keycloak import get_current_user, get_current_user_from_header_or_query
+from app.auth.access import ensure_lesson_access, ensure_live_class_access
 from app.workers.tasks import recalculate_course_rating
 
 router = APIRouter(prefix="/api/v1/learner", tags=["Learner"])
+
 
 
 @router.get("/profile", response_model=UserRead)
@@ -313,10 +317,75 @@ async def list_enrolled_courses(
     return result
 
 
+@router.get("/courses/{course_id}")
+async def get_learner_course_detail(
+    course_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Get full details for an enrolled course, including complete lesson contents and video URLs.
+    Accessible by approved enrolled learners, the course instructor, and staff/admins.
+    """
+    course = (
+        db.query(Course)
+        .options(
+            joinedload(Course.instructor),
+            joinedload(Course.sections).joinedload(Section.lessons),
+        )
+        .filter(Course.id == course_id)
+        .first()
+    )
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found")
+
+    roles = set(getattr(current_user, "_realm_roles", []))
+    is_staff = bool(roles & {"super_admin", "admin", "sub_admin", "course_coordinator"})
+    is_instructor = "instructor" in roles and course.instructor_id == current_user.id
+
+    if not is_staff and not is_instructor:
+        enrollment = db.query(Enrollment).filter(
+            Enrollment.learner_id == current_user.id,
+            Enrollment.course_id == course_id,
+            Enrollment.status == "approved",
+        ).first()
+        if not enrollment:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You do not have access to this course.",
+            )
+
+    sections_data = []
+    for section in sorted(course.sections, key=lambda s: s.order_index):
+        sections_data.append({
+            "id": str(section.id),
+            "title": section.title,
+            "order_index": section.order_index,
+            "lessons": [
+                {
+                    "id": str(l.id),
+                    "title": l.title,
+                    "order_index": l.order_index,
+                    "duration": l.duration,
+                    "is_preview": l.is_preview,
+                    "video_url": l.video_url,
+                    "content": l.content,
+                    "thumbnail_url": l.thumbnail_url,
+                }
+                for l in sorted(section.lessons, key=lambda x: x.order_index)
+            ],
+        })
+
+    return {
+        "course": CourseRead.model_validate(course),
+        "sections": sections_data,
+    }
+
+
 @router.get("/courses/{course_id}/progress")
 async def get_course_progress(
     course_id: str,
-    current_user: User = Depends(require_role("learner")),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """
@@ -324,16 +393,25 @@ async def get_course_progress(
     Used by LessonViewer to restore progress state on load/refresh.
     Also verifies that the learner is enrolled before returning data.
     """
-    enrollment = db.query(Enrollment).filter(
-        Enrollment.learner_id == current_user.id,
-        Enrollment.course_id == course_id,
-        Enrollment.status == "approved",
-    ).first()
-    if not enrollment:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You are not enrolled in this course.",
-        )
+    course = db.query(Course).filter(Course.id == course_id).first()
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found")
+
+    roles = set(getattr(current_user, "_realm_roles", []))
+    is_staff = bool(roles & {"super_admin", "admin", "sub_admin", "course_coordinator"})
+    is_instructor = "instructor" in roles and course.instructor_id == current_user.id
+
+    if not is_staff and not is_instructor:
+        enrollment = db.query(Enrollment).filter(
+            Enrollment.learner_id == current_user.id,
+            Enrollment.course_id == course_id,
+            Enrollment.status == "approved",
+        ).first()
+        if not enrollment:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You are not enrolled in this course.",
+            )
 
     completed = (
         db.query(Progress.lesson_id)
@@ -347,6 +425,7 @@ async def get_course_progress(
         .all()
     )
     return {"completed_lesson_ids": [str(row[0]) for row in completed]}
+
 
 
 @router.put("/progress")
@@ -627,6 +706,8 @@ async def request_refund(
 # ═══════════════════════════════════════════════════════════════════════
 #  LIVE CLASSES
 # ═══════════════════════════════════════════════════════════════════════
+#  LIVE CLASSES & RECORDINGS
+# ═══════════════════════════════════════════════════════════════════════
 
 @router.get("/courses/{course_id}/live-classes", response_model=list[LiveClassRead])
 async def list_course_live_classes(
@@ -635,9 +716,8 @@ async def list_course_live_classes(
     db: Session = Depends(get_db),
 ):
     """
-    List upcoming and live classes for an enrolled course.
+    List scheduled, live, and ended classes for an enrolled course.
     Only learners with an 'approved' enrollment for that course may access this.
-    Returns scheduled and live classes (not ended) ordered by scheduled_at ascending.
     """
     # Verify approved enrollment
     enrollment = db.query(Enrollment).filter(
@@ -655,9 +735,8 @@ async def list_course_live_classes(
         db.query(LiveClass)
         .filter(
             LiveClass.course_id == course_id,
-            LiveClass.status.in_(["scheduled", "live"]),
         )
-        .order_by(LiveClass.scheduled_at.asc())
+        .order_by(LiveClass.scheduled_at.desc())
         .all()
     )
 

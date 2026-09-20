@@ -10,7 +10,7 @@ import shutil
 import subprocess
 import uuid as uuid_lib
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Body
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Body, BackgroundTasks
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func
 
@@ -26,6 +26,8 @@ from app.models.progress import Progress
 from app.models.transaction import Transaction
 from app.models.instructor_payout import InstructorPayout
 from app.models.live_class import LiveClass
+from app.utils.ffmpeg import get_ffmpeg_executable, run_ffmpeg_sync
+from app.services.transcription import transcribe_lesson_video
 from app.schemas.course import CourseCreate, CourseUpdate, CourseRead
 from app.schemas.section import SectionCreate, SectionUpdate, SectionRead
 from app.schemas.lesson import LessonCreate, LessonUpdate, LessonRead
@@ -33,6 +35,7 @@ from app.schemas.lesson import LessonCreate, LessonUpdate, LessonRead
 from app.schemas.live_class import LiveClassCreate, LiveClassRead
 from app.schemas.user import UserRead, UserUpdate
 from app.redis_client import invalidate_cache
+from app.config import get_settings
 
 
 router = APIRouter(prefix="/api/v1/instructor", tags=["Instructor"])
@@ -373,6 +376,7 @@ def run_ffmpeg_sync(cmd, timeout=120):
 @router.post("/lessons/{lesson_id}/upload-video", response_model=LessonRead)
 async def upload_lesson_video(
     lesson_id: str,
+    background_tasks: BackgroundTasks,
     video: UploadFile = File(...),
     current_user: User = Depends(require_role("instructor")),
     db: Session = Depends(get_db),
@@ -399,26 +403,17 @@ async def upload_lesson_video(
         print(f"[VIDEO UPLOAD] Failed: Lesson {lesson_id} not found or unauthorized.")
         raise HTTPException(status_code=404, detail="Lesson not found")
 
-    # ── Check ffmpeg is available (check PATH, winget links, or local node_modules fallback) ──
-    ffmpeg_bin = shutil.which("ffmpeg")
-    if ffmpeg_bin is None:
-        # Check standard winget links folder
-        links_ffmpeg = os.path.expandvars(r"%LOCALAPPDATA%\Microsoft\WinGet\Links\ffmpeg.exe")
-        if os.path.exists(links_ffmpeg):
-            ffmpeg_bin = links_ffmpeg
-        else:
-            # Check workspace root node_modules fallback
-            _HERE = os.path.dirname(os.path.abspath(__file__))
-            workspace_root = os.path.normpath(os.path.join(_HERE, "..", "..", ".."))
-            local_ffmpeg = os.path.normpath(os.path.join(workspace_root, "node_modules", "ffmpeg-static", "ffmpeg.exe"))
-            if os.path.exists(local_ffmpeg):
-                ffmpeg_bin = local_ffmpeg
+    # ── Check ffmpeg is available ──────────────────────────────────────
+    ffmpeg_executable = get_ffmpeg_executable()
 
-    if ffmpeg_bin is None:
-        print("[VIDEO UPLOAD] Failed: ffmpeg not found on PATH or local node_modules.")
+    if not ffmpeg_executable:
+        print("[VIDEO UPLOAD] Failed: ffmpeg not found on PATH, configured FFMPEG_PATH, or local node_modules.")
         raise HTTPException(
             status_code=503,
-            detail="ffmpeg is not installed or not on PATH.",
+            detail=(
+                "ffmpeg is not installed or not found. "
+                "Install it with: winget install ffmpeg — or configure FFMPEG_PATH in backend/.env."
+            ),
         )
 
     # ── Save the raw upload to a temp file ────────────────────────────
@@ -442,7 +437,7 @@ async def upload_lesson_video(
         import asyncio
         import subprocess
         ffmpeg_cmd = [
-            ffmpeg_bin, "-y",            # overwrite output
+            ffmpeg_executable, "-y",            # overwrite output
             "-i", raw_path,            # input
             "-c:v", "libx264",         # H.264 video codec
             "-preset", "fast",         # encoding speed
@@ -475,7 +470,7 @@ async def upload_lesson_video(
 
         # ── Extract thumbnail at 1 second ─────────────────────────────
         thumb_cmd = [
-            ffmpeg_bin, "-y",
+            ffmpeg_executable, "-y",
             "-i", out_path,
             "-ss", "00:00:01",   # seek to 1 second
             "-vframes", "1",     # grab exactly one frame
@@ -504,6 +499,11 @@ async def upload_lesson_video(
         db.commit()
         db.refresh(lesson)
         print(f"[VIDEO UPLOAD] DB commit successful. lesson_id={lesson_id}")
+
+        # ── Enqueue transcription as a background task ─────────────────
+        background_tasks.add_task(transcribe_lesson_video, lesson_id, out_path)
+        print(f"[VIDEO UPLOAD] Transcription background task queued for lesson_id={lesson_id}")
+
         return LessonRead.model_validate(lesson)
 
     except HTTPException:

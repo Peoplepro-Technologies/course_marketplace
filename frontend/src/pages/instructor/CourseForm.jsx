@@ -19,6 +19,8 @@ export default function CourseForm() {
     category: 'General',
     thumbnail_url: '',
     price: 0.0,
+    learning_outcomes: [],
+    skills: [],
   });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -34,6 +36,8 @@ export default function CourseForm() {
             category: c.category,
             thumbnail_url: c.thumbnail_url || '',
             price: c.price || 0,
+            learning_outcomes: c.learning_outcomes || [],
+            skills: c.skills || [],
           });
         })
         .catch(err => {
@@ -49,6 +53,26 @@ export default function CourseForm() {
       ...prev,
       [name]: type === 'number' ? parseFloat(value) : value
     }));
+  };
+
+  const handleArrayChange = (name, index, value) => {
+    setFormData(prev => {
+      const arr = [...prev[name]];
+      arr[index] = value;
+      return { ...prev, [name]: arr };
+    });
+  };
+
+  const addArrayItem = (name) => {
+    setFormData(prev => ({ ...prev, [name]: [...prev[name], ''] }));
+  };
+
+  const removeArrayItem = (name, index) => {
+    setFormData(prev => {
+      const arr = [...prev[name]];
+      arr.splice(index, 1);
+      return { ...prev, [name]: arr };
+    });
   };
 
   const handleSubmit = async (e) => {
@@ -150,6 +174,53 @@ export default function CourseForm() {
             placeholder="What will students learn in this course?"
           />
         </div>
+
+        <div className="form-group">
+          <label>What you'll learn (Learning Outcomes)</label>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '0.5rem' }}>
+            {formData.learning_outcomes.map((item, index) => (
+              <div key={index} style={{ display: 'flex', gap: '0.5rem' }}>
+                <input
+                  type="text"
+                  value={item}
+                  onChange={(e) => handleArrayChange('learning_outcomes', index, e.target.value)}
+                  placeholder='e.g. "Build a REST API with FastAPI"'
+                  style={{ flex: 1 }}
+                />
+                <button type="button" className="btn btn-outline" style={{ padding: '0 0.75rem' }} onClick={() => removeArrayItem('learning_outcomes', index)}>
+                  🗑️
+                </button>
+              </div>
+            ))}
+          </div>
+          <button type="button" className="btn btn-secondary btn-sm" onClick={() => addArrayItem('learning_outcomes')}>
+            + Add Learning Outcome
+          </button>
+        </div>
+
+        <div className="form-group">
+          <label>Skills you'll gain (Tags)</label>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '0.5rem' }}>
+            {formData.skills.map((item, index) => (
+              <div key={index} style={{ display: 'flex', gap: '0.5rem' }}>
+                <input
+                  type="text"
+                  value={item}
+                  onChange={(e) => handleArrayChange('skills', index, e.target.value)}
+                  placeholder='e.g. "Python" or "REST APIs"'
+                  style={{ flex: 1 }}
+                />
+                <button type="button" className="btn btn-outline" style={{ padding: '0 0.75rem' }} onClick={() => removeArrayItem('skills', index)}>
+                  🗑️
+                </button>
+              </div>
+            ))}
+          </div>
+          <button type="button" className="btn btn-secondary btn-sm" onClick={() => addArrayItem('skills')}>
+            + Add Skill Tag
+          </button>
+        </div>
+
 
         <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
           <button type="submit" className="btn btn-primary" disabled={submitting}>

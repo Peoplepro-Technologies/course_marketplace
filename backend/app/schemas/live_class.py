@@ -25,6 +25,9 @@ class LiveClassRead(BaseModel):
     duration_minutes: int
     room_name: str
     status: str
+    recording_url: Optional[str] = None
+    recording_status: str = "none"
+    recording_uploaded_at: Optional[datetime] = None
     created_at: datetime
     # optional extras the routers may attach
     course_title: Optional[str] = None
@@ -41,3 +44,6 @@ class JoinInfoRead(BaseModel):
     scheduled_at: datetime
     duration_minutes: int
     status: str
+    recording_status: str = "none"
+    recording_url: Optional[str] = None
+

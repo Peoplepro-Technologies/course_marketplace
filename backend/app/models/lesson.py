@@ -57,3 +57,4 @@ class Lesson(Base):
 
     def __repr__(self):
         return f"<Lesson {self.title}>"
+

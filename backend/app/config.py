@@ -23,9 +23,12 @@ class Settings(BaseSettings):
     REDIS_ENABLED: bool = False
 
     # ── Keycloak ──────────────────────────────────────────────────────
-    KEYCLOAK_URL: str = "http://localhost:8080"
+    KEYCLOAK_URL: str = "https://keycloak-26-0-0-96zz.onrender.com"
     KEYCLOAK_REALM: str = "course-marketplace"
     KEYCLOAK_CLIENT_ID: str = "course-frontend"
+
+    # ── FFmpeg ────────────────────────────────────────────────────────
+    FFMPEG_PATH: str = "ffmpeg"
 
     # ── Computed Properties ───────────────────────────────────────────
     @property

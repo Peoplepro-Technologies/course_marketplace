@@ -121,6 +121,14 @@ export default function App() {
               } 
             />
             <Route 
+              path="/learner/courses/:courseId" 
+              element={
+                <ProtectedRoute role="learner">
+                  <LessonViewer />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
               path="/learner/wishlist" 
               element={
                 <ProtectedRoute role="learner">

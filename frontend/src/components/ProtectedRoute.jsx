@@ -6,9 +6,14 @@
  */
 
 import useAuth from '../hooks/useAuth';
+import LoadingSpinner from './LoadingSpinner';
 
 export default function ProtectedRoute({ role, children }) {
-  const { hasRole, authenticated, login } = useAuth();
+  const { hasRole, authenticated, login, loading } = useAuth();
+
+  if (loading) {
+    return <div className="page-wrapper"><LoadingSpinner /></div>;
+  }
 
   if (!authenticated) {
     // Trigger the Keycloak login flow so the user is prompted to log in

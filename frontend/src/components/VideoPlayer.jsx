@@ -59,6 +59,7 @@ export default function VideoPlayer({ src, onPlayerReady }) {
     }
   }, [src]);
 
+
   // Dispose the player on unmount
   useEffect(() => {
     const player = playerRef.current;

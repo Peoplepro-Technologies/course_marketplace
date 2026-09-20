@@ -153,6 +153,7 @@ function AssignmentViewer({ assignments }) {
 export default function LessonViewer() {
   const { courseId } = useParams();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const [course, setCourse] = useState(null);
   const [sections, setSections] = useState([]);

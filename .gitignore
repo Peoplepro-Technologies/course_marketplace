@@ -17,8 +17,13 @@ env/
 .env.local
 
 # OS files
-.DS_Store
-Thumbs.db
+# Media files
+backend/app/media/videos/*
+backend/app/media/thumbnails/*
+!backend/app/media/videos/.gitkeep
+!backend/app/media/thumbnails/.gitkeep
 
-
-keycloak-25.0.1/
+# Keycloak binary & data
+keycloak-*/
+*.mv.db
+*.trace.db

@@ -1,11 +1,12 @@
 /**
- * LearnerLiveClasses.jsx — Learner-side view of live classes.
+ * LearnerLiveClasses.jsx — Learner-side view of live classes and recordings.
  *
  * Features:
- *   - Lists all approved-enrolled courses and their upcoming/live sessions
+ *   - Lists all approved-enrolled courses and their upcoming, live, and ended sessions
  *   - Countdown timer ("Starts in X minutes") for scheduled sessions
- *   - "Join" button enabled only when status is "live"
- *   - Opens Jitsi room in fullscreen modal when Join is clicked
+ *   - "Join" button enabled when status is "live"
+ *   - "Watch Recording" button enabled for ended sessions with a ready recording
+ *   - Opens VideoPlayer in modal to stream recording securely with token auth
  */
 
 import { useState, useEffect, useCallback } from 'react';
@@ -13,6 +14,8 @@ import { Link } from 'react-router-dom';
 import api from '../../api/axios';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import JitsiRoomModal from '../../components/JitsiRoomModal';
+import VideoPlayer from '../../components/VideoPlayer';
+import Modal from '../../components/Modal';
 import keycloak from '../../auth/keycloak';
 import { Video, RefreshCw, GraduationCap, Calendar, BookOpen, Clock, Play } from 'lucide-react';
 import EmptyState from '../../components/EmptyState';
@@ -48,9 +51,11 @@ function useCountdown(scheduledAt) {
   return label;
 }
 
-function LiveClassCard({ lc, onJoin }) {
+function LiveClassCard({ lc, onJoin, onWatchRecording }) {
   const countdown = useCountdown(lc.scheduled_at);
   const isLive = lc.status === 'live';
+  const isEnded = lc.status === 'ended';
+  const hasRecording = lc.recording_status === 'ready';
 
   const scheduled = new Date(lc.scheduled_at);
   const dateStr = scheduled.toLocaleString(undefined, {
@@ -88,7 +93,7 @@ function LiveClassCard({ lc, onJoin }) {
       {/* Icon */}
       <div style={{
         width: 48, height: 48, borderRadius: 'var(--radius-md)',
-        background: isLive ? '#dcfce7' : 'var(--color-bg-tertiary)',
+        background: isLive ? '#dcfce7' : isEnded ? '#f1f5f9' : 'var(--color-bg-tertiary)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         color: isLive ? '#22c55e' : 'var(--color-text-muted)',
         flexShrink: 0,
@@ -107,6 +112,11 @@ function LiveClassCard({ lc, onJoin }) {
         {!isLive && (
           <div style={{ fontSize: 'var(--text-xs)', color: '#0369a1', fontWeight: 600, marginTop: '0.3rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
             <Clock size={12} /> {countdown}
+          </div>
+        )}
+        {isEnded && (
+          <div style={{ fontSize: 'var(--text-xs)', color: hasRecording ? '#15803d' : 'var(--color-text-muted)', fontWeight: 600, marginTop: '0.3rem' }}>
+            {hasRecording ? '✓ Recording Available' : 'Session ended'}
           </div>
         )}
       </div>
@@ -136,6 +146,7 @@ export default function LearnerLiveClasses() {
   const [classesByCourse, setClassesByCourse] = useState({});
   const [loading, setLoading] = useState(true);
   const [jitsiRoom, setJitsiRoom] = useState(null);
+  const [recordingModalClass, setRecordingModalClass] = useState(null);
 
   const displayName = keycloak.tokenParsed?.name || keycloak.tokenParsed?.preferred_username || 'Student';
 
@@ -179,6 +190,10 @@ export default function LearnerLiveClasses() {
     setJitsiRoom({ roomName: lc.room_name, displayName });
   };
 
+  const handleWatchRecording = (lc) => {
+    setRecordingModalClass(lc);
+  };
+
   if (loading) return <div className="page-wrapper"><LoadingSpinner /></div>;
 
   const hasAnyClasses = enrollments.some(e =>
@@ -187,6 +202,7 @@ export default function LearnerLiveClasses() {
 
   return (
     <>
+      {/* Jitsi Meeting Modal */}
       {jitsiRoom && (
         <JitsiRoomModal
           roomName={jitsiRoom.roomName}
@@ -194,6 +210,19 @@ export default function LearnerLiveClasses() {
           onClose={() => setJitsiRoom(null)}
         />
       )}
+
+      {/* Watch Recording Video Modal */}
+      <Modal
+        isOpen={Boolean(recordingModalClass)}
+        onClose={() => setRecordingModalClass(null)}
+        title={`Class Recording — ${recordingModalClass?.title || ''}`}
+      >
+        {recordingModalClass && (
+          <VideoPlayer
+            src={`http://localhost:8000/api/v1/learner/live-classes/${recordingModalClass.id}/recording?token=${keycloak.token}`}
+          />
+        )}
+      </Modal>
 
       {/* Pulse animation */}
       <style>{`
@@ -264,7 +293,12 @@ export default function LearnerLiveClasses() {
 
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                     {classes.map(lc => (
-                      <LiveClassCard key={lc.id} lc={lc} onJoin={handleJoin} />
+                      <LiveClassCard
+                        key={lc.id}
+                        lc={lc}
+                        onJoin={handleJoin}
+                        onWatchRecording={handleWatchRecording}
+                      />
                     ))}
                   </div>
                 </div>

@@ -44,6 +44,13 @@ class LiveClass(Base):
         nullable=False,
         default="scheduled",  # scheduled | live | ended
     )
+    recording_url = Column(String(512), nullable=True)
+    recording_status = Column(
+        String(50),
+        nullable=False,
+        default="none",  # none | recording | processing | ready | failed
+    )
+    recording_uploaded_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),
@@ -62,3 +69,4 @@ class LiveClass(Base):
 
     def __repr__(self):
         return f"<LiveClass {self.title!r} status={self.status}>"
+

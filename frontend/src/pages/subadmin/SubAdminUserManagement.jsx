@@ -78,7 +78,7 @@ export default function SubAdminUserManagement() {
   return (
     <SubAdminSidebarLayout>
       <div className="sa-page-header">
-        <h2>👥 User Management</h2>
+        <h2>User Management</h2>
         <p>View, search, and manage all platform users (delegated permissions).</p>
       </div>
 

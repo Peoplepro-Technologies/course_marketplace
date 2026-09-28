@@ -2,7 +2,7 @@
  * ACInvoices.jsx — Invoice listing for Accounts role.
  *
  * Displays approved enrollments as simplified invoice records.
- * ⚠️ SIMPLIFIED: No real invoice system or PDF generation.
+ * ! SIMPLIFIED: No real invoice system or PDF generation.
  */
 
 import { useState, useEffect } from 'react';
@@ -31,7 +31,7 @@ export default function ACInvoices() {
   return (
     <AccountsSidebarLayout>
       <div className="role-welcome">
-        <h1>🧾 <span>Invoices</span></h1>
+        <h1> <span>Invoices</span></h1>
         <p>Enrollment-based invoice records</p>
       </div>
 
@@ -41,7 +41,7 @@ export default function ACInvoices() {
         padding: 'var(--space-md) var(--space-lg)', marginBottom: 'var(--space-xl)',
         display: 'flex', gap: 'var(--space-sm)', alignItems: 'flex-start',
       }}>
-        <span style={{ fontSize: '1.2rem' }}>⚠️</span>
+        <span style={{ fontSize: '1.2rem' }}>!</span>
         <div>
           <strong>Simplified View</strong> — These are invoice-like records generated from approved
           enrollment data. No real invoice system, billing software, or PDF export is implemented.
@@ -51,7 +51,7 @@ export default function ACInvoices() {
       {loading ? (
         <LoadingSpinner />
       ) : error ? (
-        <div className="alert alert-error">⚠️ {error}</div>
+        <div className="alert alert-error">! {error}</div>
       ) : (
         <>
           <div style={{ marginBottom: 'var(--space-md)', color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }}>

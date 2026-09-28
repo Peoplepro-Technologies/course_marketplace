@@ -53,14 +53,14 @@ export default function ACFinancialReports() {
   return (
     <AccountsSidebarLayout>
       <div className="role-welcome">
-        <h1>📈 <span>Financial Reports</span></h1>
+        <h1> <span>Financial Reports</span></h1>
         <p>Aggregated financial metrics across the platform</p>
       </div>
 
       {loading ? (
         <LoadingSpinner />
       ) : error ? (
-        <div className="alert alert-error">⚠️ {error}</div>
+        <div className="alert alert-error">! {error}</div>
       ) : (
         <>
           {/* Note banner */}

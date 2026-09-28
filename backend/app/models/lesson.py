@@ -38,6 +38,16 @@ class Lesson(Base):
         back_populates="lesson",
         cascade="all, delete-orphan",
     )
+    quiz_questions = relationship(
+        "QuizQuestion",
+        back_populates="lesson",
+        cascade="all, delete-orphan",
+    )
+    assignments = relationship(
+        "Assignment",
+        back_populates="lesson",
+        cascade="all, delete-orphan",
+    )
     transcript = relationship(
         "Transcript",
         back_populates="lesson",

@@ -25,6 +25,8 @@ class User(Base):
     is_active = Column(Boolean, default=True, nullable=False)
     profile_pic = Column(Text, nullable=True)
     bio = Column(Text, nullable=True)
+    payout_account_name = Column(String(255), nullable=True)
+    payout_account_number = Column(String(255), nullable=True)
     created_at = Column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),
@@ -42,6 +44,21 @@ class User(Base):
     reviews = relationship("Review", back_populates="learner", lazy="dynamic")
     progress_records = relationship("Progress", back_populates="learner", lazy="dynamic")
     live_classes = relationship("LiveClass", back_populates="instructor", lazy="dynamic")
+    
+    # Support
+    support_tickets = relationship(
+        "SupportTicket", 
+        back_populates="raised_by", 
+        foreign_keys="SupportTicket.raised_by_id", 
+        lazy="dynamic"
+    )
+    assigned_tickets = relationship(
+        "SupportTicket", 
+        back_populates="assigned_to", 
+        foreign_keys="SupportTicket.assigned_to_id", 
+        lazy="dynamic"
+    )
+    ticket_replies = relationship("TicketReply", back_populates="author", lazy="dynamic")
 
     def __repr__(self):
         return f"<User {self.name} ({self.role})>"

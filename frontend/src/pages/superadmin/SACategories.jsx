@@ -65,7 +65,7 @@ export default function SACategories() {
   return (
     <SASidebarLayout>
       <div className="sa-page-header">
-        <h2>🏷️ Category Management</h2>
+        <h2>Category Management</h2>
         <p>Manage course categories available to instructors.</p>
       </div>
 

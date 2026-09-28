@@ -48,10 +48,26 @@ export default function AuthProvider({ children }) {
             preferredUsername: tokenData.preferred_username || '',
           });
 
-          // Extract realm roles
+          // Extract realm and client roles
           const realmRoles = (tokenData.realm_access?.roles || []).map(r => r.toLowerCase());
-          console.log("EXTRACTED ROLES:", realmRoles);
-          setRoles(realmRoles);
+          const clientRoles = (tokenData.resource_access?.['course-frontend']?.roles || []).map(r => r.toLowerCase());
+          const allRolesSet = new Set([...realmRoles, ...clientRoles]);
+
+          if (allRolesSet.has('course_coordinator') || allRolesSet.has('coursecoordinator')) {
+            allRolesSet.add('coursecoordinator');
+            allRolesSet.add('course_coordinator');
+          }
+          if (allRolesSet.has('super_admin') || allRolesSet.has('superadmin')) {
+            allRolesSet.add('super_admin');
+            allRolesSet.add('admin');
+          }
+          if (allRolesSet.has('sub_admin') || allRolesSet.has('subadmin')) {
+            allRolesSet.add('sub_admin');
+          }
+
+          const extractedRoles = Array.from(allRolesSet);
+          console.log("EXTRACTED ROLES:", extractedRoles);
+          setRoles(extractedRoles);
         }
 
         setLoading(false);
@@ -95,21 +111,27 @@ export default function AuthProvider({ children }) {
   }, []);
 
   const hasRole = useCallback(
-    (role) => roles.includes(role),
+    (role) => {
+      const normalized = role.toLowerCase();
+      if (normalized === 'coursecoordinator' || normalized === 'course_coordinator') {
+        return roles.includes('coursecoordinator') || roles.includes('course_coordinator');
+      }
+      return roles.includes(normalized);
+    },
     [roles]
   );
 
   /**
    * Determine the user's primary role for dashboard routing.
-   * Priority: super_admin > admin > sub_admin > coursecoordinator > accounts > instructor > learner
+   * Priority: super_admin > sub_admin > coursecoordinator > accounts > instructor > learner
+   * Note: legacy 'admin' role is no longer used — all super_admin functionality
+   * is now gated with require_role('super_admin') in the backend.
    */
   const primaryRole = roles.includes('super_admin')
     ? 'super_admin'
-    : roles.includes('admin')
-    ? 'admin'
     : roles.includes('sub_admin')
     ? 'sub_admin'
-    : roles.includes('coursecoordinator')
+    : (roles.includes('coursecoordinator') || roles.includes('course_coordinator'))
     ? 'coursecoordinator'
     : roles.includes('accounts')
     ? 'accounts'

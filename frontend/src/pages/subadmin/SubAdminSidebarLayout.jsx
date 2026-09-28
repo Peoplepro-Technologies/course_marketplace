@@ -6,18 +6,21 @@
  */
 
 import { Link, useLocation } from 'react-router-dom';
+import {
+  LayoutDashboard, Users, BookOpen, Tag, CheckSquare, Star, LifeBuoy, BarChart2, Wrench,
+} from 'lucide-react';
 import '../RoleDashboard.css';
 import '../superadmin/SuperAdminDashboard.css';
 
 const SIDEBAR_ITEMS = [
-  { icon: '📊', label: 'Dashboard', path: '/sub-admin' },
-  { icon: '👥', label: 'User Management', path: '/sub-admin/users' },
-  { icon: '📚', label: 'Course Management', path: '/sub-admin/courses' },
-  { icon: '🏷️', label: 'Categories', path: '/sub-admin/categories' },
-  { icon: '✅', label: 'Approvals', path: '/sub-admin/approvals' },
-  { icon: '⭐', label: 'Reviews & Moderation', path: '/sub-admin/reviews' },
-  { icon: '🛟', label: 'Support', path: '/sub-admin/support' },
-  { icon: '📈', label: 'Reports', path: '/sub-admin/reports' },
+  { Icon: LayoutDashboard, label: 'Dashboard',            path: '/sub-admin' },
+  { Icon: Users,           label: 'User Management',      path: '/sub-admin/users' },
+  { Icon: BookOpen,        label: 'Course Management',    path: '/sub-admin/courses' },
+  { Icon: Tag,             label: 'Categories',           path: '/sub-admin/categories' },
+  { Icon: CheckSquare,     label: 'Approvals',            path: '/sub-admin/approvals' },
+  { Icon: Star,            label: 'Reviews & Moderation', path: '/sub-admin/reviews' },
+  { Icon: LifeBuoy,        label: 'Support',              path: '/sub-admin/support' },
+  { Icon: BarChart2,       label: 'Reports',              path: '/sub-admin/reports' },
 ];
 
 export { SIDEBAR_ITEMS };
@@ -30,16 +33,18 @@ export default function SubAdminSidebarLayout({ children }) {
       {/* ── Sidebar ────────────────────────────────────────────────── */}
       <aside className="role-sidebar">
         <div className="role-sidebar-header">
-          <h3>🔧 Sub Admin</h3>
+          <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Wrench size={18} /> Sub Admin
+          </h3>
           <p>Delegated Management</p>
         </div>
         <ul className="sidebar-nav">
           {SIDEBAR_ITEMS.map((item) => {
-            const isPlaceholder = item.path === '/sub-admin/support';
+            const isPlaceholder = false;
             return (
               <Link to={item.path} key={item.label} style={{ textDecoration: 'none' }}>
                 <li className={`sidebar-nav-item${location.pathname === item.path ? ' active' : ''}`}>
-                  <span className="sidebar-nav-icon">{item.icon}</span>
+                  <span className="sidebar-nav-icon"><item.Icon size={16} /></span>
                   {item.label}
                   {isPlaceholder && (
                     <span className="sidebar-coming-soon">Soon</span>

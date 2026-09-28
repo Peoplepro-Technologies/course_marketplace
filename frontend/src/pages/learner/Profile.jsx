@@ -46,10 +46,12 @@ export default function Profile() {
 
   return (
     <div className="page-wrapper">
-      <div className="container animate-fade-in" style={{ maxWidth: '600px', margin: '0 auto' }}>
-        <h1 style={{ marginBottom: '2rem' }}>My Profile</h1>
-        
-        <div className="card-glass" style={{ padding: '2rem' }}>
+      <div className="section-header" style={{ maxWidth: '600px', margin: '0 auto 24px auto' }}>
+        <h2>My Profile</h2>
+        <p>Update your personal information</p>
+      </div>
+      
+      <div className="dashboard-card" style={{ maxWidth: '600px', margin: '0 auto', padding: '2rem' }}>
           {message && (
             <div style={{
               padding: '1rem',
@@ -124,7 +126,6 @@ export default function Profile() {
             </button>
           </form>
         </div>
-      </div>
     </div>
   );
 }

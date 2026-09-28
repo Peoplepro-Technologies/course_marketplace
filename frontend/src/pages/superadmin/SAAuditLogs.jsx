@@ -26,7 +26,7 @@ export default function SAAuditLogs() {
   return (
     <SASidebarLayout>
       <div className="sa-page-header">
-        <h2>📋 Audit Logs</h2>
+        <h2>Audit Logs</h2>
         <p>System tracking of critical administrative actions.</p>
       </div>
 

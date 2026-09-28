@@ -41,7 +41,7 @@ export default function CourseCatalog() {
     <div className="page-wrapper container animate-fade-in">
       <div className="section-header flex-between">
         <div>
-          <h2>📚 Course Catalog</h2>
+          <h2>Course Catalog</h2>
           <p>Read-only view of all platform courses.</p>
         </div>
         <Link to="/coordinator" className="btn btn-secondary">← Dashboard</Link>
@@ -65,7 +65,7 @@ export default function CourseCatalog() {
       </div>
 
       {error ? (
-        <div className="alert alert-error">⚠️ {error}</div>
+        <div className="alert alert-error">! {error}</div>
       ) : loading ? (
         <LoadingSpinner />
       ) : data.courses.length === 0 ? (

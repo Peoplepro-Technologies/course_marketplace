@@ -10,6 +10,7 @@
 
 import { Link, useLocation } from 'react-router-dom';
 import useAuth from '../hooks/useAuth';
+import { BookOpen } from 'lucide-react';
 import './Navbar.css';
 
 export default function Navbar() {
@@ -23,7 +24,7 @@ export default function Navbar() {
       <div className="navbar-inner container">
         {/* ── Logo ──────────────────────────────────────────────────── */}
         <Link to="/" className="navbar-brand">
-          <span className="navbar-logo">🎓</span>
+          <span className="navbar-logo"><BookOpen size={22} strokeWidth={2} /></span>
           <span className="navbar-title">CourseHub</span>
         </Link>
 
@@ -68,14 +69,7 @@ export default function Navbar() {
             </Link>
           )}
 
-          {primaryRole === 'admin' && (
-            <Link
-              to="/admin"
-              className={`nav-link ${isActive('/admin') ? 'active' : ''}`}
-            >
-              Admin Panel
-            </Link>
-          )}
+
 
           {primaryRole === 'super_admin' && (
             <Link

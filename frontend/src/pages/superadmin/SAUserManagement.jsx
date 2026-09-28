@@ -73,7 +73,7 @@ export default function SAUserManagement() {
   return (
     <SASidebarLayout>
       <div className="sa-page-header">
-        <h2>👥 User Management</h2>
+        <h2>User Management</h2>
         <p>View, search, and manage all platform users.</p>
       </div>
 

@@ -123,7 +123,7 @@ export default function VideoPlayer({ src, onPlayerReady }) {
           borderRadius: "var(--radius-md, 8px)"
         }}>
           <div style={{ textAlign: "center", padding: "1.5rem" }}>
-            <span style={{ fontSize: "2rem" }}>⚠️</span>
+            <span style={{ fontSize: "2rem" }}>!</span>
             <p style={{ margin: "0.5rem 0 0", fontSize: "var(--text-sm, 0.875rem)", fontWeight: "bold" }}>
               Unable to load video, please try again
             </p>

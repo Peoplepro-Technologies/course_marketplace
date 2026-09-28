@@ -1,11 +1,12 @@
 /**
- * LearnerLiveClasses.jsx — Learner-side view of live classes.
+ * LearnerLiveClasses.jsx — Learner-side view of live classes and recordings.
  *
  * Features:
- *   - Lists all approved-enrolled courses and their upcoming/live sessions
+ *   - Lists all approved-enrolled courses and their upcoming, live, and ended sessions
  *   - Countdown timer ("Starts in X minutes") for scheduled sessions
- *   - "Join" button enabled only when status is "live"
- *   - Opens Jitsi room in fullscreen modal when Join is clicked
+ *   - "Join" button enabled when status is "live"
+ *   - "Watch Recording" button enabled for ended sessions with a ready recording
+ *   - Opens VideoPlayer in modal to stream recording securely with token auth
  */
 
 import { useState, useEffect, useCallback } from 'react';
@@ -13,7 +14,11 @@ import { Link } from 'react-router-dom';
 import api from '../../api/axios';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import JitsiRoomModal from '../../components/JitsiRoomModal';
+import VideoPlayer from '../../components/VideoPlayer';
+import Modal from '../../components/Modal';
 import keycloak from '../../auth/keycloak';
+import { Video, RefreshCw, GraduationCap, Calendar, BookOpen, Clock, Play } from 'lucide-react';
+import EmptyState from '../../components/EmptyState';
 
 function useCountdown(scheduledAt) {
   const [label, setLabel] = useState('');
@@ -46,9 +51,11 @@ function useCountdown(scheduledAt) {
   return label;
 }
 
-function LiveClassCard({ lc, onJoin }) {
+function LiveClassCard({ lc, onJoin, onWatchRecording }) {
   const countdown = useCountdown(lc.scheduled_at);
   const isLive = lc.status === 'live';
+  const isEnded = lc.status === 'ended';
+  const hasRecording = lc.recording_status === 'ready';
 
   const scheduled = new Date(lc.scheduled_at);
   const dateStr = scheduled.toLocaleString(undefined, {
@@ -86,11 +93,12 @@ function LiveClassCard({ lc, onJoin }) {
       {/* Icon */}
       <div style={{
         width: 48, height: 48, borderRadius: 'var(--radius-md)',
-        background: isLive ? '#dcfce7' : 'var(--color-bg-tertiary)',
+        background: isLive ? '#dcfce7' : isEnded ? '#f1f5f9' : 'var(--color-bg-tertiary)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: '1.5rem', flexShrink: 0,
+        color: isLive ? '#22c55e' : 'var(--color-text-muted)',
+        flexShrink: 0,
       }}>
-        {isLive ? '🔴' : '🎥'}
+        <Video size={24} />
       </div>
 
       {/* Info */}
@@ -102,8 +110,13 @@ function LiveClassCard({ lc, onJoin }) {
           {dateStr} · {lc.duration_minutes} min
         </div>
         {!isLive && (
-          <div style={{ fontSize: 'var(--text-xs)', color: '#0369a1', fontWeight: 600, marginTop: '0.3rem' }}>
-            ⏱ {countdown}
+          <div style={{ fontSize: 'var(--text-xs)', color: '#0369a1', fontWeight: 600, marginTop: '0.3rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <Clock size={12} /> {countdown}
+          </div>
+        )}
+        {isEnded && (
+          <div style={{ fontSize: 'var(--text-xs)', color: hasRecording ? '#15803d' : 'var(--color-text-muted)', fontWeight: 600, marginTop: '0.3rem' }}>
+            {hasRecording ? '✓ Recording Available' : 'Session ended'}
           </div>
         )}
       </div>
@@ -111,17 +124,18 @@ function LiveClassCard({ lc, onJoin }) {
       {/* Join button */}
       <button
         id={`learner-join-live-class-${lc.id}`}
-        className={`btn ${isLive ? 'btn-success' : 'btn-secondary'} btn-sm`}
+        className={`btn ${isLive ? 'btn-success' : 'btn-secondary'} btn-sm flex-center`}
         disabled={!isLive}
         onClick={() => isLive && onJoin(lc)}
         title={isLive ? 'Join live session' : 'Session not started yet'}
         style={{
-          minWidth: 90,
+          minWidth: 100,
           opacity: isLive ? 1 : 0.55,
           cursor: isLive ? 'pointer' : 'not-allowed',
+          gap: '6px'
         }}
       >
-        {isLive ? '▶ Join Now' : 'Not Started'}
+        {isLive && <Play size={14} />} {isLive ? 'Join Now' : 'Not Started'}
       </button>
     </div>
   );
@@ -132,6 +146,7 @@ export default function LearnerLiveClasses() {
   const [classesByCourse, setClassesByCourse] = useState({});
   const [loading, setLoading] = useState(true);
   const [jitsiRoom, setJitsiRoom] = useState(null);
+  const [recordingModalClass, setRecordingModalClass] = useState(null);
 
   const displayName = keycloak.tokenParsed?.name || keycloak.tokenParsed?.preferred_username || 'Student';
 
@@ -175,6 +190,10 @@ export default function LearnerLiveClasses() {
     setJitsiRoom({ roomName: lc.room_name, displayName });
   };
 
+  const handleWatchRecording = (lc) => {
+    setRecordingModalClass(lc);
+  };
+
   if (loading) return <div className="page-wrapper"><LoadingSpinner /></div>;
 
   const hasAnyClasses = enrollments.some(e =>
@@ -183,6 +202,7 @@ export default function LearnerLiveClasses() {
 
   return (
     <>
+      {/* Jitsi Meeting Modal */}
       {jitsiRoom && (
         <JitsiRoomModal
           roomName={jitsiRoom.roomName}
@@ -190,6 +210,19 @@ export default function LearnerLiveClasses() {
           onClose={() => setJitsiRoom(null)}
         />
       )}
+
+      {/* Watch Recording Video Modal */}
+      <Modal
+        isOpen={Boolean(recordingModalClass)}
+        onClose={() => setRecordingModalClass(null)}
+        title={`Class Recording — ${recordingModalClass?.title || ''}`}
+      >
+        {recordingModalClass && (
+          <VideoPlayer
+            src={`http://localhost:8000/api/v1/learner/live-classes/${recordingModalClass.id}/recording?token=${keycloak.token}`}
+          />
+        )}
+      </Modal>
 
       {/* Pulse animation */}
       <style>{`
@@ -199,37 +232,34 @@ export default function LearnerLiveClasses() {
         }
       `}</style>
 
-      <div className="page-wrapper container">
-        <div className="section-header flex-between">
+      <div className="page-wrapper">
+        <div className="section-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
-            <Link to="/learner" className="btn btn-secondary btn-sm" style={{ marginBottom: '0.5rem' }}>
-              ← Back to Dashboard
-            </Link>
-            <h2 style={{ marginTop: '0.5rem' }}>🎥 Live Classes</h2>
+            <h2 style={{ marginTop: '0.5rem', display: 'flex', alignItems: 'center', gap: '8px' }}><Video size={24} /> Live Classes</h2>
             <p>Join live sessions hosted by your instructors.</p>
           </div>
           <button
             className="btn btn-secondary btn-sm"
+            style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
             onClick={fetchData}
             id="learner-refresh-live-classes-btn"
           >
-            🔄 Refresh
+            <RefreshCw size={14} /> Refresh
           </button>
         </div>
 
         {enrollments.length === 0 ? (
-          <div className="empty-state card">
-            <div className="empty-icon">🎒</div>
-            <h3>No approved enrollments</h3>
-            <p>You need an approved enrollment to view live classes.</p>
-            <Link to="/learner" className="btn btn-primary">Back to Dashboard</Link>
-          </div>
+          <EmptyState 
+            icon={GraduationCap}
+            title="No approved enrollments"
+            message="You need an approved enrollment to view live classes."
+          />
         ) : !hasAnyClasses ? (
-          <div className="empty-state card">
-            <div className="empty-icon">🗓</div>
-            <h3>No upcoming live sessions</h3>
-            <p>Your instructors haven't scheduled any live classes yet. Check back soon!</p>
-          </div>
+          <EmptyState 
+            icon={Calendar}
+            title="No upcoming live sessions"
+            message="Your instructors haven't scheduled any live classes yet. Check back soon!"
+          />
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
             {enrollments.map(enrollment => {
@@ -253,8 +283,8 @@ export default function LearnerLiveClasses() {
                         width: 36, height: 36, borderRadius: 6,
                         background: 'var(--color-bg-tertiary)',
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        fontSize: '1.1rem',
-                      }}>📚</div>
+                        color: 'var(--color-text-muted)'
+                      }}><BookOpen size={20} /></div>
                     )}
                     <h3 style={{ margin: 0, fontSize: 'var(--text-lg)', fontWeight: 700 }}>
                       {enrollment.course_title}
@@ -263,7 +293,12 @@ export default function LearnerLiveClasses() {
 
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                     {classes.map(lc => (
-                      <LiveClassCard key={lc.id} lc={lc} onJoin={handleJoin} />
+                      <LiveClassCard
+                        key={lc.id}
+                        lc={lc}
+                        onJoin={handleJoin}
+                        onWatchRecording={handleWatchRecording}
+                      />
                     ))}
                   </div>
                 </div>

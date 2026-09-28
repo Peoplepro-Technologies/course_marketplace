@@ -26,14 +26,14 @@ export default function Reports() {
     <div className="page-wrapper container animate-fade-in">
       <div className="section-header flex-between">
         <div>
-          <h2>📈 Course Reports</h2>
+          <h2> Course Reports</h2>
           <p>Aggregated performance metrics for all courses.</p>
         </div>
         <Link to="/coordinator" className="btn btn-secondary">← Dashboard</Link>
       </div>
 
       {error ? (
-        <div className="alert alert-error">⚠️ {error}</div>
+        <div className="alert alert-error">! {error}</div>
       ) : loading ? (
         <LoadingSpinner />
       ) : data.reports.length === 0 ? (

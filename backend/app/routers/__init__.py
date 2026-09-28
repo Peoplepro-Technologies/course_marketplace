@@ -1,4 +1,3 @@
 # routers/__init__.py
 
-from . import public, learner, instructor, admin, coordinator, superadmin, accounts, subadmin, transcripts
-
+from . import public, learner, instructor, coordinator, superadmin, subadmin, accounts

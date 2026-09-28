@@ -15,17 +15,21 @@ import { Link, useLocation } from 'react-router-dom';
 import api from '../../api/axios';
 import useAuth from '../../hooks/useAuth';
 import LoadingSpinner from '../../components/LoadingSpinner';
+import {
+  LayoutDashboard, CheckSquare, BookOpen, Tag, Users, Star, BarChart2,
+  Rocket, User, AlertTriangle, ClipboardList,
+} from 'lucide-react';
 import '../RoleDashboard.css';
 import './CoordinatorDashboard.css';
 
 const SIDEBAR_ITEMS = [
-  { icon: '📊', label: 'Dashboard', path: '/coordinator' },
-  { icon: '✅', label: 'Course Approvals', path: '/coordinator/courses/pending' },
-  { icon: '📚', label: 'Course Catalog', path: '/coordinator/courses' },
-  { icon: '🏷️', label: 'Categories', path: '/coordinator/categories' },
-  { icon: '👨‍🏫', label: 'Instructors', path: '/coordinator/instructors' },
-  { icon: '⭐', label: 'Quality & Reviews', path: '/coordinator/quality-reviews' },
-  { icon: '📈', label: 'Reports', path: '/coordinator/reports' },
+  { Icon: LayoutDashboard, label: 'Dashboard',           path: '/coordinator' },
+  { Icon: CheckSquare,     label: 'Course Approvals',    path: '/coordinator/courses/pending' },
+  { Icon: BookOpen,        label: 'Course Catalog',      path: '/coordinator/courses' },
+  { Icon: Tag,             label: 'Categories',          path: '/coordinator/categories' },
+  { Icon: Users,           label: 'Instructors',         path: '/coordinator/instructors' },
+  { Icon: Star,            label: 'Quality & Reviews',   path: '/coordinator/quality-reviews' },
+  { Icon: BarChart2,       label: 'Reports',             path: '/coordinator/reports' },
 ];
 
 const QUICK_ACCESS = SIDEBAR_ITEMS.slice(1); // skip Dashboard itself
@@ -55,14 +59,16 @@ export default function CoordinatorDashboard() {
       {/* ── Sidebar ──────────────────────────────────────────────────── */}
       <aside className="role-sidebar">
         <div className="role-sidebar-header">
-          <h3>📋 Coordinator</h3>
+          <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <ClipboardList size={18} /> Coordinator
+          </h3>
           <p>Course Quality & Oversight</p>
         </div>
         <ul className="sidebar-nav">
           {SIDEBAR_ITEMS.map((item) => (
             <Link to={item.path} key={item.label} style={{ textDecoration: 'none' }}>
               <li className={`sidebar-nav-item${location.pathname === item.path ? ' active' : ''}`}>
-                <span className="sidebar-nav-icon">{item.icon}</span>
+                <span className="sidebar-nav-icon"><item.Icon size={16} /></span>
                 {item.label}
               </li>
             </Link>
@@ -84,8 +90,8 @@ export default function CoordinatorDashboard() {
         {statsLoading ? (
           <div style={{ padding: 'var(--space-2xl) 0' }}><LoadingSpinner /></div>
         ) : statsError ? (
-          <div className="alert alert-error" style={{ marginBottom: 'var(--space-xl)' }}>
-            ⚠️ Could not load stats: {statsError}
+          <div className="alert alert-error" style={{ marginBottom: 'var(--space-xl)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <AlertTriangle size={18} /> Could not load stats: {statsError}
           </div>
         ) : (
           <div className="coord-widgets-grid">
@@ -93,7 +99,7 @@ export default function CoordinatorDashboard() {
             {/* Widget 1 — Pending Reviews */}
             <div className="coord-widget coord-widget--pending animate-fade-in-up" style={{ animationDelay: '0.05s' }}>
               <div className="coord-widget-header">
-                <span className="coord-widget-icon">✅</span>
+                <span className="coord-widget-icon"><CheckSquare size={22} /></span>
                 <h3>Pending Reviews</h3>
               </div>
               <div className="coord-widget-body">
@@ -112,7 +118,7 @@ export default function CoordinatorDashboard() {
             {/* Widget 2 — Recently Published */}
             <div className="coord-widget coord-widget--published animate-fade-in-up" style={{ animationDelay: '0.10s' }}>
               <div className="coord-widget-header">
-                <span className="coord-widget-icon">🚀</span>
+                <span className="coord-widget-icon"><Rocket size={22} /></span>
                 <h3>Recently Published</h3>
               </div>
               <div className="coord-widget-body">
@@ -127,8 +133,8 @@ export default function CoordinatorDashboard() {
                           <span className="badge badge-success" style={{ fontSize: '0.65rem' }}>
                             {c.category}
                           </span>
-                          <span className="coord-recent-instructor">
-                            👤 {c.instructor_name}
+                          <span className="coord-recent-instructor" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                            <User size={12} /> {c.instructor_name}
                           </span>
                         </div>
                       </li>
@@ -144,7 +150,7 @@ export default function CoordinatorDashboard() {
             {/* Widget 3 — Instructor Roster */}
             <div className="coord-widget coord-widget--instructors animate-fade-in-up" style={{ animationDelay: '0.15s' }}>
               <div className="coord-widget-header">
-                <span className="coord-widget-icon">👨‍🏫</span>
+                <span className="coord-widget-icon"><Users size={22} /></span>
                 <h3>Instructor Roster</h3>
               </div>
               <div className="coord-widget-body">
@@ -163,7 +169,7 @@ export default function CoordinatorDashboard() {
             {/* Widget 4 — Category Health */}
             <div className="coord-widget coord-widget--categories animate-fade-in-up" style={{ animationDelay: '0.20s' }}>
               <div className="coord-widget-header">
-                <span className="coord-widget-icon">🏷️</span>
+                <span className="coord-widget-icon"><Tag size={22} /></span>
                 <h3>Category Health</h3>
               </div>
               <div className="coord-widget-body">
@@ -200,7 +206,9 @@ export default function CoordinatorDashboard() {
           {QUICK_ACCESS.map((item) => (
             <Link to={item.path} key={item.label} style={{ textDecoration: 'none', display: 'block' }}>
               <div className="role-placeholder-card" style={{ cursor: 'pointer', height: '100%' }}>
-                <div className="card-icon">{item.icon}</div>
+                <div className="card-icon" style={{ display: 'flex', justifyContent: 'center', marginBottom: '0.75rem' }}>
+                  <item.Icon size={32} strokeWidth={1.5} />
+                </div>
                 <h4>{item.label}</h4>
                 <p>View {item.label.toLowerCase()}</p>
               </div>

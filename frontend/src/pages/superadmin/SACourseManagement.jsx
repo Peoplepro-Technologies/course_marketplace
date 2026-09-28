@@ -45,7 +45,7 @@ export default function SACourseManagement() {
   return (
     <SASidebarLayout>
       <div className="sa-page-header">
-        <h2>📚 Course Management</h2>
+        <h2>Course Management</h2>
         <p>View and manage all courses on the platform.</p>
       </div>
 

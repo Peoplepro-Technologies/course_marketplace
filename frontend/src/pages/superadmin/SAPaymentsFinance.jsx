@@ -33,7 +33,7 @@ export default function SAPaymentsFinance() {
   return (
     <SASidebarLayout>
       <div className="sa-page-header">
-        <h2>💳 Payments & Finance</h2>
+        <h2>Payments & Finance</h2>
         <p>Overview of platform revenue and recent transactions.</p>
       </div>
 

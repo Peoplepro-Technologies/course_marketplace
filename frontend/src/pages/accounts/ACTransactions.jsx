@@ -2,7 +2,7 @@
  * ACTransactions.jsx — Simplified transaction listing for Accounts role.
  *
  * Displays all approved enrollments as transaction records.
- * ⚠️ SIMPLIFIED VIEW: This is based on enrollment data, not real payment
+ * ! SIMPLIFIED VIEW: This is based on enrollment data, not real payment
  *    records. Clearly labeled in the UI. Pending real payment integration.
  */
 
@@ -32,7 +32,7 @@ export default function ACTransactions() {
   return (
     <AccountsSidebarLayout>
       <div className="role-welcome">
-        <h1>💰 <span>Transactions</span></h1>
+        <h1> <span>Transactions</span></h1>
         <p>Approved enrollment-based transaction records</p>
       </div>
 
@@ -42,7 +42,7 @@ export default function ACTransactions() {
         padding: 'var(--space-md) var(--space-lg)', marginBottom: 'var(--space-xl)',
         display: 'flex', gap: 'var(--space-sm)', alignItems: 'flex-start',
       }}>
-        <span style={{ fontSize: '1.2rem' }}>⚠️</span>
+        <span style={{ fontSize: '1.2rem' }}>!</span>
         <div>
           <strong>Simplified View</strong> — These records are derived from enrollment approvals, not a real
           payment gateway. A real payment integration is required to show actual transaction data (amounts charged,
@@ -53,7 +53,7 @@ export default function ACTransactions() {
       {loading ? (
         <LoadingSpinner />
       ) : error ? (
-        <div className="alert alert-error">⚠️ {error}</div>
+        <div className="alert alert-error">! {error}</div>
       ) : (
         <>
           <div style={{ marginBottom: 'var(--space-md)', color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }}>

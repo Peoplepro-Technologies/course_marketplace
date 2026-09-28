@@ -7,6 +7,9 @@ import { useParams, useNavigate } from 'react-router-dom';
 import api from '../../api/axios';
 import Modal from '../../components/Modal';
 import LessonForm from './LessonForm';
+import EmptyState from '../../components/EmptyState';
+import StatusBadge from '../../components/StatusBadge';
+import { FolderOpen, X, Plus } from 'lucide-react';
 
 export default function SectionManager() {
   const { courseId } = useParams();
@@ -83,19 +86,17 @@ export default function SectionManager() {
           <h2>Curriculum for: {course?.title}</h2>
         </div>
         <div>
-          <span className={`badge badge-${course?.status === 'published' ? 'success' : 'warning'}`}>
-            {course?.status}
-          </span>
+          {course && <StatusBadge status={course.status} />}
         </div>
       </div>
 
       <div className="flex-col gap-lg">
         {sections.length === 0 ? (
-          <div className="empty-state card">
-            <div className="empty-icon">📂</div>
-            <h3>No curriculum yet</h3>
-            <p>Start by creating your first section below.</p>
-          </div>
+          <EmptyState 
+            icon={FolderOpen}
+            title="No curriculum yet"
+            message="Start by creating your first section below."
+          />
         ) : (
           sections.map((section, idx) => (
             <div key={section.id} className="card-glass flex-col gap-md" style={{ padding: '1.5rem' }}>
@@ -128,10 +129,11 @@ export default function SectionManager() {
                           Edit
                         </button>
                         <button 
-                          className="btn btn-secondary btn-sm" 
+                          className="btn btn-secondary btn-sm flex-center" 
+                          style={{ padding: '0.25rem' }}
                           onClick={() => handleDeleteLesson(lesson.id)}
                         >
-                          ✕
+                          <X size={16} />
                         </button>
                       </div>
                     </div>
@@ -140,11 +142,11 @@ export default function SectionManager() {
               </div>
               
               <button 
-                className="btn btn-secondary btn-sm" 
-                style={{ alignSelf: 'flex-start' }}
+                className="btn btn-secondary btn-sm flex-center" 
+                style={{ alignSelf: 'flex-start', gap: '6px' }}
                 onClick={() => setLessonModal({ isOpen: true, sectionId: section.id, lesson: null })}
               >
-                + Add Lesson
+                <Plus size={14} /> Add Lesson
               </button>
             </div>
           ))

@@ -265,7 +265,7 @@ export default function CourseApprovals() {
                       <div className="preview-info-row">
                         <span className="preview-label">Price</span>
                         <strong className="preview-price">
-                          {previewCourse.price > 0 ? `$${Number(previewCourse.price).toFixed(2)}` : 'Free'}
+                          {previewCourse.price > 0 ? `₹${Number(previewCourse.price).toFixed(2)}` : 'Free'}
                         </strong>
                       </div>
                       <div className="preview-info-row">

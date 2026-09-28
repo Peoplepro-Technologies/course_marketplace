@@ -44,7 +44,7 @@ export default function CourseCard({ course, showStatus = false }) {
             <span className="rating-value">{(course.avg_rating || 0).toFixed(1)}</span>
           </div>
           <div className="course-card-price">
-            {course.price > 0 ? `$${course.price.toFixed(2)}` : 'Free'}
+            {course.price > 0 ? `₹${course.price.toFixed(2)}` : 'Free'}
           </div>
         </div>
       </div>

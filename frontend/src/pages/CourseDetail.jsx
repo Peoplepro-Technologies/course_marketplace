@@ -413,7 +413,7 @@ export default function CourseDetail() {
               )}
 
               <div className="sidebar-price" style={{ fontSize: '2rem', fontWeight: '800', color: 'var(--text-h)', marginBottom: '1.5rem' }}>
-                {course.price > 0 ? `$${course.price.toFixed(2)}` : 'Free'}
+                {course.price > 0 ? `₹${course.price.toFixed(2)}` : 'Free'}
               </div>
 
               <div style={{ marginBottom: '1.5rem' }}>

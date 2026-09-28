@@ -60,7 +60,7 @@ export default function Wishlist() {
                 <div style={{ padding: '1rem', display: 'flex', flexDirection: 'column', flexGrow: 1 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
                     <span className="badge badge-primary" style={{ fontSize: '0.75rem' }}>{item.course_category}</span>
-                    <span style={{ fontWeight: 'bold' }}>${item.course_price}</span>
+                    <span style={{ fontWeight: 'bold' }}>₹{item.course_price}</span>
                   </div>
                   
                   <h3 style={{ margin: '0 0 0.5rem', fontSize: '1.1rem' }}>{item.course_title}</h3>

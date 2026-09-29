@@ -27,6 +27,36 @@ backend/app/media/thumbnails/*
 keycloak-*/
 *.mv.db
 *.trace.db
+keycloak-26.7.0/
+# Discard node_modules and builds
+node_modules/
+dist/
+
+# Discard python cache
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Discard virtual envs
+venv/
+.venv/
+env/
+
+# Discard env files
+.env
+.env.local
+
+# OS files
+# Media files
+backend/app/media/videos/*
+backend/app/media/thumbnails/*
+!backend/app/media/videos/.gitkeep
+!backend/app/media/thumbnails/.gitkeep
+
+# Keycloak binary & data
+keycloak-*/
+*.mv.db
+*.trace.db
 
 # Cloudflare tunnel binary
 cloudflared.exe
@@ -40,4 +70,4 @@ scratch/
 !package-lock.json
 !tsconfig*.json
 !jsconfig*.json
-!vite.config.*
+!vite.config.*

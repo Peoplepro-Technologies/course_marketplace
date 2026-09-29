@@ -183,12 +183,11 @@ async def enroll_in_course(
     if existing:
         raise HTTPException(status_code=400, detail="Already enrolled in this course")
 
-    # Create enrollment — status set to "approved" immediately for this platform's
-    # local enrollment flow (no external payment gateway; #55 remains MISSING).
+    # Create enrollment — status set to "pending" to require accounts approval.
     enrollment = Enrollment(
         learner_id=current_user.id,
         course_id=course_id,
-        status="approved",
+        status="pending",
     )
     db.add(enrollment)
     
@@ -197,7 +196,7 @@ async def enroll_in_course(
         learner_id=current_user.id,
         course_id=course_id,
         amount=course.price,
-        status="completed",
+        status="pending",
         payment_method="mock"
     )
     db.add(transaction)

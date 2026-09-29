@@ -74,6 +74,7 @@ export default function CourseCard({ course, showStatus = false }) {
         {/* Footer: price */}
         <div className="course-card-footer">
           <div className="course-card-price">
+            {course.price > 0 ? `₹${course.price.toFixed(2)}` : 'Free'}
             {course.price > 0 ? (
               <>
                 <span className="price-currency">₹</span>

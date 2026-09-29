@@ -98,9 +98,14 @@ export default function EarningsChart() {
           </h2>
           <p>Track your revenue and upcoming payouts.</p>
         </div>
-        <Link to="/instructor" className="btn btn-secondary">
-          ← Dashboard
-        </Link>
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <Link to="/instructor/earnings-per-course" className="btn btn-primary">
+            Course Breakdown
+          </Link>
+          <Link to="/instructor" className="btn btn-secondary">
+            ← Dashboard
+          </Link>
+        </div>
       </div>
 
       {/* ── Error State ──────────────────────────────────────────────── */}

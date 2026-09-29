@@ -764,3 +764,82 @@ async def get_financial_reports(
         "note": "Revenue figures are estimated (course price × approved enrollments). No real payment gateway connected.",
         "generated_at": now.isoformat(),
     }
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Enrollment Approvals
+# ─────────────────────────────────────────────────────────────────────────────
+
+@router.get("/enrollments/pending")
+async def get_pending_enrollments(
+    current_user: User = Depends(require_role("accounts")),
+    db: Session = Depends(get_db),
+):
+    enrollments = (
+        db.query(Enrollment)
+        .join(Course, Enrollment.course_id == Course.id)
+        .join(User, Enrollment.learner_id == User.id)
+        .filter(Enrollment.status == "pending")
+        .order_by(Enrollment.enrolled_at.desc())
+        .all()
+    )
+
+    result = []
+    for e in enrollments:
+        result.append({
+            "id": str(e.id),
+            "course_title": e.course.title,
+            "learner_name": f"{e.learner.first_name} {e.learner.last_name}",
+            "learner_email": e.learner.email,
+            "course_price": e.course.price,
+            "enrolled_at": e.enrolled_at.isoformat() if e.enrolled_at else None,
+        })
+    return result
+
+@router.put("/enrollments/{enrollment_id}/approve")
+async def approve_enrollment(
+    enrollment_id: str,
+    current_user: User = Depends(require_role("accounts")),
+    db: Session = Depends(get_db),
+):
+    enrollment = db.query(Enrollment).filter(Enrollment.id == enrollment_id).first()
+    if not enrollment:
+        raise HTTPException(status_code=404, detail="Enrollment not found")
+    
+    enrollment.status = "approved"
+    enrollment.approved_at = datetime.now(timezone.utc)
+    
+    # Also update transaction status
+    transaction = db.query(Transaction).filter(
+        Transaction.learner_id == enrollment.learner_id,
+        Transaction.course_id == enrollment.course_id,
+        Transaction.status == "pending"
+    ).first()
+    if transaction:
+        transaction.status = "completed"
+
+    db.commit()
+    return {"message": "Enrollment approved"}
+
+@router.put("/enrollments/{enrollment_id}/reject")
+async def reject_enrollment(
+    enrollment_id: str,
+    current_user: User = Depends(require_role("accounts")),
+    db: Session = Depends(get_db),
+):
+    enrollment = db.query(Enrollment).filter(Enrollment.id == enrollment_id).first()
+    if not enrollment:
+        raise HTTPException(status_code=404, detail="Enrollment not found")
+    
+    enrollment.status = "rejected"
+    
+    # Also update transaction status
+    transaction = db.query(Transaction).filter(
+        Transaction.learner_id == enrollment.learner_id,
+        Transaction.course_id == enrollment.course_id,
+        Transaction.status == "pending"
+    ).first()
+    if transaction:
+        transaction.status = "failed"
+
+    db.commit()
+    return {"message": "Enrollment rejected"}

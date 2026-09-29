@@ -625,10 +625,18 @@ def get_instructor_earnings(
     total_earnings = 0
     pending_payout = 0
     monthly_data = defaultdict(float)
+    course_earnings_data = defaultdict(float)
+    course_titles = {}
 
     for transaction, payout in transactions_data:
         amount = transaction.amount
         total_earnings += amount
+        
+        # Course Earnings
+        course_id_str = str(transaction.course_id)
+        course_earnings_data[course_id_str] += amount
+        if transaction.course:
+            course_titles[course_id_str] = transaction.course.title
         
         # Pending if not included in any payout OR included but payout is still "pending"
         if transaction.included_in_payout_id is None or (payout and payout.status == "pending"):
@@ -640,11 +648,23 @@ def get_instructor_earnings(
             monthly_data[month_abbr] += amount
     
     monthly = [{"month": month, "amount": round(amount, 2)} for month, amount in monthly_data.items()]
+    
+    course_earnings = [
+        {
+            "course_id": cid, 
+            "title": course_titles.get(cid, "Unknown Course"), 
+            "amount": round(amount, 2)
+        } 
+        for cid, amount in course_earnings_data.items()
+    ]
+    # Sort course earnings by amount descending
+    course_earnings.sort(key=lambda x: x["amount"], reverse=True)
 
     return {
         "total_earnings": round(total_earnings, 2),
         "pending_payout": round(pending_payout, 2),
         "monthly": monthly,
+        "course_earnings": course_earnings,
     }
 
 @router.get("/payouts")

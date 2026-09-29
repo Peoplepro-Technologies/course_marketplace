@@ -27,6 +27,7 @@ import CourseForm from './pages/instructor/CourseForm';
 import SectionManager from './pages/instructor/SectionManager';
 import ReviewInbox from './pages/instructor/ReviewInbox';
 import EarningsChart from './pages/instructor/EarningsChart';
+import CourseEarningsDashboard from './pages/instructor/CourseEarningsDashboard';
 import StudentsProgress from './pages/instructor/StudentsProgress';
 import LiveClassManager from './pages/instructor/LiveClassManager';
 import SubmissionsStatus from './pages/instructor/SubmissionsStatus';
@@ -50,6 +51,7 @@ import ACPayouts from './pages/accounts/ACPayouts';
 import ACInvoices from './pages/accounts/ACInvoices';
 import ACFinancialReports from './pages/accounts/ACFinancialReports';
 import ACReconciliation from './pages/accounts/ACReconciliation';
+import ACEnrollments from './pages/accounts/ACEnrollments';
 
 // Super Admin Sub-pages
 import SAUserManagement from './pages/superadmin/SAUserManagement';
@@ -316,6 +318,14 @@ export default function App() {
               } 
             />
             <Route 
+              path="/instructor/earnings-per-course" 
+              element={
+                <ProtectedRoute role="instructor">
+                  <CourseEarningsDashboard />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
               path="/instructor/course/:courseId/students" 
               element={
                 <ProtectedRoute role="instructor">
@@ -476,6 +486,7 @@ export default function App() {
             <Route path="/accounts/payouts" element={<ProtectedRoute role="accounts"><ACPayouts /></ProtectedRoute>} />
             <Route path="/accounts/invoices" element={<ProtectedRoute role="accounts"><ACInvoices /></ProtectedRoute>} />
             <Route path="/accounts/reports" element={<ProtectedRoute role="accounts"><ACFinancialReports /></ProtectedRoute>} />
+            <Route path="/accounts/enrollments" element={<ProtectedRoute role="accounts"><ACEnrollments /></ProtectedRoute>} />
             <Route path="/accounts/reconciliation" element={<ProtectedRoute role="accounts"><ACReconciliation /></ProtectedRoute>} />
             <Route path="/accounts/support" element={<ProtectedRoute role="accounts"><ACSupportTickets /></ProtectedRoute>} />
           </Routes>

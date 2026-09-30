@@ -424,7 +424,6 @@ export default function CourseDetail() {
               )}
 
               <div className="sidebar-price" style={{ fontSize: '2rem', fontWeight: '800', color: 'var(--text-h)', marginBottom: '1.5rem' }}>
-              <div className="sidebar-price">
                 {course.price > 0 ? `₹${course.price.toFixed(2)}` : 'Free'}
               </div>
 

@@ -17,6 +17,8 @@ import useAuth from '../hooks/useAuth';
 import StarRating from '../components/StarRating';
 import ProgressBar from '../components/ProgressBar';
 import LoadingSpinner from '../components/LoadingSpinner';
+import CourseSkills from '../components/CourseSkills';
+import TranscriptSearch from '../components/TranscriptSearch';
 import { Heart, Clock } from 'lucide-react';
 import './CourseDetail.css';
 

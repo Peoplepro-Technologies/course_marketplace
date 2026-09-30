@@ -12,14 +12,6 @@ import {
 import '../RoleDashboard.css';
 
 const SIDEBAR_ITEMS = [
-  { icon: '📊', label: 'Dashboard',           path: '/accounts' },
-  { icon: '💰', label: 'Transactions',         path: '/accounts/transactions' },
-  { icon: '💳', label: 'Payments & Refunds',   path: '/accounts/refunds' },
-  { icon: '🏦', label: 'Instructor Payouts',   path: '/accounts/payouts' },
-  { icon: '🧾', label: 'Invoices',             path: '/accounts/invoices' },
-  { icon: '✅', label: 'Enrollments',          path: '/accounts/enrollments' },
-  { icon: '📈', label: 'Financial Reports',    path: '/accounts/reports' },
-  { icon: '🔄', label: 'Reconciliation',       path: '/accounts/reconciliation', comingSoon: true },
   { Icon: LayoutDashboard, label: 'Dashboard',           path: '/accounts' },
   { Icon: DollarSign,      label: 'Transactions',        path: '/accounts/transactions' },
   { Icon: CreditCard,      label: 'Payments & Refunds',  path: '/accounts/refunds' },

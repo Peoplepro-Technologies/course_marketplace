@@ -23,5 +23,5 @@ class Wishlist(Base):
         UniqueConstraint("learner_id", "course_id", name="uix_learner_course_wishlist"),
     )
 
-    learner = relationship("User", foreign_keys=[learner_id])
-    course = relationship("Course", foreign_keys=[course_id])
+    learner = relationship("User", foreign_keys=[learner_id], back_populates="wishlists")
+    course = relationship("Course", foreign_keys=[course_id], back_populates="wishlists")

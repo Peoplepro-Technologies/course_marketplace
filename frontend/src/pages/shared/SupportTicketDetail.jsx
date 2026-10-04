@@ -9,7 +9,7 @@ export default function SupportTicketDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
-  const rolePrefix = location.pathname.startsWith('/instructor') ? 'instructor' : 'learner';
+  const rolePrefix = location.pathname.startsWith('/instructor') ? 'instructor' : location.pathname.startsWith('/coordinator') ? 'coordinator' : 'learner';
   
   const [ticket, setTicket] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -18,7 +18,12 @@ export default function SupportTicketDetail() {
 
   const fetchTicket = () => {
     api.get(`/support-tickets/${id}`)
-      .then(res => setTicket(res.data))
+      .then(res => {
+        setTicket(res.data);
+        if (res.data.is_unread) {
+          api.post(`/support-tickets/${id}/read`).catch(console.error);
+        }
+      })
       .catch(err => {
         console.error(err);
         alert("Failed to load ticket");
@@ -57,7 +62,9 @@ export default function SupportTicketDetail() {
           <ArrowLeft size={16} /> Back to Tickets
         </button>
         <div className="flex-between">
-          <h2>{ticket.subject}</h2>
+          <h2>
+            {ticket.ticket_number ? `#${ticket.ticket_number} - ` : ''}{ticket.subject}
+          </h2>
           <StatusBadge status={ticket.status} />
         </div>
         <p style={{ display: 'flex', gap: '1.5rem', marginTop: '0.5rem', fontSize: '14px', color: 'var(--color-text-muted)' }}>

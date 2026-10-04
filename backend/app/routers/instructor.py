@@ -149,6 +149,47 @@ async def update_course(
     return CourseRead.model_validate(course)
 
 
+@router.post("/courses/{course_id}/upload-thumbnail", response_model=CourseRead)
+async def upload_course_thumbnail(
+    course_id: str,
+    thumbnail: UploadFile = File(...),
+    current_user: User = Depends(require_role("instructor")),
+    db: Session = Depends(get_db),
+):
+    """Upload a thumbnail image for a course."""
+    course = db.query(Course).filter(
+        Course.id == course_id, Course.instructor_id == current_user.id
+    ).first()
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found or permission denied")
+
+    import os
+    here = os.path.dirname(os.path.abspath(__file__))
+    media_root = os.path.join(os.path.dirname(here), "media")
+    os.makedirs(os.path.join(media_root, "thumbnails"), exist_ok=True)
+
+    file_ext = os.path.splitext(thumbnail.filename)[1] or ".jpg"
+    thumb_filename = f"course_{course_id}{file_ext}"
+    thumb_path = os.path.join(media_root, "thumbnails", thumb_filename)
+
+    try:
+        with open(thumb_path, "wb") as f:
+            while chunk := await thumbnail.read(1024 * 1024):
+                f.write(chunk)
+    except Exception as e:
+        print(f"Failed to save course thumbnail: {e}")
+        raise HTTPException(status_code=500, detail="Failed to save uploaded file.")
+
+    course.thumbnail_url = f"/media/thumbnails/{thumb_filename}"
+    db.commit()
+    db.refresh(course)
+
+    if course.status == "published":
+        invalidate_cache("courses:*")
+
+    return CourseRead.model_validate(course)
+
+
 @router.delete("/courses/{course_id}")
 async def delete_course(
     course_id: str,
@@ -311,8 +352,29 @@ async def create_lesson(
         content=data.content,
         order_index=data.order_index,
         duration=data.duration,
+        video_url=data.video_url,
+        thumbnail_url=data.thumbnail_url,
     )
     db.add(lesson)
+    db.flush()  # get lesson.id before commit
+
+    # Auto-set is_preview for the very first lesson of the very first section
+    course = db.query(Course).filter(Course.id == section.course_id).first()
+    if course:
+        all_sections = sorted(
+            db.query(Section).filter(Section.course_id == course.id).all(),
+            key=lambda s: s.order_index
+        )
+        if all_sections and str(all_sections[0].id) == str(section_id):
+            # This is the first section — check if lesson is first
+            existing_lessons = db.query(Lesson).filter(
+                Lesson.section_id == section_id,
+                Lesson.id != lesson.id
+            ).all()
+            if len(existing_lessons) == 0:
+                # No other lessons yet — this is the first lesson
+                lesson.is_preview = True
+
     db.commit()
     db.refresh(lesson)
     return LessonRead.model_validate(lesson)
@@ -367,10 +429,168 @@ async def delete_lesson(
     return {"message": "Lesson deleted"}
 
 
-def run_ffmpeg_sync(cmd, timeout=120):
+@router.put("/lessons/{lesson_id}/toggle-preview")
+async def toggle_lesson_preview(
+    lesson_id: str,
+    current_user: User = Depends(require_role("instructor")),
+    db: Session = Depends(get_db),
+):
+    """Toggle the is_preview flag on a lesson."""
+    lesson = (
+        db.query(Lesson)
+        .join(Section)
+        .join(Course)
+        .filter(Lesson.id == lesson_id, Course.instructor_id == current_user.id)
+        .first()
+    )
+    if not lesson:
+        raise HTTPException(status_code=404, detail="Lesson not found")
+
+    lesson.is_preview = not lesson.is_preview
+    db.commit()
+    db.refresh(lesson)
+    return {"is_preview": lesson.is_preview}
+
+
+def _compute_transcode_timeout(file_size_bytes: int) -> int:
+    """
+    Returns a dynamic ffmpeg timeout in seconds based on file size.
+    Base: 600 s (10 min), plus 60 s for every 100 MB.
+    This comfortably handles 8-minute+ videos on modest hardware.
+    """
+    extra = int(file_size_bytes / (100 * 1024 * 1024)) * 60
+    return 600 + extra
+
+
+def _transcode_and_update_lesson(
+    lesson_id: str,
+    raw_path: str,
+    out_path: str,
+    thumb_path: str,
+    ffmpeg_executable: str,
+) -> None:
+    """
+    Background task: transcode the raw upload to H.264 MP4, extract a
+    thumbnail, update the lesson record in the DB, and kick off
+    transcription — all without blocking the HTTP response.
+    """
     import subprocess
-    result = subprocess.run(cmd, capture_output=True, timeout=timeout)
-    return result.returncode, result.stdout, result.stderr
+    from app.database import SessionLocal
+
+    print(f"\n[VIDEO TRANSCODE BG] Starting for lesson_id={lesson_id}")
+    db = SessionLocal()
+    try:
+        file_size = os.path.getsize(raw_path) if os.path.exists(raw_path) else 0
+        file_size_mb = file_size / (1024 * 1024)
+        transcode_timeout = _compute_transcode_timeout(file_size)
+        print(f"[VIDEO TRANSCODE BG] File size: {file_size_mb:.1f} MB — timeout: {transcode_timeout}s")
+
+        ffmpeg_cmd = [
+            ffmpeg_executable, "-y",
+            "-i", raw_path,
+            "-c:v", "libx264",
+            "-preset", "fast",
+            "-crf", "23",
+            "-c:a", "aac",
+            "-movflags", "+faststart",
+            "-fflags", "+genpts",
+            "-max_muxing_queue_size", "1024",
+            out_path
+        ]
+        print(f"[VIDEO TRANSCODE BG] Running ffmpeg (timeout={transcode_timeout}s): {' '.join(ffmpeg_cmd)}")
+
+        try:
+            returncode, stdout, stderr = run_ffmpeg_sync(ffmpeg_cmd, timeout=transcode_timeout)
+        except subprocess.TimeoutExpired:
+            print(f"[VIDEO TRANSCODE BG] ffmpeg timed out after {transcode_timeout}s — lesson_id={lesson_id}")
+            # Mark lesson with an error indicator in video_url so instructor knows
+            lesson = db.query(Lesson).filter(Lesson.id == lesson_id).first()
+            if lesson:
+                lesson.video_url = None
+                db.commit()
+            return
+
+        if returncode != 0:
+            stderr_decoded = stderr.decode(errors="replace") if stderr else ""
+            print(f"[VIDEO TRANSCODE BG] ffmpeg failed (code {returncode}):\n{stderr_decoded}")
+            lesson = db.query(Lesson).filter(Lesson.id == lesson_id).first()
+            if lesson:
+                lesson.video_url = None
+                db.commit()
+            return
+
+        print(f"[VIDEO TRANSCODE BG] Transcode succeeded for lesson_id={lesson_id}")
+
+        # ── Thumbnail ──────────────────────────────────────────────────
+        thumb_cmd = [
+            ffmpeg_executable, "-y",
+            "-i", out_path,
+            "-ss", "00:00:01",
+            "-vframes", "1",
+            "-q:v", "2",
+            thumb_path
+        ]
+        try:
+            thumb_rc, _, _ = run_ffmpeg_sync(thumb_cmd, timeout=60)
+            thumb_ok = thumb_rc == 0
+        except subprocess.TimeoutExpired:
+            thumb_ok = False
+
+        # ── Extract duration via ffprobe ───────────────────────────────
+        duration_seconds = None
+        ffprobe_bin = shutil.which("ffprobe") or ffmpeg_executable.replace("ffmpeg", "ffprobe")
+        if ffprobe_bin and os.path.exists(ffprobe_bin if os.path.isfile(ffprobe_bin) else ""):
+            try:
+                probe_cmd = [
+                    ffprobe_bin, "-v", "error",
+                    "-show_entries", "format=duration",
+                    "-of", "default=noprint_wrappers=1:nokey=1",
+                    out_path
+                ]
+                probe_result = subprocess.run(probe_cmd, capture_output=True, timeout=30)
+                if probe_result.returncode == 0:
+                    raw_dur = probe_result.stdout.decode().strip()
+                    duration_seconds = round(float(raw_dur)) if raw_dur else None
+            except Exception as probe_err:
+                print(f"[VIDEO TRANSCODE BG] ffprobe duration extraction failed: {probe_err}")
+
+        # ── Update DB ─────────────────────────────────────────────────
+        lesson = db.query(Lesson).filter(Lesson.id == lesson_id).first()
+        if lesson:
+            lesson.video_url = f"/learner/lessons/{lesson_id}/video"
+            if thumb_ok:
+                lesson.thumbnail_url = f"/media/thumbnails/{lesson_id}.jpg"
+                print(f"[VIDEO TRANSCODE BG] Thumbnail saved for lesson_id={lesson_id}")
+            if duration_seconds is not None:
+                # Convert seconds → minutes (round up to nearest minute, minimum 1)
+                duration_minutes = max(1, round(duration_seconds / 60))
+                lesson.duration = duration_minutes
+                print(f"[VIDEO TRANSCODE BG] Auto-set duration={duration_seconds}s → {duration_minutes}min for lesson_id={lesson_id}")
+            db.commit()
+            db.refresh(lesson)
+            print(f"[VIDEO TRANSCODE BG] DB updated for lesson_id={lesson_id}")
+
+        # ── Kick off transcription ─────────────────────────────────────
+        transcribe_lesson_video(lesson_id, out_path)
+
+    except Exception as exc:
+        import traceback
+        print(f"[VIDEO TRANSCODE BG] Unexpected error for lesson_id={lesson_id}: {exc}")
+        print(traceback.format_exc())
+        try:
+            db.rollback()
+        except Exception:
+            pass
+    finally:
+        # Clean up the raw upload
+        if os.path.exists(raw_path):
+            try:
+                os.remove(raw_path)
+                print(f"[VIDEO TRANSCODE BG] Cleaned up raw file: {raw_path}")
+            except OSError:
+                pass
+        db.close()
+
 
 
 @router.post("/lessons/{lesson_id}/upload-video", response_model=LessonRead)
@@ -385,12 +605,17 @@ async def upload_lesson_video(
     Upload a video file for a lesson.
 
     - Accepts any video format supported by ffmpeg.
-    - Transcodes to H.264 MP4 for web compatibility.
-    - Generates a JPEG thumbnail at the 1-second mark.
-    - Updates lesson.video_url and lesson.thumbnail_url.
-    - Returns the updated lesson.
+    - Saves the raw file immediately, then transcodes to H.264 MP4 in a
+      background task (non-blocking) so the HTTP response returns right away.
+    - Dynamic timeout: 600 s base + 60 s per 100 MB (handles 8-min+ videos).
+    - Generates a JPEG thumbnail and auto-detects duration via ffprobe.
+    - Updates lesson.video_url, lesson.thumbnail_url, and lesson.duration.
     """
     print(f"\n[VIDEO UPLOAD] Started for lesson_id={lesson_id}")
+
+    if not current_user.can_upload_video:
+        raise HTTPException(status_code=403, detail="Faculty accounts are restricted to assignments and quizzes and cannot upload videos.")
+
     # ── Verify the lesson belongs to this instructor ───────────────────
     lesson = (
         db.query(Lesson)
@@ -405,9 +630,8 @@ async def upload_lesson_video(
 
     # ── Check ffmpeg is available ──────────────────────────────────────
     ffmpeg_executable = get_ffmpeg_executable()
-
     if not ffmpeg_executable:
-        print("[VIDEO UPLOAD] Failed: ffmpeg not found on PATH, configured FFMPEG_PATH, or local node_modules.")
+        print("[VIDEO UPLOAD] Failed: ffmpeg not found.")
         raise HTTPException(
             status_code=503,
             detail=(
@@ -416,7 +640,7 @@ async def upload_lesson_video(
             ),
         )
 
-    # ── Save the raw upload to a temp file ────────────────────────────
+    # ── Save the raw upload ────────────────────────────────────────────
     unique_id = str(uuid_lib.uuid4())
     raw_ext = os.path.splitext(video.filename or "upload.mp4")[1] or ".mp4"
     raw_path = os.path.join(_VIDEOS_DIR, f"{unique_id}_raw{raw_ext}")
@@ -424,102 +648,80 @@ async def upload_lesson_video(
     thumb_path = os.path.join(_THUMBS_DIR, f"{lesson_id}.jpg")
 
     print(f"[VIDEO UPLOAD] Receiving file: {video.filename}")
-
     try:
         with open(raw_path, "wb") as f:
-            while chunk := await video.read(1024 * 1024):  # 1MB chunks
+            while chunk := await video.read(1024 * 1024):  # 1 MB chunks
                 f.write(chunk)
-        
-        file_size_mb = os.path.getsize(raw_path) / (1024 * 1024)
-        print(f"[VIDEO UPLOAD] File saved to {raw_path} (Size: {file_size_mb:.2f} MB)")
-
-        # ── Transcode to H.264 MP4 ────────────────────────────────────
-        import asyncio
-        import subprocess
-        ffmpeg_cmd = [
-            ffmpeg_executable, "-y",            # overwrite output
-            "-i", raw_path,            # input
-            "-c:v", "libx264",         # H.264 video codec
-            "-preset", "fast",         # encoding speed
-            "-crf", "23",              # quality
-            "-c:a", "aac",             # AAC audio
-            "-movflags", "+faststart", # web-optimised: moov atom at front
-            "-fflags", "+genpts",      # Handle missing PTS for phone videos
-            "-max_muxing_queue_size", "1024", # Handle complex multiplexing
-            out_path
-        ]
-        print(f"[VIDEO UPLOAD] Running ffmpeg: {' '.join(ffmpeg_cmd)}")
-
-        loop = asyncio.get_event_loop()
-        try:
-            returncode, stdout, stderr = await loop.run_in_executor(
-                None, run_ffmpeg_sync, ffmpeg_cmd, 120
-            )
-        except subprocess.TimeoutExpired:
-            print("[VIDEO UPLOAD] Failed: ffmpeg timed out after 120 seconds")
-            raise HTTPException(status_code=500, detail="ffmpeg transcoding timed out after 120 seconds")
-
-        print(f"[VIDEO UPLOAD] ffmpeg exit code: {returncode}")
-        if returncode != 0:
-            stderr_decoded = stderr.decode(errors='replace') if stderr else ""
-            print(f"[VIDEO UPLOAD] ffmpeg STDERR:\n{stderr_decoded}")
-            raise HTTPException(
-                status_code=500,
-                detail=f"ffmpeg transcoding failed. Check server logs."
-            )
-
-        # ── Extract thumbnail at 1 second ─────────────────────────────
-        thumb_cmd = [
-            ffmpeg_executable, "-y",
-            "-i", out_path,
-            "-ss", "00:00:01",   # seek to 1 second
-            "-vframes", "1",     # grab exactly one frame
-            "-q:v", "2",         # JPEG quality
-            thumb_path
-        ]
-        
-        try:
-            thumb_rc, thumb_out, thumb_err = await loop.run_in_executor(
-                None, run_ffmpeg_sync, thumb_cmd, 30
-            )
-            thumb_ok = thumb_rc == 0
-        except subprocess.TimeoutExpired:
-            thumb_ok = False
-
-        if thumb_ok:
-            print("[VIDEO UPLOAD] Thumbnail generated successfully.")
-        else:
-            print("[VIDEO UPLOAD] Warning: Thumbnail generation failed.")
-
-        # ── Update the lesson record ───────────────────────────────────────
-        lesson.video_url = f"/learner/lessons/{lesson_id}/video"
-        if thumb_ok:
-            lesson.thumbnail_url = f"/media/thumbnails/{lesson_id}.jpg"
-
-        db.commit()
-        db.refresh(lesson)
-        print(f"[VIDEO UPLOAD] DB commit successful. lesson_id={lesson_id}")
-
-        # ── Enqueue transcription as a background task ─────────────────
-        background_tasks.add_task(transcribe_lesson_video, lesson_id, out_path)
-        print(f"[VIDEO UPLOAD] Transcription background task queued for lesson_id={lesson_id}")
-
-        return LessonRead.model_validate(lesson)
-
-    except HTTPException:
-        db.rollback()
-        raise
     except Exception as e:
-        db.rollback()
         import traceback
-        print(f"[VIDEO UPLOAD] Unexpected error: {e}")
+        print(f"[VIDEO UPLOAD] Failed to save raw file: {e}")
         print(traceback.format_exc())
-        raise HTTPException(status_code=500, detail="An unexpected error occurred during upload.")
-    finally:
-        # Always remove the raw upload to save disk space
-        if os.path.exists(raw_path):
-            os.remove(raw_path)
-            print(f"[VIDEO UPLOAD] Cleaned up raw file: {raw_path}")
+        raise HTTPException(status_code=500, detail="Failed to save uploaded file.")
+
+    file_size_mb = os.path.getsize(raw_path) / (1024 * 1024)
+    print(f"[VIDEO UPLOAD] File saved to {raw_path} ({file_size_mb:.2f} MB). Queuing transcode as background task.")
+
+    # ── Mark lesson as 'processing' and return immediately ─────────────
+    # The actual transcode happens in the background; video_url gets the
+    # real serving URL once _transcode_and_update_lesson() finishes.
+    lesson.video_url = f"processing:{lesson_id}"
+    db.commit()
+    db.refresh(lesson)
+
+    background_tasks.add_task(
+        _transcode_and_update_lesson,
+        lesson_id,
+        raw_path,
+        out_path,
+        thumb_path,
+        ffmpeg_executable,
+    )
+    print(f"[VIDEO UPLOAD] Background transcode task queued for lesson_id={lesson_id}")
+
+    return LessonRead.model_validate(lesson)
+
+
+@router.post("/lessons/{lesson_id}/upload-thumbnail", response_model=LessonRead)
+async def upload_lesson_thumbnail(
+    lesson_id: str,
+    thumbnail: UploadFile = File(...),
+    current_user: User = Depends(require_role("instructor")),
+    db: Session = Depends(get_db),
+):
+    """Upload a thumbnail image for a lesson."""
+    lesson = (
+        db.query(Lesson)
+        .join(Section)
+        .join(Course)
+        .filter(Lesson.id == lesson_id, Course.instructor_id == current_user.id)
+        .first()
+    )
+    if not lesson:
+        raise HTTPException(status_code=404, detail="Lesson not found or you don't have permission")
+
+    import os
+    # Get the directory where this file (instructor.py) lives, then go up one level to 'app'
+    here = os.path.dirname(os.path.abspath(__file__))
+    media_root = os.path.join(os.path.dirname(here), "media")
+    os.makedirs(os.path.join(media_root, "thumbnails"), exist_ok=True)
+    
+    file_ext = os.path.splitext(thumbnail.filename)[1] or ".jpg"
+    thumb_filename = f"{lesson_id}{file_ext}"
+    thumb_path = os.path.join(media_root, "thumbnails", thumb_filename)
+
+    try:
+        with open(thumb_path, "wb") as f:
+            while chunk := await thumbnail.read(1024 * 1024):
+                f.write(chunk)
+    except Exception as e:
+        print(f"Failed to save thumbnail: {e}")
+        raise HTTPException(status_code=500, detail="Failed to save uploaded file.")
+
+    lesson.thumbnail_url = f"/media/thumbnails/{thumb_filename}"
+    db.commit()
+    db.refresh(lesson)
+
+    return LessonRead.model_validate(lesson)
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -625,18 +827,10 @@ def get_instructor_earnings(
     total_earnings = 0
     pending_payout = 0
     monthly_data = defaultdict(float)
-    course_earnings_data = defaultdict(float)
-    course_titles = {}
 
     for transaction, payout in transactions_data:
         amount = transaction.amount
         total_earnings += amount
-        
-        # Course Earnings
-        course_id_str = str(transaction.course_id)
-        course_earnings_data[course_id_str] += amount
-        if transaction.course:
-            course_titles[course_id_str] = transaction.course.title
         
         # Pending if not included in any payout OR included but payout is still "pending"
         if transaction.included_in_payout_id is None or (payout and payout.status == "pending"):
@@ -648,23 +842,11 @@ def get_instructor_earnings(
             monthly_data[month_abbr] += amount
     
     monthly = [{"month": month, "amount": round(amount, 2)} for month, amount in monthly_data.items()]
-    
-    course_earnings = [
-        {
-            "course_id": cid, 
-            "title": course_titles.get(cid, "Unknown Course"), 
-            "amount": round(amount, 2)
-        } 
-        for cid, amount in course_earnings_data.items()
-    ]
-    # Sort course earnings by amount descending
-    course_earnings.sort(key=lambda x: x["amount"], reverse=True)
 
     return {
         "total_earnings": round(total_earnings, 2),
         "pending_payout": round(pending_payout, 2),
         "monthly": monthly,
-        "course_earnings": course_earnings,
     }
 
 @router.get("/payouts")
@@ -699,6 +881,53 @@ def get_instructor_payouts(
 # ═══════════════════════════════════════════════════════════════════════
 #  STUDENTS & PROGRESS
 # ═══════════════════════════════════════════════════════════════════════
+
+@router.get("/students")
+def list_all_students(
+    current_user: User = Depends(require_role("instructor")),
+    db: Session = Depends(get_db),
+):
+    """Return all enrolled learners across all courses for this instructor."""
+    enrollments = (
+        db.query(Enrollment, User, Course)
+        .join(User, Enrollment.learner_id == User.id)
+        .join(Course, Enrollment.course_id == Course.id)
+        .filter(Course.instructor_id == current_user.id)
+        .order_by(Enrollment.enrolled_at.desc())
+        .all()
+    )
+    
+    results = []
+    for enrollment, learner, course in enrollments:
+        total_lessons = db.query(func.count(Lesson.id)).join(Section, Lesson.section_id == Section.id).filter(Section.course_id == course.id).scalar() or 0
+        completed = (
+            db.query(func.count(Progress.id))
+            .join(Lesson, Progress.lesson_id == Lesson.id)
+            .join(Section, Lesson.section_id == Section.id)
+            .filter(
+                Section.course_id == course.id,
+                Progress.learner_id == learner.id,
+                Progress.status == "completed"
+            )
+            .scalar()
+        ) or 0
+        
+        results.append({
+            "enrollment_id": str(enrollment.id),
+            "status": enrollment.status,
+            "learner_id": str(learner.id) + "_" + str(course.id),
+            "real_learner_id": str(learner.id),
+            "course_id": str(course.id),
+            "learner_name": learner.name,
+            "email": learner.email,
+            "course_title": course.title,
+            "enrolled_at": enrollment.enrolled_at,
+            "completed_lessons": completed,
+            "total_lessons": total_lessons,
+            "completion_pct": int((completed / total_lessons * 100) if total_lessons > 0 else 0),
+        })
+    return {"course_title": "All Courses", "total_lessons": 0, "students": results}
+
 
 @router.get("/courses/{course_id}/students")
 def list_course_students(
@@ -761,6 +990,8 @@ def list_course_students(
         completion_pct = round((completed / total_lessons * 100), 1) if total_lessons > 0 else 0.0
 
         results.append({
+            "enrollment_id": str(enrollment.id),
+            "status": enrollment.status,
             "learner_id": str(learner.id),
             "learner_name": learner.name,
             "email": learner.email,
@@ -793,6 +1024,9 @@ async def schedule_live_class(
     Schedule a new live class for a course owned by the current instructor.
     Auto-generates a unique Jitsi room_name.
     """
+    if not current_user.can_host_live_classes:
+        raise HTTPException(status_code=403, detail="Your account is restricted to faculty mode (no live classes).")
+
     course = db.query(Course).filter(
         Course.id == course_id,
         Course.instructor_id == current_user.id,
@@ -848,6 +1082,8 @@ async def start_live_class(
     db: Session = Depends(get_db),
 ):
     """Mark a scheduled live class as 'live'. Only the owning instructor can do this."""
+    if not current_user.can_host_live_classes:
+        raise HTTPException(status_code=403, detail="Your account is restricted to faculty mode (no live classes).")
     live_class = db.query(LiveClass).filter(
         LiveClass.id == live_class_id,
         LiveClass.instructor_id == current_user.id,
@@ -869,6 +1105,8 @@ async def end_live_class(
     db: Session = Depends(get_db),
 ):
     """Mark a live class as 'ended'. Only the owning instructor can do this."""
+    if not current_user.can_host_live_classes:
+        raise HTTPException(status_code=403, detail="Your account is restricted to faculty mode (no live classes).")
     live_class = db.query(LiveClass).filter(
         LiveClass.id == live_class_id,
         LiveClass.instructor_id == current_user.id,
@@ -890,6 +1128,8 @@ async def delete_live_class(
     db: Session = Depends(get_db),
 ):
     """Cancel/delete a scheduled live class. Cannot delete if already live or ended."""
+    if not current_user.can_host_live_classes:
+        raise HTTPException(status_code=403, detail="Your account is restricted to faculty mode (no live classes).")
     live_class = db.query(LiveClass).filter(
         LiveClass.id == live_class_id,
         LiveClass.instructor_id == current_user.id,
@@ -985,6 +1225,39 @@ async def delete_quiz_question(
     db.commit()
     return None
 
+@router.put("/quiz-questions/{question_id}")
+async def update_quiz_question(
+    question_id: str,
+    payload: dict,
+    current_user: User = Depends(require_role("instructor")),
+    db: Session = Depends(get_db),
+):
+    """Update a quiz question."""
+    from app.models.quiz import QuizQuestion
+    q = db.query(QuizQuestion).filter(QuizQuestion.id == question_id).first()
+    if not q:
+        raise HTTPException(status_code=404, detail="Question not found")
+    
+    if "question_text" in payload:
+        q.question_text = payload["question_text"]
+    if "options" in payload:
+        q.options = payload["options"]
+    if "correct_option_index" in payload:
+        q.correct_option_index = payload["correct_option_index"]
+    if "explanation" in payload:
+        q.explanation = payload["explanation"]
+        
+    db.commit()
+    db.refresh(q)
+    return {
+        "id": str(q.id),
+        "lesson_id": str(q.lesson_id),
+        "question_text": q.question_text,
+        "options": q.options,
+        "correct_option_index": q.correct_option_index,
+        "explanation": q.explanation,
+    }
+
 
 # ═══════════════════════════════════════════════════════════════════════
 #  ASSIGNMENTS
@@ -1048,6 +1321,28 @@ async def delete_assignment(
     db.commit()
     return None
 
+@router.put("/assignments/{assignment_id}")
+async def update_assignment(
+    assignment_id: str,
+    payload: dict,
+    current_user: User = Depends(require_role("instructor")),
+    db: Session = Depends(get_db),
+):
+    """Update an assignment."""
+    from app.models.assignment import Assignment
+    a = db.query(Assignment).filter(Assignment.id == assignment_id).first()
+    if not a:
+        raise HTTPException(status_code=404, detail="Assignment not found")
+        
+    if "title" in payload:
+        a.title = payload["title"]
+    if "instructions" in payload:
+        a.instructions = payload["instructions"]
+        
+    db.commit()
+    db.refresh(a)
+    return {"id": str(a.id), "lesson_id": str(a.lesson_id), "title": a.title, "instructions": a.instructions}
+
 # ═══════════════════════════════════════════════════════════════════════
 #  PROFILE & PAYOUT
 # ═══════════════════════════════════════════════════════════════════════
@@ -1081,4 +1376,107 @@ async def update_instructor_profile(
     db.refresh(current_user)
     return current_user
 
+@router.put("/enrollments/{enrollment_id}/approve")
+async def approve_enrollment(
+    enrollment_id: str,
+    current_user: User = Depends(require_role("instructor")),
+    db: Session = Depends(get_db),
+):
+    from app.models.enrollment import Enrollment
+    from datetime import datetime, timezone
+    
+    enrollment = db.query(Enrollment).filter(Enrollment.id == enrollment_id).first()
+    if not enrollment:
+        raise HTTPException(status_code=404, detail="Enrollment not found")
+    
+    course = db.query(Course).filter(Course.id == enrollment.course_id).first()
+    if not course or course.instructor_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized")
+        
+    enrollment.status = "approved"
+    enrollment.approved_at = datetime.now(timezone.utc)
+    enrollment.approved_by = current_user.id
+    db.commit()
+    return {"message": "Enrollment approved"}
 
+@router.put("/enrollments/{enrollment_id}/reject")
+async def reject_enrollment(
+    enrollment_id: str,
+    current_user: User = Depends(require_role("instructor")),
+    db: Session = Depends(get_db),
+):
+    from app.models.enrollment import Enrollment
+    enrollment = db.query(Enrollment).filter(Enrollment.id == enrollment_id).first()
+    if not enrollment:
+        raise HTTPException(status_code=404, detail="Enrollment not found")
+    
+    course = db.query(Course).filter(Course.id == enrollment.course_id).first()
+    if not course or course.instructor_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized")
+        
+    enrollment.status = "rejected"
+    db.commit()
+    return {"message": "Enrollment rejected"}
+
+
+
+
+@router.get("/my-assignments-quizzes")
+def get_my_assignments_quizzes(
+    current_user: User = Depends(require_role("instructor")),
+    db: Session = Depends(get_db),
+):
+    from app.models.assignment import Assignment
+    from app.models.quiz import QuizQuestion
+    from app.models.assignment_submission import AssignmentSubmission
+    from app.models.quiz_attempt import QuizAttempt
+    from app.models.section import Section
+
+    courses = db.query(Course).filter(Course.instructor_id == current_user.id).all()
+    courses_data = []
+
+    for c in courses:
+        total_enrolled = db.query(Enrollment).filter(Enrollment.course_id == c.id).count()
+
+        # Assignments
+        assignments = (
+            db.query(Assignment)
+            .join(Lesson, Assignment.lesson_id == Lesson.id)
+            .join(Section, Lesson.section_id == Section.id)
+            .filter(Section.course_id == c.id)
+            .all()
+        )
+        assign_data = []
+        for a in assignments:
+            submitted = db.query(func.count(func.distinct(AssignmentSubmission.learner_id))).filter(AssignmentSubmission.assignment_id == a.id).scalar() or 0
+            assign_data.append({
+                "title": a.title,
+                "total_enrolled": total_enrolled,
+                "submitted": min(submitted, total_enrolled)
+            })
+
+        # Quizzes
+        quizzes = (
+            db.query(QuizQuestion)
+            .join(Lesson, QuizQuestion.lesson_id == Lesson.id)
+            .join(Section, Lesson.section_id == Section.id)
+            .filter(Section.course_id == c.id)
+            .all()
+        )
+        quiz_data = []
+        for q in quizzes:
+            attempted = db.query(func.count(func.distinct(QuizAttempt.learner_id))).filter(QuizAttempt.quiz_question_id == q.id).scalar() or 0
+            quiz_data.append({
+                "title": q.question_text[:50] + ("..." if len(q.question_text) > 50 else ""),
+                "total_enrolled": total_enrolled,
+                "attempted": min(attempted, total_enrolled)
+            })
+
+        if assign_data or quiz_data:
+            courses_data.append({
+                "course_title": c.title,
+                "assignments": assign_data,
+                "quizzes": quiz_data
+            })
+
+    return courses_data

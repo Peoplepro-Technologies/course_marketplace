@@ -30,7 +30,7 @@ export default function SACourseManagement() {
   useEffect(() => { fetchCourses(); }, [fetchCourses]);
 
   const handleStatusOverride = async (courseId, newStatus) => {
-    if (!window.confirm(`Are you sure you want to change this course's status to "${newStatus}"?`)) return;
+    if (!window.confirm(`Are you sure you want to change this course's status to "₹{newStatus}"?`)) return;
     setActionLoading(courseId);
     try {
       await api.put(`/superadmin/courses/${courseId}/status`, { status: newStatus });
@@ -45,7 +45,7 @@ export default function SACourseManagement() {
   return (
     <SASidebarLayout>
       <div className="sa-page-header">
-        <h2>Course Management</h2>
+        <h2>📚 Course Management</h2>
         <p>View and manage all courses on the platform.</p>
       </div>
 

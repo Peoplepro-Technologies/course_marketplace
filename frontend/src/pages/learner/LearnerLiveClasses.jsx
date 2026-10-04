@@ -274,7 +274,7 @@ export default function LearnerLiveClasses() {
                   }}>
                     {enrollment.course_thumbnail ? (
                       <img
-                        src={enrollment.course_thumbnail}
+                        src={enrollment.course_thumbnail.startsWith('/media/') ? `http://localhost:8000${enrollment.course_thumbnail}` : enrollment.course_thumbnail}
                         alt={enrollment.course_title}
                         style={{ width: 36, height: 36, borderRadius: 6, objectFit: 'cover' }}
                       />

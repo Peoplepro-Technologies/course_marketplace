@@ -4,7 +4,7 @@ import AdminSupportInbox from '../shared/AdminSupportInbox';
 export default function SubAdminSupportTickets() {
   return (
     <SubAdminSidebarLayout>
-      <AdminSupportInbox apiPrefix="/api/v1/subadmin" roleName="Sub Admin" />
+      <AdminSupportInbox apiPrefix="/subadmin" roleName="Sub Admin" />
     </SubAdminSidebarLayout>
   );
 }

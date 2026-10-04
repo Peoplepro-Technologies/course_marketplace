@@ -7,17 +7,20 @@
 
 import { Link, useLocation } from 'react-router-dom';
 import {
-  LayoutDashboard, DollarSign, CreditCard, Building2, FileText, BarChart2, RefreshCcw, Wallet, LifeBuoy,
+  LayoutDashboard, IndianRupee, CreditCard, Building2, FileText, BarChart2, RefreshCcw, Wallet, LifeBuoy, ClipboardCheck,
 } from 'lucide-react';
+import SupportBadgeLink from '../../components/SupportBadgeLink';
 import '../RoleDashboard.css';
 
 const SIDEBAR_ITEMS = [
   { Icon: LayoutDashboard, label: 'Dashboard',           path: '/accounts' },
-  { Icon: DollarSign,      label: 'Transactions',        path: '/accounts/transactions' },
+  { Icon: Wallet,          label: 'Course Earnings',     path: '/accounts/course-earnings' },
+  { Icon: IndianRupee,      label: 'Transactions',        path: '/accounts/transactions' },
   { Icon: CreditCard,      label: 'Payments & Refunds',  path: '/accounts/refunds' },
   { Icon: Building2,       label: 'Instructor Payouts',  path: '/accounts/payouts' },
   { Icon: FileText,        label: 'Invoices',            path: '/accounts/invoices' },
   { Icon: BarChart2,       label: 'Financial Reports',   path: '/accounts/reports' },
+  { Icon: ClipboardCheck,  label: 'Learner Approvals',   path: '/accounts/enrollments' },
   { Icon: RefreshCcw,      label: 'Reconciliation',      path: '/accounts/reconciliation', comingSoon: true },
   { Icon: LifeBuoy,        label: 'Support',             path: '/accounts/support' },
 ];
@@ -38,17 +41,30 @@ export default function AccountsSidebarLayout({ children }) {
           <p>Financial Operations</p>
         </div>
         <ul className="sidebar-nav">
-          {SIDEBAR_ITEMS.map((item) => (
-            <Link to={item.path} key={item.label} style={{ textDecoration: 'none' }}>
-              <li className={`sidebar-nav-item${location.pathname === item.path ? ' active' : ''}`}>
-                <span className="sidebar-nav-icon"><item.Icon size={16} /></span>
-                {item.label}
-                {item.comingSoon && (
-                  <span className="sidebar-coming-soon">Soon</span>
-                )}
-              </li>
-            </Link>
-          ))}
+          {SIDEBAR_ITEMS.map((item) => {
+            if (item.label === 'Support') {
+              return (
+                <SupportBadgeLink 
+                  key={item.label}
+                  icon={<item.Icon size={16} />}
+                  label={item.label}
+                  path={item.path}
+                  apiEndpoint="/accounts/support-tickets/unread-count"
+                />
+              );
+            }
+            return (
+              <Link to={item.path} key={item.label} style={{ textDecoration: 'none' }}>
+                <li className={`sidebar-nav-item${location.pathname === item.path ? ' active' : ''}`}>
+                  <span className="sidebar-nav-icon"><item.Icon size={16} /></span>
+                  {item.label}
+                  {item.comingSoon && (
+                    <span className="sidebar-coming-soon">Soon</span>
+                  )}
+                </li>
+              </Link>
+            );
+          })}
         </ul>
       </aside>
 

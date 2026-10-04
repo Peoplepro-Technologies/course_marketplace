@@ -35,22 +35,40 @@ def require_role(required_role: str):
     async def role_checker(
         current_user: User = Depends(get_current_user),
     ) -> User:
+        # _realm_roles is attached by get_current_user
         roles = getattr(current_user, "_realm_roles", [])
-        user_db_role = (current_user.role or "").lower()
-        req_role = required_role.lower()
+        if required_role not in roles:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Access denied. Required role: {required_role}",
+            )
+        return current_user
 
-        if (
-            req_role in roles
-            or user_db_role == req_role
-            or user_db_role in ["admin", "super_admin"]
-            or "super_admin" in roles
-            or "admin" in roles
-        ):
-            return current_user
+    return role_checker
 
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Access denied. Required role: {required_role}",
-        )
+
+def require_any_role(required_roles: list[str]):
+    """
+    Dependency factory that returns a dependency function.
+    The inner function checks that the authenticated user has AT LEAST ONE of the
+    required Keycloak realm roles.
+
+    Args:
+        required_roles: A list of allowed roles.
+
+    Returns:
+        A FastAPI dependency that raises 403 if no match.
+    """
+
+    async def role_checker(
+        current_user: User = Depends(get_current_user),
+    ) -> User:
+        roles = getattr(current_user, "_realm_roles", [])
+        if not any(role in roles for role in required_roles):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Access denied. Required one of: {required_roles}",
+            )
+        return current_user
 
     return role_checker

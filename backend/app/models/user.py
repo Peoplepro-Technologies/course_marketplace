@@ -7,7 +7,7 @@ Each row corresponds to a Keycloak user, linked via `keycloak_sub` (the
 
 import uuid
 from datetime import datetime, timezone
-from sqlalchemy import Column, String, Text, DateTime, Boolean
+from sqlalchemy import Column, String, Text, DateTime, Boolean, Float
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
@@ -25,8 +25,12 @@ class User(Base):
     is_active = Column(Boolean, default=True, nullable=False)
     profile_pic = Column(Text, nullable=True)
     bio = Column(Text, nullable=True)
-    payout_account_name = Column(String(255), nullable=True)
-    payout_account_number = Column(String(255), nullable=True)
+    # Group 3: per-instructor custom payout rate (% kept by instructor, e.g. 70 = 70%).
+    # NULL means use platform default (80% instructor / 20% platform).
+    instructor_payout_rate = Column(Float, nullable=True)
+    # Group 5: faculty flag. False = Faculty mode (no live classes). Default True.
+    can_host_live_classes = Column(Boolean, default=True, nullable=False)
+    can_upload_video = Column(Boolean, default=True, nullable=False)
     created_at = Column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),
@@ -34,7 +38,7 @@ class User(Base):
     )
 
     # ── Relationships ─────────────────────────────────────────────────
-    courses = relationship("Course", back_populates="instructor", lazy="dynamic")
+    courses = relationship("Course", back_populates="instructor", foreign_keys="Course.instructor_id", lazy="dynamic")
     enrollments = relationship(
         "Enrollment",
         back_populates="learner",
@@ -44,19 +48,18 @@ class User(Base):
     reviews = relationship("Review", back_populates="learner", lazy="dynamic")
     progress_records = relationship("Progress", back_populates="learner", lazy="dynamic")
     live_classes = relationship("LiveClass", back_populates="instructor", lazy="dynamic")
-    
-    # Support
+    wishlists = relationship("Wishlist", back_populates="learner", lazy="dynamic")
     support_tickets = relationship(
-        "SupportTicket", 
-        back_populates="raised_by", 
-        foreign_keys="SupportTicket.raised_by_id", 
-        lazy="dynamic"
+        "SupportTicket",
+        back_populates="raised_by",
+        foreign_keys="SupportTicket.raised_by_id",
+        lazy="dynamic",
     )
     assigned_tickets = relationship(
-        "SupportTicket", 
-        back_populates="assigned_to", 
-        foreign_keys="SupportTicket.assigned_to_id", 
-        lazy="dynamic"
+        "SupportTicket",
+        back_populates="assigned_to",
+        foreign_keys="SupportTicket.assigned_to_id",
+        lazy="dynamic",
     )
     ticket_replies = relationship("TicketReply", back_populates="author", lazy="dynamic")
 

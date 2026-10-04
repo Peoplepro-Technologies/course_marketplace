@@ -32,8 +32,9 @@ from app.models.refund_request import RefundRequest
 from app.models.instructor_payout import InstructorPayout
 from app.models.transaction import Transaction
 from app.schemas.refund_request import RefundRequestRead, RefundRequestResolve
-from app.models.support_ticket import SupportTicket, TicketReply
+from app.models.support_ticket import SupportTicket, TicketReply, TicketRead
 from app.schemas.support_ticket import SupportTicketOut, SupportTicketUpdate, TicketReplyCreate, TicketReplyOut
+from app.services.audit import record_audit_log
 
 router = APIRouter(prefix="/api/v1/accounts", tags=["Accounts"])
 
@@ -57,11 +58,11 @@ async def get_dashboard_kpis(
       - pending_refunds_count: number of refund requests with status "pending"
       - recent_transactions_count: approved enrollments in the last 30 days
     """
-    # Estimated total revenue: sum of course.price for approved/active enrollments
+    # Estimated total revenue: sum of course.price for approved enrollments
     revenue_rows = (
         db.query(Course.price)
         .join(Enrollment, Enrollment.course_id == Course.id)
-        .filter(Enrollment.status.in_(["approved", "active", "completed"]))
+        .filter(Enrollment.status == "approved")
         .all()
     )
     total_revenue = sum(r[0] if isinstance(r, (tuple, list)) else getattr(r, 'price', 0.0) for r in revenue_rows if (r[0] if isinstance(r, (tuple, list)) else getattr(r, 'price', None)))
@@ -73,12 +74,12 @@ async def get_dashboard_kpis(
         .scalar() or 0
     )
 
-    # Recent transactions: enrollments in last 30 days
+    # Recent transactions: approved enrollments in last 30 days
     cutoff = datetime.now(timezone.utc) - timedelta(days=30)
     recent_transactions = (
         db.query(func.count(Enrollment.id))
         .filter(
-            Enrollment.status.in_(["approved", "active", "completed"]),
+            Enrollment.status == "approved",
             func.coalesce(Enrollment.approved_at, Enrollment.enrolled_at) >= cutoff,
         )
         .scalar() or 0
@@ -87,7 +88,7 @@ async def get_dashboard_kpis(
     # Total approved enrollments
     total_approved = (
         db.query(func.count(Enrollment.id))
-        .filter(Enrollment.status.in_(["approved", "active", "completed"]))
+        .filter(Enrollment.status == "approved")
         .scalar() or 0
     )
 
@@ -118,7 +119,7 @@ async def list_transactions(
         db.query(Enrollment, User, Course)
         .join(User, Enrollment.learner_id == User.id)
         .join(Course, Enrollment.course_id == Course.id)
-        .filter(Enrollment.status.in_(["approved", "active", "completed"]))
+        .filter(Enrollment.status == "approved")
         .order_by(func.coalesce(Enrollment.approved_at, Enrollment.enrolled_at).desc())
     )
 
@@ -296,11 +297,10 @@ async def list_instructor_payouts(
     """
     Per-instructor earnings summary.
     Gross = sum of course.price for all approved enrollments per instructor.
-    Platform fee = 20% flat (placeholder).
-    Net = gross * 0.80.
+    Platform fee = uses instructor's custom instructor_payout_rate if set,
+    otherwise falls back to the platform default (_PLATFORM_FEE_RATE = 20%).
     ⚠️ These are estimated figures — no real payment system is connected.
     """
-    # Get all instructors who have at least one approved enrollment
     instructors = (
         db.query(User)
         .filter(User.role == "instructor")
@@ -309,7 +309,6 @@ async def list_instructor_payouts(
 
     result = []
     for instructor in instructors:
-        # Sum approved enrollment prices for this instructor's courses
         rows = (
             db.query(Course.price)
             .join(Enrollment, Enrollment.course_id == Course.id)
@@ -321,19 +320,24 @@ async def list_instructor_payouts(
         )
         gross = sum(r.price for r in rows if r.price)
         if gross == 0:
-            continue  # Skip instructors with no approved enrollments
+            continue
 
-        fee = round(gross * _PLATFORM_FEE_RATE, 2)
-        net = round(gross - fee, 2)
+        # Per-instructor payout rate (Group 3)
+        if instructor.instructor_payout_rate is not None:
+            instructor_share = instructor.instructor_payout_rate / 100.0
+        else:
+            instructor_share = 1.0 - _PLATFORM_FEE_RATE  # default 80%
+        platform_share = 1.0 - instructor_share
+
+        fee = round(gross * platform_share, 2)
+        net = round(gross * instructor_share, 2)
         gross = round(gross, 2)
 
-        # Count courses and approved enrollments
         course_count = db.query(func.count(Course.id)).filter(
             Course.instructor_id == instructor.id
         ).scalar()
         enrollment_count = len(rows)
 
-        # Get the most recent payout for this instructor
         last_payout = (
             db.query(InstructorPayout)
             .filter(InstructorPayout.instructor_id == instructor.id)
@@ -350,17 +354,18 @@ async def list_instructor_payouts(
             "gross_earnings": gross,
             "platform_fee": fee,
             "net_payout": net,
+            "payout_rate_pct": round(instructor_share * 100, 1),
+            "custom_rate": instructor.instructor_payout_rate is not None,
             "last_paid_at": last_payout.marked_paid_at.isoformat() if last_payout else None,
             "last_payout_id": str(last_payout.id) if last_payout else None,
         })
 
-    # Sort by gross earnings descending
     result.sort(key=lambda x: x["gross_earnings"], reverse=True)
 
     return {
         "payouts": result,
         "platform_fee_rate": _PLATFORM_FEE_RATE,
-        "note": "Estimated figures based on enrollment data. Flat 20% platform fee. No real payment processed.",
+        "note": "Net payout uses per-instructor rate where set, otherwise platform default (80/20).",
     }
 
 
@@ -372,7 +377,7 @@ async def mark_instructor_paid(
 ):
     """
     Record a payout for an instructor.
-    Creates an InstructorPayout row with current earnings snapshot and timestamp.
+    Uses the instructor's custom rate if set, otherwise platform default.
     No real payment is processed.
     """
     instructor = db.query(User).filter(
@@ -382,7 +387,6 @@ async def mark_instructor_paid(
     if not instructor:
         raise HTTPException(status_code=404, detail="Instructor not found")
 
-    # Calculate current earnings
     rows = (
         db.query(Course.price)
         .join(Enrollment, Enrollment.course_id == Course.id)
@@ -393,8 +397,16 @@ async def mark_instructor_paid(
         .all()
     )
     gross = round(sum(r.price for r in rows if r.price), 2)
-    fee = round(gross * _PLATFORM_FEE_RATE, 2)
-    net = round(gross - fee, 2)
+
+    # Per-instructor rate (Group 3)
+    if instructor.instructor_payout_rate is not None:
+        instructor_share = instructor.instructor_payout_rate / 100.0
+    else:
+        instructor_share = 1.0 - _PLATFORM_FEE_RATE
+    platform_share = 1.0 - instructor_share
+
+    fee = round(gross * platform_share, 2)
+    net = round(gross * instructor_share, 2)
 
     now = datetime.now(timezone.utc)
     period_label = now.strftime("%b %Y")
@@ -416,6 +428,7 @@ async def mark_instructor_paid(
         "message": f"Payout recorded for {instructor.name}",
         "payout_id": str(payout.id),
         "net_payout": net,
+        "payout_rate_pct": round(instructor_share * 100, 1),
         "marked_paid_at": payout.marked_paid_at.isoformat(),
     }
 
@@ -592,7 +605,7 @@ def accounts_get_support_tickets(
     db: Session = Depends(get_db),
     admin: User = Depends(require_role("accounts")),
 ):
-    query = db.query(SupportTicket).filter(SupportTicket.category == "billing")
+    query = db.query(SupportTicket).filter(SupportTicket.assigned_team == "accounts")
     if status:
         query = query.filter(SupportTicket.status == status)
     if priority:
@@ -603,7 +616,29 @@ def accounts_get_support_tickets(
         t.raised_by_name = t.raised_by.name if t.raised_by else "Unknown"
         if t.assigned_to:
             t.assigned_to_name = t.assigned_to.name
+            
+        read_record = db.query(TicketRead).filter_by(ticket_id=t.id, user_id=admin.id).first()
+        last_read = read_record.last_read_at if read_record else datetime.min.replace(tzinfo=timezone.utc)
+        
+        t.is_unread = (
+            t.last_activity_at > last_read and
+            t.last_activity_by != admin.id
+        )
     return tickets
+
+@router.get("/support-tickets/unread-count")
+def accounts_get_unread_count(
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_role("accounts"))
+):
+    tickets = db.query(SupportTicket).filter(SupportTicket.assigned_team == "accounts").all()
+    count = 0
+    for ticket in tickets:
+        read_record = db.query(TicketRead).filter_by(ticket_id=ticket.id, user_id=admin.id).first()
+        last_read = read_record.last_read_at if read_record else datetime.min.replace(tzinfo=timezone.utc)
+        if ticket.last_activity_at > last_read and ticket.last_activity_by != admin.id:
+            count += 1
+    return {"unread_count": count}
 
 @router.put("/support-tickets/{ticket_id}", response_model=SupportTicketOut)
 def accounts_update_support_ticket(
@@ -614,11 +649,12 @@ def accounts_update_support_ticket(
 ):
     ticket = db.query(SupportTicket).filter(
         SupportTicket.id == ticket_id, 
-        SupportTicket.category == "billing"
+        SupportTicket.assigned_team == "accounts"
     ).first()
     if not ticket:
-        raise HTTPException(status_code=404, detail="Ticket not found or not in billing category")
+        raise HTTPException(status_code=404, detail="Ticket not found or not in accounts team")
         
+    old_status = ticket.status
     if update_data.status:
         ticket.status = update_data.status
     if update_data.priority:
@@ -626,13 +662,36 @@ def accounts_update_support_ticket(
     if update_data.assigned_to_id is not None:
         ticket.assigned_to_id = update_data.assigned_to_id
         
+    if update_data.status and old_status != update_data.status:
+        record_audit_log(db, admin.id, f"ticket_{update_data.status}", "support_ticket", str(ticket.id), {"ticket_number": ticket.ticket_number})
+        
+        ticket.last_activity_at = datetime.now(timezone.utc)
+        ticket.last_activity_by = admin.id
+        
     db.commit()
     db.refresh(ticket)
     
     ticket.raised_by_name = ticket.raised_by.name if ticket.raised_by else "Unknown"
     if ticket.assigned_to:
         ticket.assigned_to_name = ticket.assigned_to.name
+        
+    ticket.is_unread = False
     return ticket
+
+@router.post("/support-tickets/{ticket_id}/read")
+def accounts_mark_ticket_read(
+    ticket_id: str,
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_role("accounts")),
+):
+    read_record = db.query(TicketRead).filter_by(ticket_id=ticket_id, user_id=admin.id).first()
+    if not read_record:
+        read_record = TicketRead(ticket_id=ticket_id, user_id=admin.id)
+        db.add(read_record)
+    
+    read_record.last_read_at = datetime.now(timezone.utc)
+    db.commit()
+    return {"status": "ok"}
 
 @router.post("/support-tickets/{ticket_id}/reply", response_model=TicketReplyOut)
 def accounts_reply_support_ticket(
@@ -643,10 +702,13 @@ def accounts_reply_support_ticket(
 ):
     ticket = db.query(SupportTicket).filter(
         SupportTicket.id == ticket_id,
-        SupportTicket.category == "billing"
+        SupportTicket.assigned_team == "accounts"
     ).first()
     if not ticket:
-        raise HTTPException(status_code=404, detail="Ticket not found or not in billing category")
+        raise HTTPException(status_code=404, detail="Ticket not found or not in accounts team")
+        
+    if ticket.status == "cancelled":
+        raise HTTPException(status_code=409, detail="Cannot reply to a cancelled ticket")
         
     new_reply = TicketReply(
         ticket_id=ticket.id,
@@ -656,6 +718,13 @@ def accounts_reply_support_ticket(
     db.add(new_reply)
     if ticket.status in ["resolved", "closed"]:
         ticket.status = "open"
+        record_audit_log(db, admin.id, "ticket_reopened", "support_ticket", str(ticket.id), {"ticket_number": ticket.ticket_number})
+        
+    ticket.last_activity_at = datetime.now(timezone.utc)
+    ticket.last_activity_by = admin.id
+    
+    record_audit_log(db, admin.id, "ticket_reply", "support_ticket", str(ticket.id), {"ticket_number": ticket.ticket_number})
+        
     db.commit()
     db.refresh(new_reply)
     
@@ -765,81 +834,141 @@ async def get_financial_reports(
         "generated_at": now.isoformat(),
     }
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Enrollment Approvals
-# ─────────────────────────────────────────────────────────────────────────────
-
-@router.get("/enrollments/pending")
-async def get_pending_enrollments(
+@router.get("/course-earnings")
+async def get_course_earnings(
     current_user: User = Depends(require_role("accounts")),
     db: Session = Depends(get_db),
 ):
-    enrollments = (
-        db.query(Enrollment)
-        .join(Course, Enrollment.course_id == Course.id)
+    """
+    Get estimated earnings grouped by course.
+    """
+    from sqlalchemy import func
+    from app.models.course import Course
+    from app.models.enrollment import Enrollment
+    from app.models.user import User
+
+    courses = db.query(Course).all()
+    
+    results = []
+    for course in courses:
+        approved_enrollments = db.query(func.count(Enrollment.id)).filter(
+            Enrollment.course_id == course.id,
+            Enrollment.status == "approved"
+        ).scalar() or 0
+        
+        gross_revenue = approved_enrollments * course.price
+        platform_fee = gross_revenue * 0.20
+        instructor_cut = gross_revenue * 0.80
+        
+        results.append({
+            "course_id": str(course.id),
+            "course_title": course.title,
+            "instructor_name": course.instructor.name if course.instructor else "Unknown",
+            "category": course.category,
+            "price": course.price,
+            "approved_enrollments": approved_enrollments,
+            "gross_revenue": round(gross_revenue, 2),
+            "platform_fee": round(platform_fee, 2),
+            "instructor_cut": round(instructor_cut, 2),
+            "status": course.status
+        })
+        
+    # Sort by gross revenue descending
+    results.sort(key=lambda x: x["gross_revenue"], reverse=True)
+    return results
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Learner Course Approvals
+# ─────────────────────────────────────────────────────────────────────────────
+
+@router.get("/enrollments")
+async def list_enrollments(
+    status: Optional[str] = Query(None, description="Filter by status: pending, approved, rejected"),
+    search: Optional[str] = Query(None),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    current_user: User = Depends(require_role("accounts")),
+    db: Session = Depends(get_db),
+):
+    """List all enrollments with learner and course info for accounts review."""
+    query = (
+        db.query(Enrollment, User, Course)
         .join(User, Enrollment.learner_id == User.id)
-        .filter(Enrollment.status == "pending")
+        .join(Course, Enrollment.course_id == Course.id)
+    )
+
+    if status:
+        query = query.filter(Enrollment.status == status)
+
+    if search:
+        query = query.filter(
+            User.name.ilike(f"%{search}%") |
+            User.email.ilike(f"%{search}%") |
+            Course.title.ilike(f"%{search}%")
+        )
+
+    total = query.count()
+    rows = (
+        query
         .order_by(Enrollment.enrolled_at.desc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
         .all()
     )
 
-    result = []
-    for e in enrollments:
-        result.append({
-            "id": str(e.id),
-            "course_title": e.course.title,
-            "learner_name": f"{e.learner.first_name} {e.learner.last_name}",
-            "learner_email": e.learner.email,
-            "course_price": e.course.price,
-            "enrolled_at": e.enrolled_at.isoformat() if e.enrolled_at else None,
+    results = []
+    for enrollment, learner, course in rows:
+        results.append({
+            "enrollment_id": str(enrollment.id),
+            "learner_id": str(learner.id),
+            "learner_name": learner.name,
+            "learner_email": learner.email,
+            "course_id": str(course.id),
+            "course_title": course.title,
+            "course_price": course.price,
+            "course_thumbnail": course.thumbnail_url,
+            "enrolled_at": enrollment.enrolled_at.isoformat(),
+            "approved_at": enrollment.approved_at.isoformat() if enrollment.approved_at else None,
+            "status": enrollment.status,
         })
-    return result
+
+    return {"enrollments": results, "total": total, "page": page, "page_size": page_size}
+
 
 @router.put("/enrollments/{enrollment_id}/approve")
-async def approve_enrollment(
+async def accounts_approve_enrollment(
     enrollment_id: str,
     current_user: User = Depends(require_role("accounts")),
     db: Session = Depends(get_db),
 ):
+    """Approve a pending enrollment, granting learner access to course content."""
     enrollment = db.query(Enrollment).filter(Enrollment.id == enrollment_id).first()
     if not enrollment:
         raise HTTPException(status_code=404, detail="Enrollment not found")
-    
+    if enrollment.status == "approved":
+        raise HTTPException(status_code=400, detail="Already approved")
+
     enrollment.status = "approved"
     enrollment.approved_at = datetime.now(timezone.utc)
-    
-    # Also update transaction status
-    transaction = db.query(Transaction).filter(
-        Transaction.learner_id == enrollment.learner_id,
-        Transaction.course_id == enrollment.course_id,
-        Transaction.status == "pending"
-    ).first()
-    if transaction:
-        transaction.status = "completed"
-
+    enrollment.approved_by = current_user.id
     db.commit()
-    return {"message": "Enrollment approved"}
+
+    return {"message": "Enrollment approved", "enrollment_id": enrollment_id, "status": "approved"}
+
 
 @router.put("/enrollments/{enrollment_id}/reject")
-async def reject_enrollment(
+async def accounts_reject_enrollment(
     enrollment_id: str,
     current_user: User = Depends(require_role("accounts")),
     db: Session = Depends(get_db),
 ):
+    """Reject a pending or approved enrollment, revoking learner access."""
     enrollment = db.query(Enrollment).filter(Enrollment.id == enrollment_id).first()
     if not enrollment:
         raise HTTPException(status_code=404, detail="Enrollment not found")
-    
-    enrollment.status = "rejected"
-    
-    # Also update transaction status
-    transaction = db.query(Transaction).filter(
-        Transaction.learner_id == enrollment.learner_id,
-        Transaction.course_id == enrollment.course_id,
-        Transaction.status == "pending"
-    ).first()
-    if transaction:
-        transaction.status = "failed"
 
+    enrollment.status = "rejected"
     db.commit()
-    return {"message": "Enrollment rejected"}
+
+    return {"message": "Enrollment rejected", "enrollment_id": enrollment_id, "status": "rejected"}

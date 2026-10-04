@@ -82,13 +82,13 @@ export default function InvoiceView() {
             <tr>
               <td>{invoice.course_title}</td>
               <td>{invoice.instructor_name}</td>
-              <td className="text-right">${invoice.amount?.toFixed(2)}</td>
+              <td className="text-right">₹{invoice.amount?.toFixed(2)}</td>
             </tr>
           </tbody>
           <tfoot>
             <tr>
               <td colSpan="2" className="text-right"><strong>Total:</strong></td>
-              <td className="text-right"><strong>${invoice.amount?.toFixed(2)}</strong></td>
+              <td className="text-right"><strong>₹{invoice.amount?.toFixed(2)}</strong></td>
             </tr>
           </tfoot>
         </table>

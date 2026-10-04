@@ -1,5 +1,6 @@
 import { Link, useLocation } from 'react-router-dom';
 import { BookOpen, Heart, Clock, FileText, LifeBuoy, TrendingUp, MessageSquare } from 'lucide-react';
+import SupportBadgeLink from '../../components/SupportBadgeLink';
 import '../RoleDashboard.css';
 
 const SIDEBAR_ITEMS = [
@@ -30,6 +31,17 @@ export default function LearnerSidebarLayout({ children }) {
         <ul className="sidebar-nav">
           {SIDEBAR_ITEMS.map((item) => {
             const Icon = item.icon;
+            if (item.label === 'Support') {
+              return (
+                <SupportBadgeLink 
+                  key={item.label}
+                  icon={<Icon size={18} strokeWidth={2} />}
+                  label={item.label}
+                  path={item.path}
+                  apiEndpoint="/support-tickets/unread-count"
+                />
+              );
+            }
             return (
               <Link to={item.path} key={item.label} style={{ textDecoration: 'none' }}>
                 <li className={`sidebar-nav-item${location.pathname.startsWith(item.path) ? ' active' : ''}`}>

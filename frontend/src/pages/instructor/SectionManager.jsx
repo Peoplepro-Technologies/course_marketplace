@@ -7,9 +7,6 @@ import { useParams, useNavigate } from 'react-router-dom';
 import api from '../../api/axios';
 import Modal from '../../components/Modal';
 import LessonForm from './LessonForm';
-import EmptyState from '../../components/EmptyState';
-import StatusBadge from '../../components/StatusBadge';
-import { FolderOpen, X, Plus } from 'lucide-react';
 
 export default function SectionManager() {
   const { courseId } = useParams();
@@ -74,6 +71,15 @@ export default function SectionManager() {
     }
   };
 
+  const handleTogglePreview = async (lessonId) => {
+    try {
+      await api.put(`/instructor/lessons/${lessonId}/toggle-preview`);
+      fetchCurriculum();
+    } catch (err) {
+      alert('Failed to update preview status');
+    }
+  };
+
   if (loading) return null;
 
   return (
@@ -86,17 +92,19 @@ export default function SectionManager() {
           <h2>Curriculum for: {course?.title}</h2>
         </div>
         <div>
-          {course && <StatusBadge status={course.status} />}
+          <span className={`badge badge-${course?.status === 'published' ? 'success' : 'warning'}`}>
+            {course?.status}
+          </span>
         </div>
       </div>
 
       <div className="flex-col gap-lg">
         {sections.length === 0 ? (
-          <EmptyState 
-            icon={FolderOpen}
-            title="No curriculum yet"
-            message="Start by creating your first section below."
-          />
+          <div className="empty-state card">
+            <div className="empty-icon">📂</div>
+            <h3>No curriculum yet</h3>
+            <p>Start by creating your first section below.</p>
+          </div>
         ) : (
           sections.map((section, idx) => (
             <div key={section.id} className="card-glass flex-col gap-md" style={{ padding: '1.5rem' }}>
@@ -117,11 +125,22 @@ export default function SectionManager() {
                 ) : (
                   section.lessons?.map((lesson, lIdx) => (
                     <div key={lesson.id} className="flex-between" style={{ padding: '1rem', borderBottom: '1px solid var(--color-border)' }}>
-                      <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                         <strong style={{ marginRight: '0.5rem' }}>{lIdx + 1}.</strong>
-                        {lesson.title} <span style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-xs)', marginLeft: '1rem' }}>{lesson.duration} min</span>
+                        {lesson.title}
+                        <span style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-xs)', marginLeft: '0.5rem' }}>{lesson.duration} min</span>
+                        {lesson.is_preview && (
+                          <span className="badge badge-primary" style={{ fontSize: '0.65rem', padding: '0.15rem 0.45rem', marginLeft: '0.25rem' }}>Preview</span>
+                        )}
                       </div>
                       <div className="flex gap-sm">
+                        <button
+                          className={`btn btn-sm ${lesson.is_preview ? 'btn-primary' : 'btn-secondary'}`}
+                          title={lesson.is_preview ? 'Remove free preview' : 'Make free preview'}
+                          onClick={() => handleTogglePreview(lesson.id)}
+                        >
+                          {lesson.is_preview ? 'Preview On' : 'Preview Off'}
+                        </button>
                         <button 
                           className="btn btn-secondary btn-sm" 
                           onClick={() => setLessonModal({ isOpen: true, sectionId: section.id, lesson })}
@@ -129,11 +148,10 @@ export default function SectionManager() {
                           Edit
                         </button>
                         <button 
-                          className="btn btn-secondary btn-sm flex-center" 
-                          style={{ padding: '0.25rem' }}
+                          className="btn btn-secondary btn-sm" 
                           onClick={() => handleDeleteLesson(lesson.id)}
                         >
-                          <X size={16} />
+                          ✕
                         </button>
                       </div>
                     </div>
@@ -142,11 +160,11 @@ export default function SectionManager() {
               </div>
               
               <button 
-                className="btn btn-secondary btn-sm flex-center" 
-                style={{ alignSelf: 'flex-start', gap: '6px' }}
+                className="btn btn-secondary btn-sm" 
+                style={{ alignSelf: 'flex-start' }}
                 onClick={() => setLessonModal({ isOpen: true, sectionId: section.id, lesson: null })}
               >
-                <Plus size={14} /> Add Lesson
+                + Add Lesson
               </button>
             </div>
           ))

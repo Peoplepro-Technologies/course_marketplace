@@ -15,13 +15,16 @@ class CourseBase(BaseModel):
     category: str = "General"
     thumbnail_url: Optional[str] = None
     price: float = 0.0
-    learning_outcomes: Optional[List[str]] = []
-    skills: Optional[List[str]] = []
 
 
 class CourseCreate(CourseBase):
-    """Fields required to create a new course."""
+    """Fields required to create a new course (Instructor self-serve)."""
     pass
+
+
+class CoordinatorCourseCreate(CourseBase):
+    """Fields required to create a new course by a coordinator."""
+    instructor_id: Optional[UUID] = None
 
 
 class CourseUpdate(BaseModel):
@@ -31,8 +34,6 @@ class CourseUpdate(BaseModel):
     category: Optional[str] = None
     thumbnail_url: Optional[str] = None
     price: Optional[float] = None
-    learning_outcomes: Optional[List[str]] = None
-    skills: Optional[List[str]] = None
 
 
 class InstructorInfo(BaseModel):
@@ -48,7 +49,7 @@ class InstructorInfo(BaseModel):
 class CourseRead(CourseBase):
     """Full course view returned to clients."""
     id: UUID
-    instructor_id: UUID
+    instructor_id: Optional[UUID] = None
     status: str
     rejection_reason: Optional[str] = None
     avg_rating: Optional[float] = 0.0

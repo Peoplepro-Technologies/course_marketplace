@@ -42,6 +42,13 @@ export default function AdminSupportInbox({ apiPrefix, roleName, hideCategoryFil
     setSelectedTicket(ticket);
     setUpdateStatus(ticket.status);
     setReplyMessage('');
+
+    if (ticket.is_unread) {
+      api.post(`${apiPrefix}/support-tickets/${ticket.id}/read`).then(() => {
+        setTickets(prev => prev.map(t => t.id === ticket.id ? { ...t, is_unread: false } : t));
+        setSelectedTicket(prev => ({ ...prev, is_unread: false }));
+      }).catch(console.error);
+    }
   };
 
   const handleUpdateStatus = async () => {
@@ -148,8 +155,15 @@ export default function AdminSupportInbox({ apiPrefix, roleName, hideCategoryFil
                 </thead>
                 <tbody>
                   {tickets.map(ticket => (
-                    <tr key={ticket.id} onClick={() => handleSelectTicket(ticket)} style={{ cursor: 'pointer' }}>
-                      <td style={{ fontWeight: 600 }}>{ticket.subject}</td>
+                    <tr key={ticket.id} onClick={() => handleSelectTicket(ticket)} style={{ cursor: 'pointer', background: ticket.is_unread ? 'var(--color-bg-secondary)' : 'transparent' }}>
+                      <td style={{ fontWeight: 600 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          {ticket.ticket_number ? `#${ticket.ticket_number} - ` : ''}{ticket.subject}
+                          {ticket.is_unread && (
+                            <span className="badge" style={{ backgroundColor: 'var(--color-danger)', color: 'white', fontSize: '0.7rem' }}>New Reply</span>
+                          )}
+                        </div>
+                      </td>
                       <td>
                         {ticket.raised_by_name}
                         <div style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>Role: {ticket.role_context}</div>
@@ -173,7 +187,9 @@ export default function AdminSupportInbox({ apiPrefix, roleName, hideCategoryFil
             <div className="card">
               <div className="flex-between" style={{ marginBottom: '1.5rem' }}>
                 <div>
-                  <h3 style={{ margin: '0 0 0.5rem 0' }}>{selectedTicket.subject}</h3>
+                  <h3 style={{ margin: '0 0 0.5rem 0' }}>
+                    {selectedTicket.ticket_number ? `#${selectedTicket.ticket_number} - ` : ''}{selectedTicket.subject}
+                  </h3>
                   <div style={{ display: 'flex', gap: '1rem', fontSize: '13px', color: 'var(--color-text-muted)' }}>
                     <span>By: {selectedTicket.raised_by_name} ({selectedTicket.role_context})</span>
                     <span>Opened: {new Date(selectedTicket.created_at).toLocaleString()}</span>

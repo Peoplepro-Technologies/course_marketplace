@@ -55,11 +55,11 @@ def list_courses(
     - Results are paginated (default 12 per page).
     - Cached in Redis for 5 minutes.
     """
-    # ── Check Redis cache (bypassed for local dev accuracy) ───────────
-    # cache_key = f"courses:list:{search}:{category}:{page}:{page_size}"
-    # cached = get_cache(cache_key)
-    # if cached:
-    #     return cached
+    # ── Check Redis cache ─────────────────────────────────────────────
+    cache_key = f"courses:list:{search}:{category}:{page}:{page_size}"
+    cached = get_cache(cache_key)
+    if cached:
+        return cached
 
     # ── Build query ───────────────────────────────────────────────────
     query = db.query(Course).options(
@@ -95,7 +95,7 @@ def list_courses(
     )
 
     # ── Cache the result ──────────────────────────────────────────────
-    # set_cache(cache_key, result.model_dump(mode="json"), ttl=300)
+    set_cache(cache_key, result.model_dump(mode="json"), ttl=300)
 
     return result
 
@@ -156,8 +156,13 @@ def get_course_detail(course_id: str, db: Session = Depends(get_db)):
                     "order_index": l.order_index,
                     "duration": l.duration,
                     "is_preview": l.is_preview,
-                    # Only expose video_url/content for preview lessons
-                    "video_url": l.video_url if l.is_preview else None,
+                    # Only expose video_url for preview lessons.
+                    # Remap local video paths to the public preview endpoint (no auth required).
+                    "video_url": (
+                        f"/public/lessons/{str(l.id)}/preview/video"
+                        if l.is_preview and l.video_url and not l.video_url.startswith('http')
+                        else (l.video_url if l.is_preview else None)
+                    ),
                     "content": l.content if l.is_preview else None,
                     "thumbnail_url": l.thumbnail_url,
                     "quiz_questions": [

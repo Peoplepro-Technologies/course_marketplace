@@ -2,17 +2,17 @@
 routers/superadmin.py — Super Admin-only endpoints.
 
 Provides:
-  - User management (list, role change, deactivate/reactivate/activate)
-  - Course management (list all, status override, full moderation)
+  - User management (list, role change, deactivate/reactivate)
+  - Course management (list all, status override)
   - Category CRUD
   - Approval workflow (pending courses, approve/reject)
-  - Enrollment management (list, approve, reject)
   - Finance overview (revenue estimate, recent transactions)
-  - Analytics KPIs with flagged content counts
+  - Analytics KPIs (total users, courses, enrollments, revenue)
   - Review moderation (list, hide/unhide)
   - Audit logs (list)
 
-All endpoints are protected with require_role("super_admin").
+All endpoints are protected with require_role("admin"), which passes
+for both admin and super_admin users (see auth/keycloak.py role mapping).
 """
 
 from datetime import datetime, timezone
@@ -31,15 +31,14 @@ from app.models.review import Review
 from app.models.category import Category
 from app.models.audit_log import AuditLog
 from app.schemas.user import UserRead
-from app.schemas.course import CourseRead, CourseModerateAction
+from app.schemas.course import CourseRead
 from app.schemas.review import ReviewRead, ReviewModerateAction
-from app.schemas.enrollment import EnrollmentRead
 from app.schemas.category import CategoryRead, CategoryCreate, CategoryUpdate
-from app.models.support_ticket import SupportTicket, TicketReply
-from app.models.platform_setting import PlatformSetting
+from app.models.support_ticket import SupportTicket, TicketReply, TicketRead
 from app.schemas.support_ticket import SupportTicketOut, SupportTicketUpdate, TicketReplyCreate, TicketReplyOut
-from app.redis_client import invalidate_cache
+from app.models.ticket_routing_rule import TicketRoutingRule
 from app.services.audit import record_audit_log
+from app.redis_client import invalidate_cache
 
 router = APIRouter(prefix="/api/v1/superadmin", tags=["SuperAdmin"])
 
@@ -69,7 +68,7 @@ async def list_users(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     search: Optional[str] = Query(None, description="Search by name or email"),
-    current_user: User = Depends(require_role("super_admin")),
+    current_user: User = Depends(require_role("admin")),
     db: Session = Depends(get_db),
 ):
     """Paginated user listing with optional search."""
@@ -101,7 +100,7 @@ class RoleChangeRequest(BaseModel):
 async def change_user_role(
     user_id: str,
     data: RoleChangeRequest,
-    current_user: User = Depends(require_role("super_admin")),
+    current_user: User = Depends(require_role("admin")),
     db: Session = Depends(get_db),
 ):
     """Change a user's role. Logs to audit trail."""
@@ -125,7 +124,7 @@ async def change_user_role(
 @router.put("/users/{user_id}/deactivate")
 async def deactivate_user(
     user_id: str,
-    current_user: User = Depends(require_role("super_admin")),
+    current_user: User = Depends(require_role("admin")),
     db: Session = Depends(get_db),
 ):
     """Deactivate a user by setting their role to 'deactivated'."""
@@ -153,7 +152,7 @@ class ReactivateRequest(BaseModel):
 async def reactivate_user(
     user_id: str,
     data: ReactivateRequest,
-    current_user: User = Depends(require_role("super_admin")),
+    current_user: User = Depends(require_role("admin")),
     db: Session = Depends(get_db),
 ):
     """Reactivate a deactivated user with a specified role."""
@@ -175,29 +174,6 @@ async def reactivate_user(
     return {"message": f"User reactivated as '{data.role}'"}
 
 
-@router.put("/users/{user_id}/activate")
-async def activate_user(
-    user_id: str,
-    current_user: User = Depends(require_role("super_admin")),
-    db: Session = Depends(get_db),
-):
-    """Activate (set is_active=True) a user account without changing their role."""
-    user = db.query(User).filter(User.id == user_id).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    user.is_active = True
-    record_audit_log(
-        db,
-        actor_id=current_user.id,
-        action="account_activated",
-        target_type="user",
-        target_id=str(user.id),
-        details={"user_email": user.email}
-    )
-    db.commit()
-    return {"message": "User activated", "is_active": True}
-
-
 # ═══════════════════════════════════════════════════════════════════════
 # 2. COURSE MANAGEMENT
 # ═══════════════════════════════════════════════════════════════════════
@@ -207,7 +183,7 @@ async def list_all_courses(
     status: Optional[str] = Query(None, description="Filter by status"),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
-    current_user: User = Depends(require_role("super_admin")),
+    current_user: User = Depends(require_role("admin")),
     db: Session = Depends(get_db),
 ):
     """List all courses across all instructors with instructor info."""
@@ -239,7 +215,7 @@ class StatusOverrideRequest(BaseModel):
 async def override_course_status(
     course_id: str,
     data: StatusOverrideRequest,
-    current_user: User = Depends(require_role("super_admin")),
+    current_user: User = Depends(require_role("admin")),
     db: Session = Depends(get_db),
 ):
     """Override a course's status. Logs to audit trail."""
@@ -262,53 +238,13 @@ async def override_course_status(
     return {"message": f"Course status changed to '{data.status}'", "old_status": old_status}
 
 
-@router.put("/courses/{course_id}/moderate")
-async def moderate_course(
-    course_id: str,
-    data: CourseModerateAction,
-    current_user: User = Depends(require_role("super_admin")),
-    db: Session = Depends(get_db),
-):
-    """
-    Moderate a course using action-based API (approve/reject/flag/remove).
-    Supports rejection_reason field for instructor feedback.
-    """
-    course = db.query(Course).filter(Course.id == course_id).first()
-    if not course:
-        raise HTTPException(status_code=404, detail="Course not found")
-
-    action_map = {
-        "approve": "published",
-        "reject": "rejected",
-        "flag": "flagged",
-        "remove": "removed",
-    }
-    new_status = action_map.get(data.action)
-    if not new_status:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Invalid action '{data.action}'. Use: approve, reject, flag, remove",
-        )
-    old_status = course.status
-    course.status = new_status
-    if data.action == "reject" and hasattr(data, 'rejection_reason') and data.rejection_reason:
-        course.rejection_reason = data.rejection_reason
-    if new_status == "published":
-        record_audit_log(db, current_user.id, "course_published", "course", str(course.id))
-    elif new_status == "removed":
-        record_audit_log(db, current_user.id, "course_removed", "course", str(course.id))
-    db.commit()
-    invalidate_cache("courses:*")
-    return {"message": f"Course {data.action}d", "status": new_status, "old_status": old_status}
-
-
 # ═══════════════════════════════════════════════════════════════════════
 # 3. CATEGORIES CRUD
 # ═══════════════════════════════════════════════════════════════════════
 
 @router.get("/categories")
 async def list_categories(
-    current_user: User = Depends(require_role("super_admin")),
+    current_user: User = Depends(require_role("admin")),
     db: Session = Depends(get_db),
 ):
     """List all categories."""
@@ -319,7 +255,7 @@ async def list_categories(
 @router.post("/categories", status_code=201)
 async def create_category(
     data: CategoryCreate,
-    current_user: User = Depends(require_role("super_admin")),
+    current_user: User = Depends(require_role("admin")),
     db: Session = Depends(get_db),
 ):
     """Create a new category."""
@@ -338,7 +274,7 @@ async def create_category(
 async def update_category(
     category_id: str,
     data: CategoryUpdate,
-    current_user: User = Depends(require_role("super_admin")),
+    current_user: User = Depends(require_role("admin")),
     db: Session = Depends(get_db),
 ):
     """Update an existing category."""
@@ -363,7 +299,7 @@ async def update_category(
 @router.delete("/categories/{category_id}", status_code=204)
 async def delete_category(
     category_id: str,
-    current_user: User = Depends(require_role("super_admin")),
+    current_user: User = Depends(require_role("admin")),
     db: Session = Depends(get_db),
 ):
     """Delete a category if it's not in use."""
@@ -387,7 +323,7 @@ async def delete_category(
 async def list_pending_approvals(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
-    current_user: User = Depends(require_role("super_admin")),
+    current_user: User = Depends(require_role("admin")),
     db: Session = Depends(get_db),
 ):
     """List courses pending approval."""
@@ -414,7 +350,7 @@ class RejectRequest(BaseModel):
 @router.put("/approvals/{course_id}/approve")
 async def approve_course(
     course_id: str,
-    current_user: User = Depends(require_role("super_admin")),
+    current_user: User = Depends(require_role("admin")),
     db: Session = Depends(get_db),
 ):
     """Approve a pending course."""
@@ -437,7 +373,7 @@ async def approve_course(
 async def reject_course(
     course_id: str,
     data: RejectRequest,
-    current_user: User = Depends(require_role("super_admin")),
+    current_user: User = Depends(require_role("admin")),
     db: Session = Depends(get_db),
 ):
     """Reject a pending course with a reason."""
@@ -461,7 +397,7 @@ async def reject_course(
 
 @router.get("/finance/overview")
 async def finance_overview(
-    current_user: User = Depends(require_role("super_admin")),
+    current_user: User = Depends(require_role("admin")),
     db: Session = Depends(get_db),
 ):
     """
@@ -493,7 +429,7 @@ async def finance_overview(
 async def recent_transactions(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=50),
-    current_user: User = Depends(require_role("super_admin")),
+    current_user: User = Depends(require_role("admin")),
     db: Session = Depends(get_db),
 ):
     """
@@ -550,7 +486,7 @@ async def recent_transactions(
 
 @router.get("/analytics/kpis")
 async def get_kpis(
-    current_user: User = Depends(require_role("super_admin")),
+    current_user: User = Depends(require_role("admin")),
     db: Session = Depends(get_db),
 ):
     """KPI cards — real counts from the database."""
@@ -589,95 +525,7 @@ async def get_kpis(
 
 
 # ═══════════════════════════════════════════════════════════════════════
-# 7. ENROLLMENT MANAGEMENT (migrated from legacy admin.py)
-# ═══════════════════════════════════════════════════════════════════════
-
-@router.get("/enrollments")
-async def list_enrollments(
-    status: Optional[str] = Query(None, description="Filter by enrollment status: pending, approved, rejected"),
-    page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
-    current_user: User = Depends(require_role("super_admin")),
-    db: Session = Depends(get_db),
-):
-    """List all enrollments across all courses, optionally filtered by status."""
-    query = db.query(Enrollment)
-    if status:
-        query = query.filter(Enrollment.status == status)
-    total = query.count()
-    enrollments = (
-        query.order_by(Enrollment.enrolled_at.desc())
-        .offset((page - 1) * page_size)
-        .limit(page_size)
-        .all()
-    )
-    return {
-        "enrollments": [EnrollmentRead.model_validate(e) for e in enrollments],
-        "total": total,
-        "page": page,
-        "page_size": page_size,
-    }
-
-
-@router.put("/enrollments/{enrollment_id}/approve")
-async def approve_enrollment(
-    enrollment_id: str,
-    current_user: User = Depends(require_role("super_admin")),
-    db: Session = Depends(get_db),
-):
-    """
-    Approve a pending enrollment, granting the learner access to lesson videos.
-    Sets status to 'approved', records approved_at timestamp and approved_by admin id.
-    """
-    enrollment = db.query(Enrollment).filter(Enrollment.id == enrollment_id).first()
-    if not enrollment:
-        raise HTTPException(status_code=404, detail="Enrollment not found")
-    if enrollment.status == "approved":
-        raise HTTPException(status_code=400, detail="Enrollment is already approved")
-
-    enrollment.status = "approved"
-    enrollment.approved_at = datetime.now(timezone.utc)
-    enrollment.approved_by = current_user.id
-    _audit(db, current_user.id, "enrollment_approved", "enrollment", enrollment_id)
-    db.commit()
-    return {
-        "message": "Enrollment approved",
-        "enrollment_id": str(enrollment.id),
-        "status": enrollment.status,
-        "approved_at": enrollment.approved_at.isoformat(),
-    }
-
-
-@router.put("/enrollments/{enrollment_id}/reject")
-async def reject_enrollment(
-    enrollment_id: str,
-    current_user: User = Depends(require_role("super_admin")),
-    db: Session = Depends(get_db),
-):
-    """
-    Reject a pending enrollment, preventing the learner from accessing lesson videos.
-    Sets status to 'rejected' and clears approval metadata.
-    """
-    enrollment = db.query(Enrollment).filter(Enrollment.id == enrollment_id).first()
-    if not enrollment:
-        raise HTTPException(status_code=404, detail="Enrollment not found")
-    if enrollment.status == "rejected":
-        raise HTTPException(status_code=400, detail="Enrollment is already rejected")
-
-    enrollment.status = "rejected"
-    enrollment.approved_at = None
-    enrollment.approved_by = None
-    _audit(db, current_user.id, "enrollment_rejected", "enrollment", enrollment_id)
-    db.commit()
-    return {
-        "message": "Enrollment rejected",
-        "enrollment_id": str(enrollment.id),
-        "status": enrollment.status,
-    }
-
-
-# ═══════════════════════════════════════════════════════════════════════
-# 8. REVIEWS & MODERATION
+# 7. REVIEWS & MODERATION
 # ═══════════════════════════════════════════════════════════════════════
 
 @router.get("/reviews")
@@ -685,7 +533,7 @@ async def list_all_reviews(
     status: Optional[str] = Query(None, description="Filter by status"),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
-    current_user: User = Depends(require_role("super_admin")),
+    current_user: User = Depends(require_role("admin")),
     db: Session = Depends(get_db),
 ):
     """List all reviews with optional status filter for moderation."""
@@ -725,7 +573,7 @@ async def list_all_reviews(
 async def moderate_review(
     review_id: str,
     data: ReviewModerateAction,
-    current_user: User = Depends(require_role("super_admin")),
+    current_user: User = Depends(require_role("admin")),
     db: Session = Depends(get_db),
 ):
     """
@@ -765,7 +613,7 @@ async def moderate_review(
 async def list_audit_logs(
     page: int = Query(1, ge=1),
     page_size: int = Query(30, ge=1, le=100),
-    current_user: User = Depends(require_role("super_admin")),
+    current_user: User = Depends(require_role("admin")),
     db: Session = Depends(get_db),
 ):
     """List audit log entries, most recent first."""
@@ -797,80 +645,260 @@ async def list_audit_logs(
         "page_size": page_size,
     }
 
+
 # ═══════════════════════════════════════════════════════════════════════
-#  TREND CHARTS
+# 9. SUPPORT TICKETS
 # ═══════════════════════════════════════════════════════════════════════
 
-@router.get("/trend-charts")
-async def get_trend_charts(
-    days: int = 30,
-    current_user: User = Depends(require_role("super_admin")),
+@router.get("/support-tickets", response_model=list[SupportTicketOut])
+def get_support_tickets(
+    status: Optional[str] = None,
+    priority: Optional[str] = None,
     db: Session = Depends(get_db),
+    admin: User = Depends(require_role("admin")),
 ):
-    """Get simple enrollment and revenue trends for the last N days."""
-    from datetime import timedelta
+    query = db.query(SupportTicket).filter(SupportTicket.assigned_team == "admin")
+    if status:
+        query = query.filter(SupportTicket.status == status)
+    if priority:
+        query = query.filter(SupportTicket.priority == priority)
     
-    end_date = datetime.now(timezone.utc)
-    start_date = end_date - timedelta(days=days)
+    tickets = query.order_by(SupportTicket.updated_at.desc()).all()
+    for t in tickets:
+        t.raised_by_name = t.raised_by.name if t.raised_by else "Unknown"
+        if t.assigned_to:
+            t.assigned_to_name = t.assigned_to.name
+            
+        read_record = db.query(TicketRead).filter_by(ticket_id=t.id, user_id=admin.id).first()
+        last_read = read_record.last_read_at if read_record else datetime.min.replace(tzinfo=timezone.utc)
+        
+        t.is_unread = (
+            t.last_activity_at > last_read and
+            t.last_activity_by != admin.id
+        )
+    return tickets
+
+@router.get("/support-tickets/unread-count")
+def superadmin_get_unread_count(
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_role("admin"))
+):
+    tickets = db.query(SupportTicket).filter(SupportTicket.assigned_team == "admin").all()
+    count = 0
+    for ticket in tickets:
+        read_record = db.query(TicketRead).filter_by(ticket_id=ticket.id, user_id=admin.id).first()
+        last_read = read_record.last_read_at if read_record else datetime.min.replace(tzinfo=timezone.utc)
+        if ticket.last_activity_at > last_read and ticket.last_activity_by != admin.id:
+            count += 1
+    return {"unread_count": count}
+
+@router.put("/support-tickets/{ticket_id}", response_model=SupportTicketOut)
+def update_support_ticket(
+    ticket_id: str,
+    update_data: SupportTicketUpdate,
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_role("admin")),
+):
+    ticket = db.query(SupportTicket).filter(
+        SupportTicket.id == ticket_id, 
+        SupportTicket.assigned_team == "admin"
+    ).first()
+    if not ticket:
+        raise HTTPException(status_code=404, detail="Ticket not found or not in admin team")
+        
+    old_status = ticket.status
+    if update_data.status:
+        ticket.status = update_data.status
+    if update_data.priority:
+        ticket.priority = update_data.priority
+    if update_data.assigned_to_id is not None:
+        ticket.assigned_to_id = update_data.assigned_to_id
+        
+    if update_data.status and old_status != update_data.status:
+        record_audit_log(db, admin.id, f"ticket_{update_data.status}", "support_ticket", str(ticket.id), {"ticket_number": ticket.ticket_number})
+        
+        ticket.last_activity_at = datetime.now(timezone.utc)
+        ticket.last_activity_by = admin.id
+        
+    db.commit()
+    db.refresh(ticket)
     
-    # Very simple aggregate: group by date
-    # Note: func.date works in Postgres to extract the date
-    enrollments = (
-        db.query(func.date(Enrollment.enrolled_at).label("day"), func.count(Enrollment.id).label("count"))
-        .filter(Enrollment.enrolled_at >= start_date)
-        .group_by(func.date(Enrollment.enrolled_at))
-        .order_by(func.date(Enrollment.enrolled_at))
-        .all()
+    ticket.raised_by_name = ticket.raised_by.name if ticket.raised_by else "Unknown"
+    if ticket.assigned_to:
+        ticket.assigned_to_name = ticket.assigned_to.name
+        
+    ticket.is_unread = False
+    return ticket
+
+@router.post("/support-tickets/{ticket_id}/read")
+def superadmin_mark_ticket_read(
+    ticket_id: str,
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_role("admin")),
+):
+    read_record = db.query(TicketRead).filter_by(ticket_id=ticket_id, user_id=admin.id).first()
+    if not read_record:
+        read_record = TicketRead(ticket_id=ticket_id, user_id=admin.id)
+        db.add(read_record)
+    
+    read_record.last_read_at = datetime.now(timezone.utc)
+    db.commit()
+    return {"status": "ok"}
+
+@router.post("/support-tickets/{ticket_id}/reply", response_model=TicketReplyOut)
+def reply_support_ticket(
+    ticket_id: str,
+    reply_in: TicketReplyCreate,
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_role("admin")),
+):
+    ticket = db.query(SupportTicket).filter(
+        SupportTicket.id == ticket_id,
+        SupportTicket.assigned_team == "admin"
+    ).first()
+    if not ticket:
+        raise HTTPException(status_code=404, detail="Ticket not found or not in admin team")
+        
+    if ticket.status == "cancelled":
+        raise HTTPException(status_code=409, detail="Cannot reply to a cancelled ticket")
+        
+    new_reply = TicketReply(
+        ticket_id=ticket.id,
+        author_id=admin.id,
+        message=reply_in.message
     )
+    db.add(new_reply)
+    if ticket.status in ["resolved", "closed"]:
+        ticket.status = "open"
+        record_audit_log(db, admin.id, "ticket_reopened", "support_ticket", str(ticket.id), {"ticket_number": ticket.ticket_number})
+        
+    ticket.last_activity_at = datetime.now(timezone.utc)
+    ticket.last_activity_by = admin.id
     
-    transactions = (
-        db.query(func.date(Transaction.created_at).label("day"), func.sum(Transaction.amount).label("revenue"))
-        .filter(Transaction.created_at >= start_date)
-        .filter(Transaction.status == "completed")
-        .group_by(func.date(Transaction.created_at))
-        .order_by(func.date(Transaction.created_at))
-        .all()
+    record_audit_log(db, admin.id, "ticket_reply", "support_ticket", str(ticket.id), {"ticket_number": ticket.ticket_number})
+        
+    db.commit()
+    db.refresh(new_reply)
+    
+    new_reply.author_name = admin.name
+    return new_reply
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# 10. TICKET ROUTING RULES (CRUD)
+# ═══════════════════════════════════════════════════════════════════════
+
+class RoutingRuleCreate(BaseModel):
+    category: str
+    assigned_role: str
+    assignee_name: Optional[str] = None
+    assignee_email: Optional[str] = None
+
+
+class RoutingRuleUpdate(BaseModel):
+    assigned_role: Optional[str] = None
+    assignee_name: Optional[str] = None
+    assignee_email: Optional[str] = None
+    is_active: Optional[bool] = None
+
+
+@router.get("/ticket-routing-rules")
+def list_routing_rules(
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_role("admin")),
+):
+    """List all ticket routing rules."""
+    rules = db.query(TicketRoutingRule).order_by(TicketRoutingRule.category.asc()).all()
+    return [
+        {
+            "id": str(r.id),
+            "category": r.category,
+            "assigned_role": r.assigned_role,
+            "assignee_name": r.assignee_name,
+            "assignee_email": r.assignee_email,
+            "is_active": r.is_active,
+            "created_at": r.created_at.isoformat(),
+        }
+        for r in rules
+    ]
+
+
+@router.post("/ticket-routing-rules", status_code=201)
+def create_routing_rule(
+    data: RoutingRuleCreate,
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_role("admin")),
+):
+    """Create a new ticket routing rule."""
+    existing = db.query(TicketRoutingRule).filter(
+        TicketRoutingRule.category.ilike(data.category)
+    ).first()
+    if existing:
+        raise HTTPException(status_code=400, detail=f"A rule for category '{data.category}' already exists")
+
+    rule = TicketRoutingRule(
+        category=data.category,
+        assigned_role=data.assigned_role,
+        assignee_name=data.assignee_name,
+        assignee_email=data.assignee_email,
     )
-    
-    enrollment_data = [{"date": str(e.day), "enrollments": e.count} for e in enrollments]
-    revenue_data = [{"date": str(t.day), "revenue": float(t.revenue or 0)} for t in transactions]
-    
+    db.add(rule)
+    db.commit()
+    db.refresh(rule)
     return {
-        "enrollments": enrollment_data,
-        "revenue": revenue_data
+        "id": str(rule.id),
+        "category": rule.category,
+        "assigned_role": rule.assigned_role,
+        "assignee_name": rule.assignee_name,
+        "assignee_email": rule.assignee_email,
+        "is_active": rule.is_active,
+        "created_at": rule.created_at.isoformat(),
     }
 
 
-# ═══════════════════════════════════════════════════════════════════════
-#  PLATFORM SETTINGS
-# ═══════════════════════════════════════════════════════════════════════
-
-@router.get("/settings")
-async def get_settings(
-    current_user: User = Depends(require_role("super_admin")),
+@router.put("/ticket-routing-rules/{rule_id}")
+def update_routing_rule(
+    rule_id: str,
+    data: RoutingRuleUpdate,
     db: Session = Depends(get_db),
+    admin: User = Depends(require_role("admin")),
 ):
-    """Get all platform settings."""
-    settings = db.query(PlatformSetting).all()
-    return {s.key: s.value for s in settings}
+    """Update an existing routing rule (role, assignee, or active status)."""
+    rule = db.query(TicketRoutingRule).filter(TicketRoutingRule.id == rule_id).first()
+    if not rule:
+        raise HTTPException(status_code=404, detail="Routing rule not found")
 
-@router.put("/settings")
-async def update_settings(
-    settings: dict,
-    current_user: User = Depends(require_role("super_admin")),
-    db: Session = Depends(get_db),
-):
-    """Update platform settings (key-value pairs)."""
-    for key, value in settings.items():
-        setting = db.query(PlatformSetting).filter(PlatformSetting.key == key).first()
-        if setting:
-            setting.value = str(value)
-        else:
-            new_setting = PlatformSetting(key=key, value=str(value))
-            db.add(new_setting)
-    
+    if data.assigned_role is not None:
+        rule.assigned_role = data.assigned_role
+    if data.assignee_name is not None:
+        rule.assignee_name = data.assignee_name
+    if data.assignee_email is not None:
+        rule.assignee_email = data.assignee_email
+    if data.is_active is not None:
+        rule.is_active = data.is_active
+
     db.commit()
-    
-    # Return updated
-    all_settings = db.query(PlatformSetting).all()
-    return {s.key: s.value for s in all_settings}
+    db.refresh(rule)
+    return {
+        "id": str(rule.id),
+        "category": rule.category,
+        "assigned_role": rule.assigned_role,
+        "assignee_name": rule.assignee_name,
+        "assignee_email": rule.assignee_email,
+        "is_active": rule.is_active,
+        "created_at": rule.created_at.isoformat(),
+    }
+
+
+@router.delete("/ticket-routing-rules/{rule_id}", status_code=204)
+def delete_routing_rule(
+    rule_id: str,
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_role("admin")),
+):
+    """Permanently delete a routing rule."""
+    rule = db.query(TicketRoutingRule).filter(TicketRoutingRule.id == rule_id).first()
+    if not rule:
+        raise HTTPException(status_code=404, detail="Routing rule not found")
+    db.delete(rule)
+    db.commit()

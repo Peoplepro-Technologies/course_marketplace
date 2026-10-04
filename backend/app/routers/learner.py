@@ -183,7 +183,8 @@ async def enroll_in_course(
     if existing:
         raise HTTPException(status_code=400, detail="Already enrolled in this course")
 
-    # Create enrollment — status set to "pending" to require accounts approval.
+    # Create enrollment — status set to "approved" immediately for this platform's
+    # local enrollment flow (no external payment gateway; #55 remains MISSING).
     enrollment = Enrollment(
         learner_id=current_user.id,
         course_id=course_id,
@@ -196,7 +197,7 @@ async def enroll_in_course(
         learner_id=current_user.id,
         course_id=course_id,
         amount=course.price,
-        status="pending",
+        status="completed",
         payment_method="mock"
     )
     db.add(transaction)
@@ -258,8 +259,6 @@ async def list_enrolled_courses(
     result = []
     for enrollment in enrollments:
         course = enrollment.course
-        if not course:
-            continue
 
         # Count total lessons in the course
         total_lessons = (
@@ -341,7 +340,7 @@ async def get_learner_course_detail(
         raise HTTPException(status_code=404, detail="Course not found")
 
     roles = set(getattr(current_user, "_realm_roles", []))
-    is_staff = bool(roles & {"super_admin", "admin", "sub_admin", "course_coordinator"})
+    is_staff = bool(roles & {"super_admin", "sub_admin", "course_coordinator"})
     is_instructor = "instructor" in roles and course.instructor_id == current_user.id
 
     if not is_staff and not is_instructor:
@@ -399,7 +398,7 @@ async def get_course_progress(
         raise HTTPException(status_code=404, detail="Course not found")
 
     roles = set(getattr(current_user, "_realm_roles", []))
-    is_staff = bool(roles & {"super_admin", "admin", "sub_admin", "course_coordinator"})
+    is_staff = bool(roles & {"super_admin", "sub_admin", "course_coordinator"})
     is_instructor = "instructor" in roles and course.instructor_id == current_user.id
 
     if not is_staff and not is_instructor:
@@ -880,7 +879,7 @@ async def get_progress_overview(
             db.query(func.count(Lesson.id))
             .join(Section, Lesson.section_id == Section.id)
             .filter(Section.course_id == enrollment.course_id)
-            .scalar() or 0
+            .scalar()
         )
         completed_lessons = (
             db.query(func.count(Progress.id))
@@ -891,17 +890,104 @@ async def get_progress_overview(
                 Progress.learner_id == current_user.id,
                 Progress.status == "completed",
             )
-            .scalar() or 0
+            .scalar()
         )
-        pct = (completed_lessons / total_lessons * 100) if total_lessons > 0 else 0.0
-        total_progress += pct
-        if pct >= 100 and total_lessons > 0:
+
+        progress_percent = (completed_lessons / total_lessons * 100) if total_lessons > 0 else 0.0
+        total_progress += progress_percent
+        if progress_percent >= 100 and total_lessons > 0:
             completed_courses += 1
-
-    avg_progress = (total_progress / total_enrolled) if total_enrolled > 0 else 0.0
-
+    
+    avg_progress = (total_progress / total_enrolled) if total_enrolled > 0 else 0
+    
     return {
         "total_enrolled": total_enrolled,
         "completed_courses": completed_courses,
         "average_progress": round(avg_progress, 1),
+    }
+
+
+# ═══════════════════════════════════════════════════════════════════════
+#  ASSIGNMENT SUBMISSIONS
+# ═══════════════════════════════════════════════════════════════════════
+
+class AssignmentSubmitPayload(BaseModel):
+    content: str = ""
+
+@router.post("/assignments/{assignment_id}/submit")
+async def submit_assignment(
+    assignment_id: str,
+    data: AssignmentSubmitPayload,
+    current_user: User = Depends(require_role("learner")),
+    db: Session = Depends(get_db),
+):
+    """Learner submits (or re-submits) an assignment."""
+    from app.models.assignment import Assignment
+    from app.models.assignment_submission import AssignmentSubmission
+
+    assignment = db.query(Assignment).filter(Assignment.id == assignment_id).first()
+    if not assignment:
+        raise HTTPException(status_code=404, detail="Assignment not found")
+
+    # Upsert — one submission per learner per assignment
+    existing = db.query(AssignmentSubmission).filter(
+        AssignmentSubmission.assignment_id == assignment_id,
+        AssignmentSubmission.learner_id == current_user.id,
+    ).first()
+    if existing:
+        from datetime import datetime, timezone
+        existing.content = data.content
+        existing.submitted_at = datetime.now(timezone.utc)
+        db.commit()
+        return {"message": "Submission updated", "id": str(existing.id)}
+
+    sub = AssignmentSubmission(
+        assignment_id=assignment_id,
+        learner_id=current_user.id,
+        content=data.content,
+    )
+    db.add(sub)
+    db.commit()
+    db.refresh(sub)
+    return {"message": "Assignment submitted", "id": str(sub.id)}
+
+
+# ═══════════════════════════════════════════════════════════════════════
+#  QUIZ ATTEMPTS
+# ═══════════════════════════════════════════════════════════════════════
+
+class QuizAttemptPayload(BaseModel):
+    selected_option_index: int
+
+@router.post("/quiz-questions/{question_id}/attempt")
+async def attempt_quiz_question(
+    question_id: str,
+    data: QuizAttemptPayload,
+    current_user: User = Depends(require_role("learner")),
+    db: Session = Depends(get_db),
+):
+    """Learner attempts a quiz question. Records result (correct/incorrect)."""
+    from app.models.quiz import QuizQuestion
+    from app.models.quiz_attempt import QuizAttempt
+
+    question = db.query(QuizQuestion).filter(QuizQuestion.id == question_id).first()
+    if not question:
+        raise HTTPException(status_code=404, detail="Quiz question not found")
+
+    is_correct = (data.selected_option_index == question.correct_option_index)
+
+    attempt = QuizAttempt(
+        quiz_question_id=question_id,
+        learner_id=current_user.id,
+        selected_option_index=data.selected_option_index,
+        is_correct=is_correct,
+    )
+    db.add(attempt)
+    db.commit()
+    db.refresh(attempt)
+    return {
+        "message": "Quiz attempt recorded",
+        "id": str(attempt.id),
+        "is_correct": is_correct,
+        "correct_option_index": question.correct_option_index,
     }

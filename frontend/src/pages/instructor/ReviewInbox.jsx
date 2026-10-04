@@ -9,15 +9,13 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../../api/axios';
 import LoadingSpinner from '../../components/LoadingSpinner';
-import EmptyState from '../../components/EmptyState';
-import { MessageSquare, Inbox, AlertTriangle, BookOpen, CheckCircle2, Star } from 'lucide-react';
 import './ReviewInbox.css';
 
 function StarRating({ rating }) {
   return (
-    <span className="stars" aria-label={`${rating} out of 5 stars`} style={{ display: 'flex', gap: '2px', color: '#fbbf24' }}>
+    <span className="stars" aria-label={`${rating} out of 5 stars`}>
       {[1, 2, 3, 4, 5].map((n) => (
-        <Star key={n} size={14} fill={n <= rating ? 'currentColor' : 'transparent'} stroke={n <= rating ? 'currentColor' : '#d1d5db'} />
+        <span key={n} className={`star${n <= rating ? ' filled' : ''}`}>★</span>
       ))}
     </span>
   );
@@ -97,9 +95,7 @@ export default function ReviewInbox() {
       {/* ── Header ─────────────────────────────────────────────────── */}
       <div className="section-header flex-between">
         <div>
-          <h2 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Inbox size={24} /> Review Inbox
-          </h2>
+          <h2>📬 Review Inbox</h2>
           <p>Read learner feedback and reply to reviews on your courses.</p>
         </div>
         <Link to="/instructor" className="btn btn-secondary">
@@ -109,18 +105,18 @@ export default function ReviewInbox() {
 
       {/* ── Error ──────────────────────────────────────────────────── */}
       {error && (
-        <div className="ri-alert ri-alert-error" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <AlertTriangle size={18} /> {error}
+        <div className="ri-alert ri-alert-error">
+          ⚠️ {error}
         </div>
       )}
 
       {/* ── Empty State ─────────────────────────────────────────────── */}
       {!error && reviews.length === 0 && (
-        <EmptyState 
-          icon={MessageSquare}
-          title="No reviews yet"
-          message="Learner reviews on your published courses will appear here."
-        />
+        <div className="empty-state ri-empty">
+          <div className="empty-icon">💬</div>
+          <h3>No reviews yet</h3>
+          <p>Learner reviews on your published courses will appear here.</p>
+        </div>
       )}
 
       {/* ── Review Cards ────────────────────────────────────────────── */}
@@ -138,7 +134,7 @@ export default function ReviewInbox() {
             >
               {/* ── Top row: course badge + date ─── */}
               <div className="ri-card-header">
-                <span className="ri-course-badge" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}><BookOpen size={14} /> {review.course_title}</span>
+                <span className="ri-course-badge">📚 {review.course_title}</span>
                 <span className="ri-date">
                   {new Date(review.created_at).toLocaleDateString('en-IN', {
                     day: 'numeric', month: 'short', year: 'numeric',
@@ -187,8 +183,8 @@ export default function ReviewInbox() {
                 />
 
                 <div className="ri-reply-actions">
-                  {rs.error && <span className="ri-inline-error" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><AlertTriangle size={14} /> {rs.error}</span>}
-                  {rs.saved && <span className="ri-inline-success" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><CheckCircle2 size={14} /> Reply saved</span>}
+                  {rs.error && <span className="ri-inline-error">⚠️ {rs.error}</span>}
+                  {rs.saved && <span className="ri-inline-success">✓ Reply saved</span>}
                   <button
                     id={`submit-reply-${review.id}`}
                     className="btn btn-primary btn-sm"

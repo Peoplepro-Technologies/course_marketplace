@@ -370,6 +370,16 @@
 .sa-audit-action--course_rejected { background: #FEE2E2; color: #991B1B; }
 .sa-audit-action--user_deactivated { background: #FEE2E2; color: #991B1B; }
 .sa-audit-action--user_reactivated { background: #D1FAE5; color: #065F46; }
+/* Ticket actions */
+.sa-audit-action--ticket_created   { background: #E0F2FE; color: #0369A1; }
+.sa-audit-action--ticket_reply     { background: #F0FDF4; color: #15803D; }
+.sa-audit-action--ticket_reopened  { background: #FEF9C3; color: #A16207; }
+.sa-audit-action--ticket_open      { background: #E0F2FE; color: #0369A1; }
+.sa-audit-action--ticket_in_progress { background: #FEF3C7; color: #B45309; }
+.sa-audit-action--ticket_resolved  { background: #D1FAE5; color: #065F46; }
+.sa-audit-action--ticket_closed    { background: #F3F4F6; color: #6B7280; }
+/* Generic / fallback */
+.sa-audit-action--default          { background: #F3F4F6; color: #374151; }
 
 /* ── Role distribution ───────────────────────────────────────────────── */
 .sa-role-bars {

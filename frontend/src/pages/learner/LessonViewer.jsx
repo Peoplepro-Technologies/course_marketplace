@@ -5,7 +5,7 @@ import LoadingSpinner from '../../components/LoadingSpinner';
 import Modal from '../../components/Modal';
 import ReviewForm from './ReviewForm';
 import keycloak from '../../auth/keycloak';
-import { PenTool, ClipboardList, CheckCircle2, Star, BookOpen, FileText, ChevronUp, ChevronDown, Clock, Search } from 'lucide-react';
+import { PenTool, ClipboardList, CheckCircle2, Star, BookOpen, FileText, ChevronUp, ChevronDown, Clock, Search, Loader2 } from 'lucide-react';
 import EmptyState from '../../components/EmptyState';
 import VideoPlayer from '../../components/VideoPlayer';
 import './LessonViewer.css';
@@ -30,19 +30,65 @@ function getYouTubeId(url) {
   return null;
 }
 
-/** Renders either a YouTube iframe or a local <video> tag based on URL */
-function LessonVideoPlayer({ url, lessonId, token, onPlayerReady }) {
+function LessonVideoPlayer({ url, lessonId, token, onPlayerReady, onProgress, posterUrl }) {
   const ytId = getYouTubeId(url);
+  const ytContainerRef = useRef(null);
+  const ytPlayerRef = useRef(null);
+
+  useEffect(() => {
+    if (!ytId) return;
+
+    const initPlayer = () => {
+      if (!ytContainerRef.current) return;
+      ytPlayerRef.current = new window.YT.Player(ytContainerRef.current, {
+        videoId: ytId,
+        events: {
+          onReady: (event) => {
+            if (onPlayerReady) onPlayerReady(event.target);
+          }
+        }
+      });
+    };
+
+    if (window.YT && window.YT.Player) {
+      initPlayer();
+    } else {
+      const tag = document.createElement('script');
+      tag.src = 'https://www.youtube.com/iframe_api';
+      const firstScriptTag = document.getElementsByTagName('script')[0];
+      if (firstScriptTag && firstScriptTag.parentNode) {
+        firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+      } else {
+        document.head.appendChild(tag);
+      }
+      window.onYouTubeIframeAPIReady = initPlayer;
+    }
+
+    return () => {
+      if (ytPlayerRef.current && ytPlayerRef.current.destroy) {
+        ytPlayerRef.current.destroy();
+      }
+    };
+  }, [ytId, onPlayerReady]);
+
+  useEffect(() => {
+    if (!ytId || !onProgress) return;
+    const interval = setInterval(() => {
+      if (ytPlayerRef.current && ytPlayerRef.current.getCurrentTime && ytPlayerRef.current.getDuration) {
+        const currentTime = ytPlayerRef.current.getCurrentTime();
+        const duration = ytPlayerRef.current.getDuration();
+        if (duration > 0) {
+          onProgress(currentTime, duration);
+        }
+      }
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [ytId, onProgress]);
+
   if (ytId) {
     return (
       <div style={{ position: 'relative', paddingTop: '56.25%', marginBottom: '1.5rem', borderRadius: '8px', overflow: 'hidden' }}>
-        <iframe
-          src={`https://www.youtube.com/embed/${ytId}`}
-          title="Lesson video"
-          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-          allowFullScreen
-          style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 'none' }}
-        />
+        <div ref={ytContainerRef} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 'none' }} />
       </div>
     );
   }
@@ -51,7 +97,7 @@ function LessonVideoPlayer({ url, lessonId, token, onPlayerReady }) {
     ? `http://localhost:8000/api/v1/learner/lessons/${lessonId}/video?token=${token}`
     : `http://localhost:8000/api/v1${url}?token=${token}`;
   return (
-    <VideoPlayer src={src} onPlayerReady={onPlayerReady} />
+    <VideoPlayer src={src} poster={posterUrl} onPlayerReady={onPlayerReady} onTimeUpdate={onProgress} />
   );
 }
 
@@ -82,7 +128,7 @@ function QuizViewer({ quizzes }) {
                   <label key={i} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: isSubmitted ? 'default' : 'pointer', padding: '0.5rem 0.75rem', borderRadius: '6px', background: bg, transition: 'background 0.2s' }}>
                     <input
                       type="radio"
-                      className="reset-radio"
+                      style={{ width: '1.25rem', height: '1.25rem', cursor: 'pointer', margin: 0 }}
                       name={`quiz-${quiz.id}`}
                       checked={answers[quiz.id] === i}
                       onChange={() => !isSubmitted && setAnswers(prev => ({ ...prev, [quiz.id]: i }))}
@@ -219,14 +265,28 @@ export default function LessonViewer() {
 
   const handleLessonSelect = lesson => setActiveLesson(lesson);
 
-  const markComplete = async () => {
-    if (!activeLesson) return;
+  const markingCompleteRef = useRef({});
+
+  const markComplete = async (lessonToMark = activeLesson) => {
+    if (!lessonToMark) return;
+    if (progressData[lessonToMark.id] === 'completed') return;
+    if (markingCompleteRef.current[lessonToMark.id]) return;
+    
+    markingCompleteRef.current[lessonToMark.id] = true;
     try {
-      await api.put('/learner/progress', { lesson_id: activeLesson.id, status: 'completed' });
-      setProgressData(prev => ({ ...prev, [activeLesson.id]: 'completed' }));
+      await api.put('/learner/progress', { lesson_id: lessonToMark.id, status: 'completed' });
+      setProgressData(prev => ({ ...prev, [lessonToMark.id]: 'completed' }));
     } catch (err) {
       console.error(err);
-      alert('Failed to update progress');
+      markingCompleteRef.current[lessonToMark.id] = false;
+    }
+  };
+
+  const handleVideoProgress = (currentTime, duration) => {
+    if (!activeLesson || duration <= 0) return;
+    const percentage = (currentTime / duration) * 100;
+    if (percentage > 90) {
+      markComplete(activeLesson);
     }
   };
 
@@ -292,7 +352,7 @@ export default function LessonViewer() {
             <button
               className={`btn ${progressData[activeLesson?.id] === 'completed' ? 'btn-success' : 'btn-primary'} btn-sm flex-center`}
               style={{ gap: '6px' }}
-              onClick={markComplete}
+              onClick={() => markComplete(activeLesson)}
               disabled={!activeLesson || progressData[activeLesson.id] === 'completed'}
             >
               {progressData[activeLesson?.id] === 'completed' ? <><CheckCircle2 size={14} /> Completed</> : 'Mark as Complete'}
@@ -304,29 +364,55 @@ export default function LessonViewer() {
           {activeLesson ? (
             <div className="lesson-text-content">
               {activeLesson.video_url && (
-                <LessonVideoPlayer 
-                  url={activeLesson.video_url} 
-                  lessonId={activeLesson.id} 
-                  token={token} 
-                  onPlayerReady={(p) => { 
-                    playerRef.current = p; 
-                    const initialSeekTime = searchParams.get('t');
-                    if (initialSeekTime) {
-                      if (typeof p.currentTime === 'function') p.currentTime(parseFloat(initialSeekTime));
-                      else p.currentTime = parseFloat(initialSeekTime);
-                      
-                      if (typeof p.play === 'function') p.play();
-                      
-                      setSearchParams(params => {
-                        params.delete('t');
-                        return params;
-                      }, { replace: true });
-                    }
-                  }}
-                />
+                activeLesson.video_url.startsWith('processing:') ? (
+                  <div style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: '0.75rem',
+                    background: 'rgba(245,158,11,0.08)',
+                    border: '1px solid rgba(245,158,11,0.25)',
+                    borderRadius: '8px',
+                    padding: '2rem 1.5rem',
+                    textAlign: 'center',
+                    color: 'var(--color-warning, #f59e0b)',
+                    marginBottom: '1.5rem',
+                  }}>
+                    <Loader2 size={32} className="spin" />
+                    <div>
+                      <strong style={{ display: 'block', marginBottom: '0.25rem' }}>Video is being processed</strong>
+                      <span style={{ fontSize: 'var(--text-sm)', opacity: 0.85 }}>
+                        The uploaded video is being transcoded in the background. Please check back in a few minutes.
+                      </span>
+                    </div>
+                  </div>
+                ) : (
+                  <LessonVideoPlayer 
+                    url={activeLesson.video_url} 
+                    lessonId={activeLesson.id} 
+                    posterUrl={activeLesson.thumbnail_url ? (activeLesson.thumbnail_url.startsWith('/media/') ? `http://localhost:8000${activeLesson.thumbnail_url}` : activeLesson.thumbnail_url) : undefined}
+                    token={token} 
+                    onProgress={handleVideoProgress}
+                    onPlayerReady={(p) => { 
+                      playerRef.current = p; 
+                      const initialSeekTime = searchParams.get('t');
+                      if (initialSeekTime) {
+                        if (typeof p.currentTime === 'function') p.currentTime(parseFloat(initialSeekTime));
+                        else p.currentTime = parseFloat(initialSeekTime);
+                        
+                        if (typeof p.play === 'function') p.play();
+                        
+                        setSearchParams(params => {
+                          params.delete('t');
+                          return params;
+                        }, { replace: true });
+                      }
+                    }}
+                  />
+                )
               )}
               {/* Transcript Panel */}
-              {activeLesson.video_url && (
+              {activeLesson.video_url && !activeLesson.video_url.startsWith('processing:') && (
                 <div className="transcript-panel card-glass">
                   <div className="transcript-header-bar">
                     <button
@@ -380,7 +466,7 @@ export default function LessonViewer() {
                   </div>
 
                   {transcriptOpen && (
-                    <div className="transcript-body">
+                    <div className="transcript-body" style={{ maxHeight: '400px', overflowY: 'auto', paddingRight: '0.5rem' }}>
                       {!transcript && !transcriptLoading && (
                         <p className="transcript-empty">
                           No transcript available yet. It will appear here once the video is processed.
@@ -471,7 +557,7 @@ export default function LessonViewer() {
                   className="reset-checkbox"
                   id="markCompleteBottom"
                   checked={progressData[activeLesson.id] === 'completed'}
-                  onChange={markComplete}
+                  onChange={() => markComplete(activeLesson)}
                   disabled={progressData[activeLesson.id] === 'completed'}
                   style={{ cursor: progressData[activeLesson.id] === 'completed' ? 'default' : 'pointer' }}
                 />

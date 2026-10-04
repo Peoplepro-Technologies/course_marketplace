@@ -29,7 +29,7 @@ class Lesson(Base):
     thumbnail_url = Column(String(1000), nullable=True)  # Relative URL to video thumbnail
     order_index = Column(Integer, nullable=False, default=0)
     duration = Column(Integer, nullable=True, default=0)  # Duration in minutes
-    is_preview = Column(Boolean, nullable=False, default=False, server_default="false")  # Free preview lesson
+    is_preview = Column(Boolean, nullable=False, default=False)  # Free preview lesson
 
     # ── Relationships ─────────────────────────────────────────────────
     section = relationship("Section", back_populates="lessons")
@@ -57,4 +57,3 @@ class Lesson(Base):
 
     def __repr__(self):
         return f"<Lesson {self.title}>"
-

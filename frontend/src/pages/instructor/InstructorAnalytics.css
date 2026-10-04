@@ -1,0 +1,189 @@
+/* InstructorAnalytics.css — Instructor assignments & quiz analytics */
+
+.ia-page {
+  padding: var(--space-xl, 1.5rem);
+  max-width: 980px;
+  margin: 0 auto;
+}
+
+/* Header */
+.ia-page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 1.75rem;
+}
+
+.ia-page-header h1 {
+  font-size: 1.65rem;
+  font-weight: 700;
+  margin: 0 0 0.25rem;
+  background: linear-gradient(135deg, #0ea5e9, #6366f1);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.ia-page-header p {
+  margin: 0;
+  color: var(--text-secondary, #64748b);
+  font-size: 0.9rem;
+}
+
+/* Legend */
+.ia-legend {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+/* Loading / Error */
+.ia-loading { display: flex; justify-content: center; padding: 4rem 0; }
+.ia-error {
+  padding: 1rem 1.25rem;
+  background: #fef2f2;
+  border: 1px solid #fca5a5;
+  border-radius: 10px;
+  color: #dc2626;
+  font-weight: 500;
+}
+
+/* Empty state */
+.ia-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 3rem 2rem;
+  gap: 0.75rem;
+  color: var(--text-secondary, #64748b);
+  text-align: center;
+}
+.ia-empty-icon { font-size: 2.5rem; }
+.ia-empty p { margin: 0; font-size: 0.9rem; }
+
+/* Courses grid */
+.ia-courses {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+/* Course card */
+.ia-course-card {
+  background: var(--surface, #fff);
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  transition: box-shadow 0.2s, transform 0.2s;
+}
+
+.ia-course-card:hover {
+  box-shadow: 0 6px 24px rgba(14,165,233,0.12);
+  transform: translateY(-2px);
+}
+
+.ia-course-card-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1.1rem 1.4rem;
+  background: linear-gradient(135deg, #0ea5e9 0%, #6366f1 100%);
+  color: #fff;
+}
+
+.ia-course-icon { font-size: 1.1rem; }
+
+.ia-course-card-header h3 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+/* Sections (assignments / quizzes) */
+.ia-section { padding: 1rem 1.25rem; }
+
+.ia-section + .ia-section {
+  border-top: 1px solid var(--border, #e2e8f0);
+}
+
+.ia-section-heading {
+  margin: 0 0 0.65rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-secondary, #64748b);
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+/* Table */
+.ia-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.ia-table th {
+  text-align: left;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary, #64748b);
+  border-bottom: 1px solid var(--border, #e2e8f0);
+}
+
+.ia-table td {
+  padding: 0.6rem 0.75rem;
+  border-bottom: 1px solid #f1f5f9;
+  color: var(--text-primary, #1e293b);
+  vertical-align: middle;
+}
+
+.ia-table tr:last-child td { border-bottom: none; }
+.ia-table tr:hover td { background: #f8fafc; }
+
+.ia-item-title {
+  max-width: 320px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: 500;
+}
+
+/* Completion badges */
+.ia-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.65rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.ia-badge--green  { background: #dcfce7; color: #15803d; }
+.ia-badge--amber  { background: #fef9c3; color: #b45309; }
+.ia-badge--red    { background: #fee2e2; color: #dc2626; }
+.ia-badge--grey   { background: #f1f5f9; color: #64748b; }
+
+/* Animation */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-in { animation: fadeIn 0.35s ease both; }
+
+@media (max-width: 768px) {
+  .ia-page { padding: 1rem; }
+  .ia-page-header { flex-direction: column; }
+  .ia-item-title { max-width: 150px; }
+  .ia-table th, .ia-table td { padding: 0.45rem 0.5rem; font-size: 0.78rem; }
+}

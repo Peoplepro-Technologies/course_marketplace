@@ -16,8 +16,6 @@ class UserBase(BaseModel):
     is_active: bool = True
     profile_pic: Optional[str] = None
     bio: Optional[str] = None
-    payout_account_name: Optional[str] = None
-    payout_account_number: Optional[str] = None
 
 
 class UserCreate(UserBase):
@@ -40,5 +38,3 @@ class UserUpdate(BaseModel):
     name: Optional[str] = None
     profile_pic: Optional[str] = None
     bio: Optional[str] = None
-    payout_account_name: Optional[str] = None
-    payout_account_number: Optional[str] = None

@@ -60,9 +60,10 @@ def run_ffmpeg_sync(cmd: list[str], timeout: int = 120) -> tuple[int, bytes, byt
     return result.returncode, result.stdout, result.stderr
 
 
-def extract_audio(video_path: str, output_audio_path: str, timeout: int = 120) -> bool:
+def extract_audio(video_path: str, output_audio_path: str, timeout: int = 900) -> bool:
     """
     Extracts 16kHz mono audio from a video file into a WAV format optimized for Whisper.
+    Default timeout is 900 s (15 min) to handle long videos.
     """
     ffmpeg_bin = get_ffmpeg_executable()
     if not ffmpeg_bin:

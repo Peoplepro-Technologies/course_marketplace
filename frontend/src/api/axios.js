@@ -9,7 +9,7 @@ import axios from 'axios';
 import keycloak from '../auth/keycloak';
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1',
+  baseURL: 'http://localhost:8000/api/v1',
   headers: {
     'Content-Type': 'application/json',
   },
@@ -37,13 +37,23 @@ api.interceptors.request.use(
 );
 
 // ── Response Interceptor ─────────────────────────────────────────────
-// Handle 401 responses gracefully without triggering an infinite redirect loop.
+// Handle 401 responses by redirecting to login.
 api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      console.warn('API returned 401 Unauthorized:', error.config?.url);
+      keycloak.login();
     }
+    
+    // Handle deactivated accounts
+    if (
+      error.response?.status === 403 &&
+      error.response?.data?.detail === "This account is being deactivated, contact course coordinator."
+    ) {
+      alert("This account is being deactivated, contact course coordinator.");
+      keycloak.logout();
+    }
+    
     return Promise.reject(error);
   }
 );

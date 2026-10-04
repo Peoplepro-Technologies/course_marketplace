@@ -6,14 +6,9 @@
  */
 
 import useAuth from '../hooks/useAuth';
-import LoadingSpinner from './LoadingSpinner';
 
 export default function ProtectedRoute({ role, children }) {
-  const { hasRole, authenticated, login, loading } = useAuth();
-
-  if (loading) {
-    return <div className="page-wrapper"><LoadingSpinner /></div>;
-  }
+  const { hasRole, authenticated, login } = useAuth();
 
   if (!authenticated) {
     // Trigger the Keycloak login flow so the user is prompted to log in
@@ -25,7 +20,7 @@ export default function ProtectedRoute({ role, children }) {
     return (
       <div className="page-wrapper container animate-fade-in">
         <div className="empty-state">
-          <div className="empty-icon"></div>
+          <div className="empty-icon">🚫</div>
           <h2>Access Denied</h2>
           <p style={{ marginTop: '0.5rem' }}>
             You don't have the <strong>{role}</strong> role to access this page.

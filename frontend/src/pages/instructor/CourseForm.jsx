@@ -2,7 +2,7 @@
  * CourseForm.jsx — Create or edit course information.
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api from '../../api/axios';
 
@@ -19,11 +19,10 @@ export default function CourseForm() {
     category: 'General',
     thumbnail_url: '',
     price: 0.0,
-    learning_outcomes: [],
-    skills: [],
   });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const thumbnailFileRef = useRef(null);
 
   useEffect(() => {
     if (isEditing) {
@@ -36,8 +35,6 @@ export default function CourseForm() {
             category: c.category,
             thumbnail_url: c.thumbnail_url || '',
             price: c.price || 0,
-            learning_outcomes: c.learning_outcomes || [],
-            skills: c.skills || [],
           });
         })
         .catch(err => {
@@ -55,39 +52,35 @@ export default function CourseForm() {
     }));
   };
 
-  const handleArrayChange = (name, index, value) => {
-    setFormData(prev => {
-      const arr = [...prev[name]];
-      arr[index] = value;
-      return { ...prev, [name]: arr };
-    });
-  };
-
-  const addArrayItem = (name) => {
-    setFormData(prev => ({ ...prev, [name]: [...prev[name], ''] }));
-  };
-
-  const removeArrayItem = (name, index) => {
-    setFormData(prev => {
-      const arr = [...prev[name]];
-      arr.splice(index, 1);
-      return { ...prev, [name]: arr };
-    });
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSubmitting(true);
     setError('');
 
     try {
+      let savedCourseId;
       if (isEditing) {
         await api.put(`/instructor/courses/${courseId}`, formData);
-        navigate(`/instructor/course/${courseId}/curriculum`);
+        savedCourseId = courseId;
       } else {
         const res = await api.post('/instructor/courses', formData);
-        navigate(`/instructor/course/${res.data.id}/curriculum`);
+        savedCourseId = res.data.id;
       }
+
+      const thumbnailFile = thumbnailFileRef.current?.files?.[0];
+      if (thumbnailFile && savedCourseId) {
+        const thumbPayload = new FormData();
+        thumbPayload.append('thumbnail', thumbnailFile);
+        try {
+          await api.post(`/instructor/courses/${savedCourseId}/upload-thumbnail`, thumbPayload, {
+            headers: { 'Content-Type': 'multipart/form-data' }
+          });
+        } catch (err) {
+          console.error("Failed to upload thumbnail", err);
+        }
+      }
+
+      navigate(`/instructor/course/${savedCourseId}/curriculum`);
     } catch (err) {
       setError(err.response?.data?.detail || 'An error occurred saving the course');
       setSubmitting(false);
@@ -151,16 +144,37 @@ export default function CourseForm() {
           <input
             id="thumbnail_url"
             name="thumbnail_url"
-            type="url"
-            value={formData.thumbnail_url}
+            type="text"
+            value={formData.thumbnail_url?.startsWith('/') ? '' : formData.thumbnail_url}
             onChange={handleChange}
             placeholder="https://example.com/image.jpg"
           />
-          {formData.thumbnail_url && (
+          {formData.thumbnail_url?.startsWith('/') && (
+            <small style={{ color: 'var(--color-text-muted)' }}>Currently using an uploaded thumbnail. Entering a URL will replace it.</small>
+          )}
+          {formData.thumbnail_url && !formData.thumbnail_url.startsWith('/') && (
             <div style={{ marginTop: '1rem', width: '200px', borderRadius: 'var(--radius-md)', overflow: 'hidden' }}>
               <img src={formData.thumbnail_url} alt="Thumbnail preview" style={{ width: '100%', display: 'block' }} />
             </div>
           )}
+
+          <div style={{ margin: '1rem 0', textAlign: 'center', color: 'var(--color-text-muted)' }}>— OR —</div>
+          
+          <label>Upload Thumbnail File (Optional)</label>
+          {formData.thumbnail_url?.startsWith('/') && (
+            <div style={{ marginBottom: '1rem' }}>
+              <img src={`http://localhost:8000${formData.thumbnail_url}`} alt="Thumbnail" style={{ maxWidth: '200px', borderRadius: '4px' }} />
+              <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)', marginTop: '0.5rem' }}>
+                Selecting a new file will replace the current thumbnail.
+              </p>
+            </div>
+          )}
+          <input
+            ref={thumbnailFileRef}
+            type="file"
+            accept="image/*"
+            style={{ color: 'var(--color-text-primary)' }}
+          />
         </div>
 
         <div className="form-group">
@@ -174,53 +188,6 @@ export default function CourseForm() {
             placeholder="What will students learn in this course?"
           />
         </div>
-
-        <div className="form-group">
-          <label>What you'll learn (Learning Outcomes)</label>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '0.5rem' }}>
-            {formData.learning_outcomes.map((item, index) => (
-              <div key={index} style={{ display: 'flex', gap: '0.5rem' }}>
-                <input
-                  type="text"
-                  value={item}
-                  onChange={(e) => handleArrayChange('learning_outcomes', index, e.target.value)}
-                  placeholder='e.g. "Build a REST API with FastAPI"'
-                  style={{ flex: 1 }}
-                />
-                <button type="button" className="btn btn-outline" style={{ padding: '0 0.75rem' }} onClick={() => removeArrayItem('learning_outcomes', index)}>
-                  🗑️
-                </button>
-              </div>
-            ))}
-          </div>
-          <button type="button" className="btn btn-secondary btn-sm" onClick={() => addArrayItem('learning_outcomes')}>
-            + Add Learning Outcome
-          </button>
-        </div>
-
-        <div className="form-group">
-          <label>Skills you'll gain (Tags)</label>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '0.5rem' }}>
-            {formData.skills.map((item, index) => (
-              <div key={index} style={{ display: 'flex', gap: '0.5rem' }}>
-                <input
-                  type="text"
-                  value={item}
-                  onChange={(e) => handleArrayChange('skills', index, e.target.value)}
-                  placeholder='e.g. "Python" or "REST APIs"'
-                  style={{ flex: 1 }}
-                />
-                <button type="button" className="btn btn-outline" style={{ padding: '0 0.75rem' }} onClick={() => removeArrayItem('skills', index)}>
-                  🗑️
-                </button>
-              </div>
-            ))}
-          </div>
-          <button type="button" className="btn btn-secondary btn-sm" onClick={() => addArrayItem('skills')}>
-            + Add Skill Tag
-          </button>
-        </div>
-
 
         <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
           <button type="submit" className="btn btn-primary" disabled={submitting}>

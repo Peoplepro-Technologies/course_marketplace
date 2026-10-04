@@ -94,7 +94,7 @@ export default function PurchasesHistory() {
                 <tr key={t.id}>
                   <td>{t.course_title}</td>
                   <td>{new Date(t.created_at).toLocaleDateString()}</td>
-                  <td>${t.amount?.toFixed(2)}</td>
+                  <td>₹{t.amount?.toFixed(2)}</td>
                   <td>
                     <StatusBadge status={t.status} />
                   </td>

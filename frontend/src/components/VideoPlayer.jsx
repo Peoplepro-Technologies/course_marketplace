@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import videojs from "video.js";
 import "video.js/dist/video-js.css";
 
-export default function VideoPlayer({ src, onPlayerReady }) {
+export default function VideoPlayer({ src, onPlayerReady, onTimeUpdate }) {
   const containerRef = useRef(null);
   const playerRef = useRef(null);
   const [loading, setLoading] = useState(true);
@@ -26,10 +26,6 @@ export default function VideoPlayer({ src, onPlayerReady }) {
         sources: [{ src, type: "video/mp4" }],
       }));
 
-      if (onPlayerReady) {
-        onPlayerReady(player);
-      }
-
       // Loading state listeners
       player.on("loadstart", () => {
         setLoading(true);
@@ -49,16 +45,24 @@ export default function VideoPlayer({ src, onPlayerReady }) {
         setLoading(false);
         setError(true);
       });
+
+      player.ready(() => {
+        if (onPlayerReady) {
+          onPlayerReady(player);
+        }
+      });
+
+      player.on("timeupdate", () => {
+        if (onTimeUpdate) {
+          onTimeUpdate(player.currentTime(), player.duration());
+        }
+      });
     } else {
       // Player already exists — just update the source
       const player = playerRef.current;
       player.src({ src, type: "video/mp4" });
-      if (onPlayerReady) {
-        onPlayerReady(player);
-      }
     }
   }, [src]);
-
 
   // Dispose the player on unmount
   useEffect(() => {
@@ -123,7 +127,7 @@ export default function VideoPlayer({ src, onPlayerReady }) {
           borderRadius: "var(--radius-md, 8px)"
         }}>
           <div style={{ textAlign: "center", padding: "1.5rem" }}>
-            <span style={{ fontSize: "2rem" }}>!</span>
+            <span style={{ fontSize: "2rem" }}>⚠️</span>
             <p style={{ margin: "0.5rem 0 0", fontSize: "var(--text-sm, 0.875rem)", fontWeight: "bold" }}>
               Unable to load video, please try again
             </p>

@@ -18,7 +18,6 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import api from '../../api/axios';
-import { DollarSign, AlertTriangle, BarChart } from 'lucide-react';
 import './EarningsChart.css';
 
 // ── Placeholder months shown in the empty / loading chart ──────────────
@@ -64,25 +63,15 @@ export default function EarningsChart() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  
-  const [payouts, setPayouts] = useState([]);
-  const [payoutsLoading, setPayoutsLoading] = useState(true);
-  const [payoutsError, setPayoutsError] = useState(null);
 
   useEffect(() => {
-    Promise.all([
-      api.get('/instructor/earnings').then((res) => setData(res.data)),
-      api.get('/instructor/payouts').then((res) => setPayouts(res.data))
-    ])
+    api.get('/instructor/earnings')
+      .then((res) => setData(res.data))
       .catch((err) => {
-        console.error('Error fetching data:', err);
-        setError('Failed to load data. Please try again.');
-        setPayoutsError('Failed to load payouts.');
+        console.error('Error fetching earnings:', err);
+        setError('Failed to load earnings data. Please try again.');
       })
-      .finally(() => {
-        setLoading(false);
-        setPayoutsLoading(false);
-      });
+      .finally(() => setLoading(false));
   }, []);
 
   const hasData = data?.monthly?.length > 0;
@@ -93,25 +82,18 @@ export default function EarningsChart() {
       {/* ── Header ─────────────────────────────────────────────────── */}
       <div className="section-header flex-between">
         <div>
-          <h2 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <DollarSign size={24} /> Earnings
-          </h2>
+          <h2>💰 Earnings</h2>
           <p>Track your revenue and upcoming payouts.</p>
         </div>
-        <div style={{ display: 'flex', gap: '10px' }}>
-          <Link to="/instructor/earnings-per-course" className="btn btn-primary">
-            Course Breakdown
-          </Link>
-          <Link to="/instructor" className="btn btn-secondary">
-            ← Dashboard
-          </Link>
-        </div>
+        <Link to="/instructor" className="btn btn-secondary">
+          ← Dashboard
+        </Link>
       </div>
 
       {/* ── Error State ──────────────────────────────────────────────── */}
       {error && (
-        <div className="ec-error-banner" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <AlertTriangle size={18} /> {error}
+        <div className="ec-error-banner">
+          <span>⚠️</span> {error}
         </div>
       )}
 
@@ -150,7 +132,7 @@ export default function EarningsChart() {
         {/* Empty-state overlay — shown only when loaded and no data */}
         {!hasData && !loading && !error && (
           <div className="ec-chart-overlay">
-            <div className="ec-overlay-icon" style={{ display: 'flex', justifyContent: 'center', marginBottom: '1rem', color: 'var(--color-primary)' }}><BarChart size={48} /></div>
+            <div className="ec-overlay-icon">📊</div>
             <h4>No earnings data yet</h4>
             <p>Your revenue chart will populate once you get your first enrollment on a paid course.</p>
           </div>
@@ -201,63 +183,9 @@ export default function EarningsChart() {
 
         {/* Footnote */}
         <p className="ec-footnote">
-          Earnings are computed from <code>Transaction</code> history.
+          Earnings are computed from <code>Enrollment × Course.price</code>.
+          Payout settlement requires the finance module (coming soon).
         </p>
-      </div>
-
-      {/* ── Payouts History ────────────────────────────────────────────── */}
-      <div className="ec-chart-card" style={{ marginTop: '2rem' }}>
-        <div className="ec-chart-header">
-          <h3>Payout History</h3>
-        </div>
-        {payoutsLoading ? (
-          <p style={{ padding: '20px', textAlign: 'center' }}>Loading payouts...</p>
-        ) : payoutsError ? (
-          <div className="ec-error-banner" style={{ margin: '20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <AlertTriangle size={18} /> {payoutsError}
-          </div>
-        ) : (
-          <div className="table-responsive" style={{ padding: '0 20px 20px' }}>
-            <table className="table" style={{ width: '100%' }}>
-              <thead>
-                <tr>
-                  <th style={{ textAlign: 'left', padding: '12px' }}>Period</th>
-                  <th style={{ textAlign: 'left', padding: '12px' }}>Amount</th>
-                  <th style={{ textAlign: 'left', padding: '12px' }}>Status</th>
-                  <th style={{ textAlign: 'left', padding: '12px' }}>Released At</th>
-                </tr>
-              </thead>
-              <tbody>
-                {payouts.length > 0 ? (
-                  payouts.map((p) => (
-                    <tr key={p.id} style={{ borderBottom: '1px solid #eee' }}>
-                      <td style={{ padding: '12px' }}>
-                        {p.period_start ? new Date(p.period_start).toLocaleDateString() : 'All Time'} 
-                        {' - '} 
-                        {p.period_end ? new Date(p.period_end).toLocaleDateString() : 'Present'}
-                      </td>
-                      <td style={{ padding: '12px' }}>₹{p.total_amount?.toFixed(2)}</td>
-                      <td style={{ padding: '12px' }}>
-                        <span className={`badge badge-${p.status === 'released' ? 'success' : 'warning'}`} style={{ display: 'inline-block', padding: '4px 8px', borderRadius: '4px', fontSize: '12px', background: p.status === 'released' ? '#e6f4ea' : '#fef7e0', color: p.status === 'released' ? '#137333' : '#b06000' }}>
-                          {p.status.toUpperCase()}
-                        </span>
-                      </td>
-                      <td style={{ padding: '12px' }}>
-                        {p.released_at ? new Date(p.released_at).toLocaleDateString() : '-'}
-                      </td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan="4" style={{ textAlign: 'center', padding: '24px', color: '#666' }}>
-                      No payouts generated yet.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        )}
       </div>
 
     </div>

@@ -8,7 +8,7 @@ Courses are created by instructors and go through a lifecycle:
 import uuid
 from datetime import datetime, timezone
 from sqlalchemy import Column, String, Text, Float, DateTime, ForeignKey
-from sqlalchemy.dialects.postgresql import UUID, JSONB
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
 from app.database import Base
@@ -21,7 +21,12 @@ class Course(Base):
     instructor_id = Column(
         UUID(as_uuid=True),
         ForeignKey("users.id", ondelete="CASCADE"),
-        nullable=False,
+        nullable=True,
+    )
+    previous_instructor_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
     )
     title = Column(String(500), nullable=False)
     description = Column(Text, nullable=True)
@@ -40,11 +45,10 @@ class Course(Base):
         default=lambda: datetime.now(timezone.utc),
         nullable=False,
     )
-    learning_outcomes = Column(JSONB, nullable=True, default=list)
-    skills = Column(JSONB, nullable=True, default=list)
 
     # ── Relationships ─────────────────────────────────────────────────
-    instructor = relationship("User", back_populates="courses")
+    instructor = relationship("User", foreign_keys=[instructor_id], back_populates="courses")
+    previous_instructor = relationship("User", foreign_keys=[previous_instructor_id])
     sections = relationship(
         "Section",
         back_populates="course",
@@ -65,7 +69,11 @@ class Course(Base):
         "LiveClass",
         back_populates="course",
         cascade="all, delete-orphan",
-        order_by="LiveClass.scheduled_at",
+    )
+    wishlists = relationship(
+        "Wishlist",
+        back_populates="course",
+        cascade="all, delete-orphan",
     )
 
     def __repr__(self):

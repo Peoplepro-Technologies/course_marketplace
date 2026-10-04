@@ -15,7 +15,7 @@ export default function SupportTickets() {
   
   // Determine role prefix for API routing based on where this component is mounted
   const location = useLocation();
-  const rolePrefix = location.pathname.startsWith('/instructor') ? 'instructor' : 'learner';
+  const rolePrefix = location.pathname.startsWith('/instructor') ? 'instructor' : location.pathname.startsWith('/coordinator') ? 'coordinator' : 'learner';
   const detailPath = `/${rolePrefix}/support`;
 
   const fetchTickets = () => {
@@ -125,7 +125,14 @@ export default function SupportTickets() {
           {tickets.map(ticket => (
             <Link to={`${detailPath}/${ticket.id}`} key={ticket.id} className="card" style={{ textDecoration: 'none', color: 'inherit', display: 'flex', flexDirection: 'column', gap: '0.75rem', transition: 'box-shadow 0.2s', ':hover': { boxShadow: 'var(--shadow-md)' } }}>
               <div className="flex-between">
-                <h4 style={{ margin: 0, fontSize: '16px', fontWeight: 600 }}>{ticket.subject}</h4>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <h4 style={{ margin: 0, fontSize: '16px', fontWeight: 600 }}>
+                    {ticket.ticket_number ? `#${ticket.ticket_number} - ` : ''}{ticket.subject}
+                  </h4>
+                  {ticket.is_unread && (
+                    <span className="badge" style={{ backgroundColor: 'var(--color-danger)', color: 'white', fontSize: '0.7rem' }}>New Reply</span>
+                  )}
+                </div>
                 <StatusBadge status={ticket.status} />
               </div>
               

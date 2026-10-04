@@ -31,8 +31,9 @@ from app.schemas.user import UserRead
 from app.schemas.course import CourseRead
 from app.schemas.review import ReviewRead, ReviewModerateAction
 from app.schemas.category import CategoryRead, CategoryCreate, CategoryUpdate
-from app.models.support_ticket import SupportTicket, TicketReply
+from app.models.support_ticket import SupportTicket, TicketReply, TicketRead
 from app.schemas.support_ticket import SupportTicketOut, SupportTicketUpdate, TicketReplyCreate, TicketReplyOut
+from app.services.audit import record_audit_log
 from app.redis_client import invalidate_cache
 
 router = APIRouter(prefix="/api/v1/subadmin", tags=["SubAdmin"])
@@ -476,86 +477,7 @@ async def moderate_review(
     review.status = new_status
     db.commit()
 
-    return {"message": "Review visibility updated", "review": review}
-
-
-# ═══════════════════════════════════════════════════════════════════════
-# ── Support Tickets ────────────────────────────────────────────────────
-# ═══════════════════════════════════════════════════════════════════════
-
-@router.get("/support-tickets", response_model=list[SupportTicketOut])
-def subadmin_get_support_tickets(
-    category: Optional[str] = None,
-    status: Optional[str] = None,
-    priority: Optional[str] = None,
-    db: Session = Depends(get_db),
-    admin: User = Depends(require_role(["sub_admin"])),
-):
-    query = db.query(SupportTicket)
-    if category:
-        query = query.filter(SupportTicket.category == category)
-    if status:
-        query = query.filter(SupportTicket.status == status)
-    if priority:
-        query = query.filter(SupportTicket.priority == priority)
-    
-    tickets = query.order_by(desc(SupportTicket.updated_at)).all()
-    for t in tickets:
-        t.raised_by_name = t.raised_by.name if t.raised_by else "Unknown"
-        if t.assigned_to:
-            t.assigned_to_name = t.assigned_to.name
-    return tickets
-
-@router.put("/support-tickets/{ticket_id}", response_model=SupportTicketOut)
-def subadmin_update_support_ticket(
-    ticket_id: str,
-    update_data: SupportTicketUpdate,
-    db: Session = Depends(get_db),
-    admin: User = Depends(require_role(["sub_admin"])),
-):
-    ticket = db.query(SupportTicket).filter(SupportTicket.id == ticket_id).first()
-    if not ticket:
-        raise HTTPException(status_code=404, detail="Ticket not found")
-        
-    if update_data.status:
-        ticket.status = update_data.status
-    if update_data.priority:
-        ticket.priority = update_data.priority
-    if update_data.assigned_to_id is not None:
-        ticket.assigned_to_id = update_data.assigned_to_id
-        
-    db.commit()
-    db.refresh(ticket)
-    
-    ticket.raised_by_name = ticket.raised_by.name if ticket.raised_by else "Unknown"
-    if ticket.assigned_to:
-        ticket.assigned_to_name = ticket.assigned_to.name
-    return ticket
-
-@router.post("/support-tickets/{ticket_id}/reply", response_model=TicketReplyOut)
-def subadmin_reply_support_ticket(
-    ticket_id: str,
-    reply_in: TicketReplyCreate,
-    db: Session = Depends(get_db),
-    admin: User = Depends(require_role(["sub_admin"])),
-):
-    ticket = db.query(SupportTicket).filter(SupportTicket.id == ticket_id).first()
-    if not ticket:
-        raise HTTPException(status_code=404, detail="Ticket not found")
-        
-    new_reply = TicketReply(
-        ticket_id=ticket.id,
-        author_id=admin.id,
-        message=reply_in.message
-    )
-    db.add(new_reply)
-    if ticket.status in ["resolved", "closed"]:
-        ticket.status = "open"
-    db.commit()
-    db.refresh(new_reply)
-    
-    new_reply.author_name = admin.name
-    return new_reply
+    return {"message": f"Review {data.action}d", "status": new_status}
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -591,3 +513,141 @@ async def get_kpis(
         "pending_approvals": pending_approvals,
         "role_distribution": [{"role": role, "count": count} for role, count in role_dist],
     }
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# 7. SUPPORT TICKETS
+# ═══════════════════════════════════════════════════════════════════════
+
+@router.get("/support-tickets", response_model=list[SupportTicketOut])
+def get_support_tickets(
+    status: Optional[str] = None,
+    priority: Optional[str] = None,
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_role("sub_admin")),
+):
+    query = db.query(SupportTicket).filter(SupportTicket.assigned_team == "admin")
+    if status:
+        query = query.filter(SupportTicket.status == status)
+    if priority:
+        query = query.filter(SupportTicket.priority == priority)
+    
+    tickets = query.order_by(SupportTicket.updated_at.desc()).all()
+    for t in tickets:
+        t.raised_by_name = t.raised_by.name if t.raised_by else "Unknown"
+        if t.assigned_to:
+            t.assigned_to_name = t.assigned_to.name
+            
+        read_record = db.query(TicketRead).filter_by(ticket_id=t.id, user_id=admin.id).first()
+        last_read = read_record.last_read_at if read_record else datetime.min.replace(tzinfo=timezone.utc)
+        
+        t.is_unread = (
+            t.last_activity_at > last_read and
+            t.last_activity_by != admin.id
+        )
+    return tickets
+
+@router.get("/support-tickets/unread-count")
+def subadmin_get_unread_count(
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_role("sub_admin"))
+):
+    tickets = db.query(SupportTicket).filter(SupportTicket.assigned_team == "admin").all()
+    count = 0
+    for ticket in tickets:
+        read_record = db.query(TicketRead).filter_by(ticket_id=ticket.id, user_id=admin.id).first()
+        last_read = read_record.last_read_at if read_record else datetime.min.replace(tzinfo=timezone.utc)
+        if ticket.last_activity_at > last_read and ticket.last_activity_by != admin.id:
+            count += 1
+    return {"unread_count": count}
+
+@router.put("/support-tickets/{ticket_id}", response_model=SupportTicketOut)
+def update_support_ticket(
+    ticket_id: str,
+    update_data: SupportTicketUpdate,
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_role("sub_admin")),
+):
+    ticket = db.query(SupportTicket).filter(
+        SupportTicket.id == ticket_id, 
+        SupportTicket.assigned_team == "admin"
+    ).first()
+    if not ticket:
+        raise HTTPException(status_code=404, detail="Ticket not found or not in admin team")
+        
+    old_status = ticket.status
+    if update_data.status:
+        ticket.status = update_data.status
+    if update_data.priority:
+        ticket.priority = update_data.priority
+    if update_data.assigned_to_id is not None:
+        ticket.assigned_to_id = update_data.assigned_to_id
+        
+    if update_data.status and old_status != update_data.status:
+        record_audit_log(db, admin.id, f"ticket_{update_data.status}", "support_ticket", str(ticket.id), {"ticket_number": ticket.ticket_number})
+        
+        ticket.last_activity_at = datetime.now(timezone.utc)
+        ticket.last_activity_by = admin.id
+        
+    db.commit()
+    db.refresh(ticket)
+    
+    ticket.raised_by_name = ticket.raised_by.name if ticket.raised_by else "Unknown"
+    if ticket.assigned_to:
+        ticket.assigned_to_name = ticket.assigned_to.name
+        
+    ticket.is_unread = False
+    return ticket
+
+@router.post("/support-tickets/{ticket_id}/read")
+def subadmin_mark_ticket_read(
+    ticket_id: str,
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_role("sub_admin")),
+):
+    read_record = db.query(TicketRead).filter_by(ticket_id=ticket_id, user_id=admin.id).first()
+    if not read_record:
+        read_record = TicketRead(ticket_id=ticket_id, user_id=admin.id)
+        db.add(read_record)
+    
+    read_record.last_read_at = datetime.now(timezone.utc)
+    db.commit()
+    return {"status": "ok"}
+
+@router.post("/support-tickets/{ticket_id}/reply", response_model=TicketReplyOut)
+def reply_support_ticket(
+    ticket_id: str,
+    reply_in: TicketReplyCreate,
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_role("sub_admin")),
+):
+    ticket = db.query(SupportTicket).filter(
+        SupportTicket.id == ticket_id,
+        SupportTicket.assigned_team == "admin"
+    ).first()
+    if not ticket:
+        raise HTTPException(status_code=404, detail="Ticket not found or not in admin team")
+        
+    if ticket.status == "cancelled":
+        raise HTTPException(status_code=409, detail="Cannot reply to a cancelled ticket")
+        
+    new_reply = TicketReply(
+        ticket_id=ticket.id,
+        author_id=admin.id,
+        message=reply_in.message
+    )
+    db.add(new_reply)
+    if ticket.status in ["resolved", "closed"]:
+        ticket.status = "open"
+        record_audit_log(db, admin.id, "ticket_reopened", "support_ticket", str(ticket.id), {"ticket_number": ticket.ticket_number})
+        
+    ticket.last_activity_at = datetime.now(timezone.utc)
+    ticket.last_activity_by = admin.id
+    
+    record_audit_log(db, admin.id, "ticket_reply", "support_ticket", str(ticket.id), {"ticket_number": ticket.ticket_number})
+        
+    db.commit()
+    db.refresh(new_reply)
+    
+    new_reply.author_name = admin.name
+    return new_reply

@@ -27,20 +27,23 @@ import CourseForm from './pages/instructor/CourseForm';
 import SectionManager from './pages/instructor/SectionManager';
 import ReviewInbox from './pages/instructor/ReviewInbox';
 import EarningsChart from './pages/instructor/EarningsChart';
-import CourseEarningsDashboard from './pages/instructor/CourseEarningsDashboard';
 import StudentsProgress from './pages/instructor/StudentsProgress';
 import LiveClassManager from './pages/instructor/LiveClassManager';
 import SubmissionsStatus from './pages/instructor/SubmissionsStatus';
 import InstructorProfile from './pages/instructor/InstructorProfile';
+import InstructorAnalytics from './pages/instructor/InstructorAnalytics';
 
 
 // New Role Dashboards
 import SuperAdminDashboard from './pages/superadmin/SuperAdminDashboard';
 import SubAdminDashboard from './pages/subadmin/SubAdminDashboard';
 import CoordinatorDashboard from './pages/coordinator/CoordinatorDashboard';
+import CoordinatorSidebarLayout from './pages/coordinator/CoordinatorSidebarLayout';
 import InstructorRoster from './pages/coordinator/InstructorRoster';
 import CourseApprovals from './pages/coordinator/CourseApprovals';
 import CourseCatalog from './pages/coordinator/CourseCatalog';
+import FacultyAssignments from './pages/coordinator/FacultyAssignments';
+import FacultyAnalytics from './pages/coordinator/FacultyAnalytics';
 import CategoryManager from './pages/coordinator/CategoryManager';
 import QualityReviews from './pages/coordinator/QualityReviews';
 import Reports from './pages/coordinator/Reports';
@@ -51,7 +54,7 @@ import ACPayouts from './pages/accounts/ACPayouts';
 import ACInvoices from './pages/accounts/ACInvoices';
 import ACFinancialReports from './pages/accounts/ACFinancialReports';
 import ACReconciliation from './pages/accounts/ACReconciliation';
-import ACEnrollments from './pages/accounts/ACEnrollments';
+import ACCourseEarnings from './pages/accounts/ACCourseEarnings';
 
 // Super Admin Sub-pages
 import SAUserManagement from './pages/superadmin/SAUserManagement';
@@ -64,6 +67,7 @@ import SAReportsAnalytics from './pages/superadmin/SAReportsAnalytics';
 import SAReviewsModeration from './pages/superadmin/SAReviewsModeration';
 import SAAuditLogs from './pages/superadmin/SAAuditLogs';
 import SASettings from './pages/superadmin/SASettings';
+import SATicketRouting from './pages/superadmin/SATicketRouting';
 
 // Sub Admin Sub-pages
 import SubAdminUserManagement from './pages/subadmin/SubAdminUserManagement';
@@ -79,6 +83,7 @@ import SupportTicketDetail from './pages/shared/SupportTicketDetail';
 import SASupportTickets from './pages/superadmin/SASupportTickets';
 import SubAdminSupportTickets from './pages/subadmin/SubAdminSupportTickets';
 import ACSupportTickets from './pages/accounts/ACSupportTickets';
+import ACEnrollmentApprovals from './pages/accounts/ACEnrollmentApprovals';
 
 export default function App() {
   return (
@@ -318,14 +323,6 @@ export default function App() {
               } 
             />
             <Route 
-              path="/instructor/earnings-per-course" 
-              element={
-                <ProtectedRoute role="instructor">
-                  <CourseEarningsDashboard />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
               path="/instructor/course/:courseId/students" 
               element={
                 <ProtectedRoute role="instructor">
@@ -375,6 +372,14 @@ export default function App() {
                 </ProtectedRoute>
               } 
             />
+            <Route 
+              path="/instructor/analytics" 
+              element={
+                <ProtectedRoute role="instructor">
+                  <InstructorAnalytics />
+                </ProtectedRoute>
+              } 
+            />
 
             {/* ── Super Admin Routes ─────────────────────────────────── */}
             <Route 
@@ -394,6 +399,7 @@ export default function App() {
             <Route path="/super-admin/analytics" element={<ProtectedRoute role="super_admin"><SAReportsAnalytics /></ProtectedRoute>} />
             <Route path="/super-admin/reviews" element={<ProtectedRoute role="super_admin"><SAReviewsModeration /></ProtectedRoute>} />
             <Route path="/super-admin/support" element={<ProtectedRoute role="super_admin"><SASupportTickets /></ProtectedRoute>} />
+            <Route path="/super-admin/ticket-routing" element={<ProtectedRoute role="super_admin"><SATicketRouting /></ProtectedRoute>} />
             <Route path="/super-admin/settings" element={<ProtectedRoute role="super_admin"><SASettings /></ProtectedRoute>} />
             <Route path="/super-admin/audit-logs" element={<ProtectedRoute role="super_admin"><SAAuditLogs /></ProtectedRoute>} />
 
@@ -419,7 +425,9 @@ export default function App() {
               path="/coordinator" 
               element={
                 <ProtectedRoute role="coursecoordinator">
-                  <CoordinatorDashboard />
+                  <CoordinatorSidebarLayout>
+                    <CoordinatorDashboard />
+                  </CoordinatorSidebarLayout>
                 </ProtectedRoute>
               } 
             />
@@ -427,7 +435,9 @@ export default function App() {
               path="/coordinator/instructors" 
               element={
                 <ProtectedRoute role="coursecoordinator">
-                  <InstructorRoster />
+                  <CoordinatorSidebarLayout>
+                    <InstructorRoster />
+                  </CoordinatorSidebarLayout>
                 </ProtectedRoute>
               } 
             />
@@ -435,7 +445,9 @@ export default function App() {
               path="/coordinator/courses/pending" 
               element={
                 <ProtectedRoute role="coursecoordinator">
-                  <CourseApprovals />
+                  <CoordinatorSidebarLayout>
+                    <CourseApprovals />
+                  </CoordinatorSidebarLayout>
                 </ProtectedRoute>
               } 
             />
@@ -443,7 +455,19 @@ export default function App() {
               path="/coordinator/courses" 
               element={
                 <ProtectedRoute role="coursecoordinator">
-                  <CourseCatalog />
+                  <CoordinatorSidebarLayout>
+                    <CourseCatalog />
+                  </CoordinatorSidebarLayout>
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/coordinator/faculty-assignments" 
+              element={
+                <ProtectedRoute role="coursecoordinator">
+                  <CoordinatorSidebarLayout>
+                    <FacultyAssignments />
+                  </CoordinatorSidebarLayout>
                 </ProtectedRoute>
               } 
             />
@@ -451,7 +475,9 @@ export default function App() {
               path="/coordinator/categories" 
               element={
                 <ProtectedRoute role="coursecoordinator">
-                  <CategoryManager />
+                  <CoordinatorSidebarLayout>
+                    <CategoryManager />
+                  </CoordinatorSidebarLayout>
                 </ProtectedRoute>
               } 
             />
@@ -459,7 +485,9 @@ export default function App() {
               path="/coordinator/quality-reviews" 
               element={
                 <ProtectedRoute role="coursecoordinator">
-                  <QualityReviews />
+                  <CoordinatorSidebarLayout>
+                    <QualityReviews />
+                  </CoordinatorSidebarLayout>
                 </ProtectedRoute>
               } 
             />
@@ -467,7 +495,37 @@ export default function App() {
               path="/coordinator/reports" 
               element={
                 <ProtectedRoute role="coursecoordinator">
-                  <Reports />
+                  <CoordinatorSidebarLayout>
+                    <Reports />
+                  </CoordinatorSidebarLayout>
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/coordinator/support" 
+              element={
+                <ProtectedRoute role="coursecoordinator">
+                  <CoordinatorSidebarLayout>
+                    <SupportTickets />
+                  </CoordinatorSidebarLayout>
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/coordinator/support/:id" 
+              element={
+                <ProtectedRoute role="coursecoordinator">
+                  <CoordinatorSidebarLayout>
+                    <SupportTicketDetail />
+                  </CoordinatorSidebarLayout>
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/coordinator/faculty-analytics" 
+              element={
+                <ProtectedRoute role="coursecoordinator">
+                  <FacultyAnalytics />
                 </ProtectedRoute>
               } 
             />
@@ -481,14 +539,15 @@ export default function App() {
                 </ProtectedRoute>
               } 
             />
+            <Route path="/accounts/course-earnings" element={<ProtectedRoute role="accounts"><ACCourseEarnings /></ProtectedRoute>} />
             <Route path="/accounts/transactions" element={<ProtectedRoute role="accounts"><ACTransactions /></ProtectedRoute>} />
             <Route path="/accounts/refunds" element={<ProtectedRoute role="accounts"><ACPaymentsRefunds /></ProtectedRoute>} />
             <Route path="/accounts/payouts" element={<ProtectedRoute role="accounts"><ACPayouts /></ProtectedRoute>} />
             <Route path="/accounts/invoices" element={<ProtectedRoute role="accounts"><ACInvoices /></ProtectedRoute>} />
             <Route path="/accounts/reports" element={<ProtectedRoute role="accounts"><ACFinancialReports /></ProtectedRoute>} />
-            <Route path="/accounts/enrollments" element={<ProtectedRoute role="accounts"><ACEnrollments /></ProtectedRoute>} />
             <Route path="/accounts/reconciliation" element={<ProtectedRoute role="accounts"><ACReconciliation /></ProtectedRoute>} />
             <Route path="/accounts/support" element={<ProtectedRoute role="accounts"><ACSupportTickets /></ProtectedRoute>} />
+            <Route path="/accounts/enrollments" element={<ProtectedRoute role="accounts"><ACEnrollmentApprovals /></ProtectedRoute>} />
           </Routes>
         </main>
       </BrowserRouter>

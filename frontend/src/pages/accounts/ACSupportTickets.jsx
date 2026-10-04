@@ -4,7 +4,7 @@ import AdminSupportInbox from '../shared/AdminSupportInbox';
 export default function ACSupportTickets() {
   return (
     <AccountsSidebarLayout>
-      <AdminSupportInbox apiPrefix="/api/v1/accounts" roleName="Accounts" hideCategoryFilter={true} />
+      <AdminSupportInbox apiPrefix="/accounts" roleName="Accounts" hideCategoryFilter={true} />
     </AccountsSidebarLayout>
   );
 }

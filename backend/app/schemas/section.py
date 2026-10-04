@@ -33,6 +33,7 @@ class LessonInSection(BaseModel):
     content: Optional[str] = None
     video_url: Optional[str] = None
     thumbnail_url: Optional[str] = None
+    is_preview: bool = False
     class Config:
         from_attributes = True
 

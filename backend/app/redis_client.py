@@ -7,11 +7,7 @@ Used primarily to cache the public course catalog (5-minute TTL).
 
 import json
 import logging
-try:
-    import redis
-except ImportError:
-    redis = None
-
+import redis
 from app.config import get_settings
 
 logger = logging.getLogger(__name__)
@@ -19,7 +15,7 @@ settings = get_settings()
 
 redis_client = None
 
-if settings.REDIS_ENABLED and redis is not None:
+if settings.REDIS_ENABLED:
     try:
         # decode_responses=True means we get Python strings instead of bytes.
         redis_client = redis.from_url(
@@ -29,7 +25,7 @@ if settings.REDIS_ENABLED and redis is not None:
     except Exception as e:
         logger.warning(f"Failed to connect to Redis during startup: {e}. Caching will be disabled.")
 else:
-    logger.warning("REDIS_ENABLED is false or redis library not installed. Caching is disabled.")
+    logger.warning("REDIS_ENABLED is false. Caching is disabled.")
 
 
 def get_cache(key: str):

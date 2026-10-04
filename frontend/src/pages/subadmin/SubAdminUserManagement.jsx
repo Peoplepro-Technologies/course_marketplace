@@ -37,7 +37,7 @@ export default function SubAdminUserManagement() {
       alert('Cannot assign super_admin role.');
       return;
     }
-    if (!window.confirm(`Change this user's role to "${newRole}"?`)) return;
+    if (!window.confirm(`Change this user's role to "₹{newRole}"?`)) return;
     setActionLoading(userId);
     try {
       await api.put(`/subadmin/users/${userId}/role`, { role: newRole });
@@ -78,7 +78,7 @@ export default function SubAdminUserManagement() {
   return (
     <SubAdminSidebarLayout>
       <div className="sa-page-header">
-        <h2>User Management</h2>
+        <h2>👥 User Management</h2>
         <p>View, search, and manage all platform users (delegated permissions).</p>
       </div>
 

@@ -53,7 +53,7 @@ export default function Wishlist() {
           {wishlist.map(item => (
             <div key={item.id} className="dashboard-card" style={{ display: 'flex', flexDirection: 'column', padding: 0, overflow: 'hidden' }}>
               {item.course_thumbnail ? (
-                <img src={item.course_thumbnail} alt={item.course_title} style={{ width: '100%', height: '160px', objectFit: 'cover' }} />
+                <img src={item.course_thumbnail.startsWith('/media/') ? `http://localhost:8000${item.course_thumbnail}` : item.course_thumbnail} alt={item.course_title} style={{ width: '100%', height: '160px', objectFit: 'cover' }} />
               ) : (
                 <div style={{ width: '100%', height: '160px', background: 'var(--color-bg-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-muted)' }}>
                   <BookOpen size={48} strokeWidth={1} />

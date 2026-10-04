@@ -19,7 +19,7 @@ import api from '../../api/axios';
 import useAuth from '../../hooks/useAuth';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import AccountsSidebarLayout, { SIDEBAR_ITEMS } from './AccountsSidebarLayout';
-import { DollarSign, RefreshCcw, CreditCard, AlertTriangle } from 'lucide-react';
+import { IndianRupee, RefreshCcw, CreditCard, AlertTriangle } from 'lucide-react';
 import '../RoleDashboard.css';
 
 const QUICK_ACCESS = SIDEBAR_ITEMS.slice(1);
@@ -64,7 +64,7 @@ export default function AccountsDashboard() {
           <div className="ac-kpi-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 'var(--space-lg)', marginBottom: 'var(--space-2xl)' }}>
             {/* Total Revenue */}
             <div className="card" style={{ borderTop: '4px solid #0056D2', padding: 'var(--space-xl)' }}>
-              <div style={{ marginBottom: 'var(--space-sm)', color: '#0056D2' }}><DollarSign size={32} /></div>
+              <div style={{ marginBottom: 'var(--space-sm)', color: '#0056D2' }}><IndianRupee size={32} /></div>
               <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 'var(--space-xs)' }}>
                 Total Revenue <span style={{ background: '#FFF3CD', color: '#856404', padding: '1px 6px', borderRadius: '4px', fontSize: '10px', fontWeight: 600 }}>Estimated</span>
               </div>

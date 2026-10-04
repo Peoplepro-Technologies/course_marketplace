@@ -55,12 +55,14 @@ app = FastAPI(
 )
 
 # ── CORS ──────────────────────────────────────────────────────────────
-# Allow all origins so Netlify frontend + Cloudflare tunnel URLs work.
-# In production with a fixed domain, restrict this to specific origins.
+# Allow the Vite dev server to call the API
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=False,  # Must be False when allow_origins=["*"]
+    allow_origins=[
+        "http://localhost:5173",  # Vite dev server
+        "http://127.0.0.1:5173",
+    ],
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )

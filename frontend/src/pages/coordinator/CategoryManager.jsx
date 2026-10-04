@@ -61,7 +61,7 @@ export default function CategoryManager() {
   };
 
   const handleDelete = (id, name) => {
-    if (!window.confirm(`Are you sure you want to delete the category "${name}"?`)) return;
+    if (!window.confirm(`Are you sure you want to delete the category "₹{name}"?`)) return;
     setProcessing(true);
     api.delete(`/coordinator/categories/${id}`)
       .then(() => fetchCategories())
@@ -75,7 +75,7 @@ export default function CategoryManager() {
     <div className="page-wrapper container animate-fade-in">
       <div className="section-header flex-between">
         <div>
-          <h2>️ Categories</h2>
+          <h2>🏷️ Categories</h2>
           <p>Manage course categories for the platform.</p>
         </div>
         <div style={{ display: 'flex', gap: '1rem' }}>
@@ -90,11 +90,11 @@ export default function CategoryManager() {
           >
             + Add Category
           </button>
-          <Link to="/coordinator" className="btn btn-secondary">← Dashboard</Link>
+
         </div>
       </div>
 
-      {error && <div className="alert alert-error">! {error}</div>}
+      {error && <div className="alert alert-error">⚠️ {error}</div>}
 
       {/* ── Add/Edit Form ────────────────────────────────────────────── */}
       {editingId && (

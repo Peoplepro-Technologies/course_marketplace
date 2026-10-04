@@ -49,10 +49,10 @@ export default function QualityReviews() {
     <div className="page-wrapper container animate-fade-in">
       <div className="section-header flex-between">
         <div>
-          <h2>Quality & Reviews</h2>
+          <h2>⭐ Quality & Reviews</h2>
           <p>Monitor and moderate learner reviews across the platform.</p>
         </div>
-        <Link to="/coordinator" className="btn btn-secondary">← Dashboard</Link>
+
       </div>
 
       <div style={{ marginBottom: '1rem', display: 'flex', gap: '1rem', alignItems: 'center' }}>
@@ -71,7 +71,7 @@ export default function QualityReviews() {
       </div>
 
       {error ? (
-        <div className="alert alert-error">! {error}</div>
+        <div className="alert alert-error">⚠️ {error}</div>
       ) : loading ? (
         <LoadingSpinner />
       ) : data.reviews.length === 0 ? (
@@ -102,7 +102,7 @@ export default function QualityReviews() {
                     </td>
                     <td>{r.learner_name || 'Anonymous'}</td>
                     <td>{'⭐'.repeat(r.rating)}</td>
-                    <td>{r.comment ? `"${r.comment}"` : <span style={{ color: '#888' }}>No comment</span>}</td>
+                    <td>{r.comment ? `"₹{r.comment}"` : <span style={{ color: '#888' }}>No comment</span>}</td>
                     <td>{getStatusBadge(r.status)}</td>
                     <td>
                       <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>

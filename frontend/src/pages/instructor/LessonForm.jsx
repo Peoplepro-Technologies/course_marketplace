@@ -1,10 +1,16 @@
 /**
- * LessonForm.jsx — Create/Edit lesson with quiz and assignment authoring.
+ * LessonForm.jsx — Create/Edit lesson used inside the modal in SectionManager.
+ *
+ * Includes:
+ *  - Title, Duration, Content (Markdown) fields (unchanged)
+ *  - Optional video file upload with progress bar
  */
 
 import { useState, useRef, useEffect } from 'react';
+import { Loader2, CheckCircle2, AlertCircle, Plus, Trash2 } from 'lucide-react';
 import api from '../../api/axios';
-import { HelpCircle, ClipboardList, Plus, Check } from 'lucide-react';
+import VideoPlayer from '../../components/VideoPlayer';
+import keycloak from '../../auth/keycloak';
 
 export default function LessonForm({ sectionId, existingLesson, onSuccess, orderIndex = 0 }) {
   const isEditing = !!existingLesson;
@@ -13,47 +19,71 @@ export default function LessonForm({ sectionId, existingLesson, onSuccess, order
     title: existingLesson?.title || '',
     content: existingLesson?.content || '',
     duration: existingLesson?.duration || 0,
-    order_index: existingLesson?.order_index ?? orderIndex
+    order_index: existingLesson?.order_index ?? orderIndex,
+    video_url: existingLesson?.video_url || '',
+    thumbnail_url: existingLesson?.thumbnail_url || ''
   });
   const [submitting, setSubmitting] = useState(false);
 
-  // Video upload
+  // Video upload state
   const videoFileRef = useRef(null);
-  const [uploadProgress, setUploadProgress] = useState(0);
-  const [uploadStatus, setUploadStatus] = useState('idle');
+  const thumbnailFileRef = useRef(null);
+  const [uploadProgress, setUploadProgress] = useState(0); // 0-100
+  const [uploadStatus, setUploadStatus] = useState('idle'); // idle | uploading | processing | done | error
   const [uploadError, setUploadError] = useState('');
 
-  // Saved lesson ID (set after create/update)
-  const [savedLessonId, setSavedLessonId] = useState(existingLesson?.id || null);
-
-  // ── Quiz state ─────────────────────────────────────────────────────
-  const [quizQuestions, setQuizQuestions] = useState([]);
-  const [newQuestion, setNewQuestion] = useState({
-    question_text: '',
-    options: ['', '', '', ''],
-    correct_option_index: 0,
-    explanation: '',
-  });
-  const [addingQuiz, setAddingQuiz] = useState(false);
-  const [quizError, setQuizError] = useState('');
-
-  // ── Assignment state ───────────────────────────────────────────────
+  // Quizzes & Assignments state
+  const [quizzes, setQuizzes] = useState([]);
   const [assignments, setAssignments] = useState([]);
-  const [newAssignment, setNewAssignment] = useState({ title: '', instructions: '' });
-  const [addingAssignment, setAddingAssignment] = useState(false);
-  const [assignmentError, setAssignmentError] = useState('');
+  const [canUploadVideo, setCanUploadVideo] = useState(true);
 
-  // Load existing quiz/assignment data when editing
   useEffect(() => {
-    if (existingLesson?.id) {
+    api.get('/instructor/profile')
+      .then(res => {
+        if (res.data && res.data.can_upload_video === false) {
+          setCanUploadVideo(false);
+        }
+      })
+      .catch(console.error);
+  }, []);
+
+  useEffect(() => {
+    if (isEditing && existingLesson?.id) {
       api.get(`/instructor/lessons/${existingLesson.id}/quiz-questions`)
-        .then(r => setQuizQuestions(r.data))
-        .catch(() => {});
+         .then(res => setQuizzes(res.data))
+         .catch(console.error);
+      
       api.get(`/instructor/lessons/${existingLesson.id}/assignments`)
-        .then(r => setAssignments(r.data))
-        .catch(() => {});
+         .then(res => setAssignments(res.data))
+         .catch(console.error);
     }
-  }, [existingLesson?.id]);
+  }, [isEditing, existingLesson]);
+
+  const handleDeleteQuiz = async (index) => {
+    const q = quizzes[index];
+    if (q.id) {
+      if (!window.confirm("Delete this quiz question?")) return;
+      try {
+        await api.delete(`/instructor/quiz-questions/${q.id}`);
+      } catch (e) {
+        console.error(e);
+      }
+    }
+    setQuizzes(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleDeleteAssignment = async (index) => {
+    const a = assignments[index];
+    if (a.id) {
+      if (!window.confirm("Delete this assignment?")) return;
+      try {
+        await api.delete(`/instructor/assignments/${a.id}`);
+      } catch (e) {
+        console.error(e);
+      }
+    }
+    setAssignments(prev => prev.filter((_, i) => i !== index));
+  };
 
   const handleChange = (e) => {
     const { name, value, type } = e.target;
@@ -67,42 +97,81 @@ export default function LessonForm({ sectionId, existingLesson, onSuccess, order
     e.preventDefault();
     setSubmitting(true);
 
-    let lessonId = existingLesson?.id;
+    let savedLessonId = existingLesson?.id;
 
     try {
+      // ── Step 1: Save text fields ──────────────────────────────────
       if (isEditing) {
         await api.put(`/instructor/lessons/${existingLesson.id}`, formData);
       } else {
         const res = await api.post(`/instructor/sections/${sectionId}/lessons`, formData);
-        lessonId = res.data.id;
-        setSavedLessonId(lessonId);
+        savedLessonId = res.data.id;
       }
 
-      // Video upload
+      // ── Step 2: Upload video if a file was selected ───────────────
       const videoFile = videoFileRef.current?.files?.[0];
-      if (videoFile && lessonId) {
+      if (videoFile && savedLessonId) {
         setUploadStatus('uploading');
         setUploadProgress(0);
         setUploadError('');
+
         const formPayload = new FormData();
         formPayload.append('video', videoFile);
+
         try {
-          await api.post(`/instructor/lessons/${lessonId}/upload-video`, formPayload, {
-            headers: { 'Content-Type': 'multipart/form-data' },
-            onUploadProgress: (evt) => {
-              if (evt.total) {
-                const pct = Math.round((evt.loaded / evt.total) * 100);
-                setUploadProgress(pct);
-                if (pct === 100) setUploadStatus('processing');
-              }
-            },
-          });
+          await api.post(
+            `/instructor/lessons/${savedLessonId}/upload-video`,
+            formPayload,
+            {
+              headers: { 'Content-Type': 'multipart/form-data' },
+              onUploadProgress: (evt) => {
+                if (evt.total) {
+                  const pct = Math.round((evt.loaded / evt.total) * 100);
+                  setUploadProgress(pct);
+                  // Once the bytes are fully sent the server is still transcoding
+                  if (pct === 100) setUploadStatus('processing');
+                }
+              },
+            }
+          );
           setUploadStatus('done');
         } catch (uploadErr) {
+          const msg = uploadErr.response?.data?.detail || 'Video upload failed';
           setUploadStatus('error');
-          setUploadError(uploadErr.response?.data?.detail || 'Video upload failed');
+          setUploadError(msg);
           setSubmitting(false);
-          return;
+          return; // Stay open so user can see error and retry
+        }
+      }
+
+      // ── Step 2.5: Upload thumbnail if a file was selected ─────────
+      const thumbnailFile = thumbnailFileRef.current?.files?.[0];
+      if (thumbnailFile && savedLessonId) {
+        const thumbPayload = new FormData();
+        thumbPayload.append('thumbnail', thumbnailFile);
+        try {
+          await api.post(`/instructor/lessons/${savedLessonId}/upload-thumbnail`, thumbPayload, {
+            headers: { 'Content-Type': 'multipart/form-data' }
+          });
+        } catch (err) {
+          console.error("Failed to upload thumbnail", err);
+        }
+      }
+
+      // ── Step 3: Save Quizzes and Assignments ───────────────────────
+      for (const quiz of quizzes) {
+        if (quiz.id) {
+          await api.put(`/instructor/quiz-questions/${quiz.id}`, quiz);
+        } else {
+          await api.post(`/instructor/lessons/${savedLessonId}/quiz-questions`, quiz);
+        }
+      }
+
+      for (const a of assignments) {
+        if (a.id) {
+          await api.put(`/instructor/assignments/${a.id}`, a);
+        } else {
+          await api.post(`/instructor/lessons/${savedLessonId}/assignments`, a);
         }
       }
 
@@ -113,206 +182,263 @@ export default function LessonForm({ sectionId, existingLesson, onSuccess, order
     }
   };
 
-  // ── Quiz handlers ──────────────────────────────────────────────────
-  const handleAddQuiz = async () => {
-    const lid = savedLessonId || existingLesson?.id;
-    if (!lid) { setQuizError('Save the lesson first before adding quiz questions.'); return; }
-    if (!newQuestion.question_text.trim()) { setQuizError('Question text is required.'); return; }
-    if (newQuestion.options.some(o => !o.trim())) { setQuizError('All 4 options are required.'); return; }
-    setAddingQuiz(true);
-    setQuizError('');
-    try {
-      const res = await api.post(`/instructor/lessons/${lid}/quiz-questions`, newQuestion);
-      setQuizQuestions(prev => [...prev, res.data]);
-      setNewQuestion({ question_text: '', options: ['', '', '', ''], correct_option_index: 0, explanation: '' });
-    } catch (err) {
-      setQuizError(err.response?.data?.detail || 'Failed to add question');
-    } finally {
-      setAddingQuiz(false);
-    }
-  };
-
-  const handleDeleteQuiz = async (qid) => {
-    try {
-      await api.delete(`/instructor/quiz-questions/${qid}`);
-      setQuizQuestions(prev => prev.filter(q => q.id !== qid));
-    } catch { alert('Failed to delete question'); }
-  };
-
-  // ── Assignment handlers ────────────────────────────────────────────
-  const handleAddAssignment = async () => {
-    const lid = savedLessonId || existingLesson?.id;
-    if (!lid) { setAssignmentError('Save the lesson first before adding an assignment.'); return; }
-    if (!newAssignment.title.trim() || !newAssignment.instructions.trim()) { setAssignmentError('Title and instructions are required.'); return; }
-    setAddingAssignment(true);
-    setAssignmentError('');
-    try {
-      const res = await api.post(`/instructor/lessons/${lid}/assignments`, newAssignment);
-      setAssignments(prev => [...prev, res.data]);
-      setNewAssignment({ title: '', instructions: '' });
-    } catch (err) {
-      setAssignmentError(err.response?.data?.detail || 'Failed to add assignment');
-    } finally {
-      setAddingAssignment(false);
-    }
-  };
-
-  const handleDeleteAssignment = async (aid) => {
-    try {
-      await api.delete(`/instructor/assignments/${aid}`);
-      setAssignments(prev => prev.filter(a => a.id !== aid));
-    } catch { alert('Failed to delete assignment'); }
-  };
-
-  const statusLabel = {
-    idle: '', uploading: `Uploading… ${uploadProgress}%`,
-    processing: 'Processing video…', done: 'Video uploaded',
-    error: `Upload error: ${uploadError}`,
+  // Upload status metadata: { icon, text, color }
+  const statusMeta = {
+    idle:       null,
+    uploading:  { icon: <Loader2 size={14} className="spin" />, text: `Uploading ${uploadProgress}%`,                         color: 'var(--color-text-muted)' },
+    processing: { icon: <CheckCircle2 size={14} />,             text: 'File uploaded. Transcoding in progress — you can close this form.', color: 'var(--color-success, #22c55e)' },
+    done:       { icon: <CheckCircle2 size={14} />,             text: 'Video queued for transcoding.',                          color: 'var(--color-success, #22c55e)' },
+    error:      { icon: <AlertCircle  size={14} />,             text: `Upload error: ${uploadError}`,                          color: 'var(--color-danger, #ef4444)' },
   }[uploadStatus];
 
   return (
-    <div>
-      <form onSubmit={handleSubmit} className="flex-col gap-md">
-        <div className="form-group">
-          <label>Lesson Title</label>
-          <input type="text" name="title" required value={formData.title} onChange={handleChange} />
-        </div>
+    <form onSubmit={handleSubmit} className="flex-col gap-md">
+      <div className="form-group">
+        <label>Lesson Title</label>
+        <input
+          type="text"
+          name="title"
+          required
+          value={formData.title}
+          onChange={handleChange}
+        />
+      </div>
 
-        <div className="form-group">
-          <label>Duration (minutes)</label>
-          <input type="number" name="duration" min="0" value={formData.duration} onChange={handleChange} />
-        </div>
+      <div className="form-group">
+        <label>Duration (minutes)</label>
+        <input
+          type="number"
+          name="duration"
+          min="0"
+          value={formData.duration}
+          onChange={handleChange}
+        />
+      </div>
 
-        <div className="form-group">
-          <label>Lesson Content (optional text/notes)</label>
-          <textarea name="content" rows="5" value={formData.content} onChange={handleChange}
-            placeholder="Enter lesson notes or markdown content..." />
-        </div>
+      <div className="form-group">
+        <label>Lesson Content (Markdown optional)</label>
+        <textarea
+          name="content"
+          rows="8"
+          value={formData.content}
+          onChange={handleChange}
+          placeholder="Enter the lesson text or markdown here..."
+        />
+      </div>
 
+      {/* ── Video upload ──────────────────────────────────────────── */}
+      {canUploadVideo && (
+      <div className="form-group" style={{ padding: '1rem', background: 'var(--bg-surface)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+        <h4 style={{ marginBottom: '1rem' }}>Video Source</h4>
+        
         <div className="form-group">
-          <label>Video File (optional)</label>
-          <input ref={videoFileRef} type="file" accept="video/*" style={{ color: 'var(--color-text-primary)' }} />
-          {(uploadStatus === 'uploading' || uploadStatus === 'processing') && (
-            <progress value={uploadStatus === 'processing' ? undefined : uploadProgress}
-              max="100" style={{ width: '100%', height: '8px', marginTop: '0.5rem' }} />
+          <label>YouTube URL (Optional)</label>
+          <input
+            type="text"
+            name="video_url"
+            value={formData.video_url?.startsWith('/') || formData.video_url?.startsWith('processing:') ? '' : formData.video_url}
+            onChange={handleChange}
+            placeholder="e.g. https://www.youtube.com/watch?v=..."
+          />
+          {(formData.video_url?.startsWith('/') || formData.video_url?.startsWith('processing:')) && (
+            <small style={{ color: 'var(--color-text-muted)' }}>Currently using an uploaded video. Entering a YouTube URL will replace it.</small>
           )}
-          {statusLabel && (
-            <p style={{ marginTop: '0.5rem', fontSize: 'var(--text-sm)',
-              color: uploadStatus === 'error' ? 'var(--color-danger, #ef4444)' : 'var(--color-text-muted)' }}>
-              {statusLabel}
+        </div>
+
+        <div style={{ margin: '1rem 0', textAlign: 'center', color: 'var(--color-text-muted)' }}>— OR —</div>
+
+        <div className="form-group">
+          <label>Upload Video File (Optional)</label>
+          {existingLesson?.video_url && (
+          <div style={{ marginBottom: '1rem' }}>
+            {existingLesson.video_url.startsWith('processing:') ? (
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                fontSize: 'var(--text-sm)',
+                color: 'var(--color-warning, #f59e0b)',
+                padding: '0.5rem 0.75rem',
+                background: 'rgba(245,158,11,0.1)',
+                borderRadius: '6px',
+                border: '1px solid rgba(245,158,11,0.3)',
+              }}>
+                <Loader2 size={14} className="spin" />
+                Video is being transcoded in the background. Refresh the lesson in a few minutes to see it.
+              </div>
+            ) : (
+              <>
+                <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)', marginBottom: '0.5rem' }}>
+                  Current video preview:
+                </p>
+                <VideoPlayer
+                  src={
+                    existingLesson.video_url.startsWith('/media/videos/')
+                      ? `http://localhost:8000/api/v1/learner/lessons/${existingLesson.id}/video?token=${keycloak.token}`
+                      : `http://localhost:8000/api/v1${existingLesson.video_url}?token=${keycloak.token}`
+                  }
+                />
+                <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)', marginTop: '0.5rem' }}>
+                  Selecting a new file will replace the current video.
+                </p>
+              </>
+            )}
+          </div>
+        )}
+        <input
+          ref={videoFileRef}
+          type="file"
+          accept="video/*"
+          style={{ color: 'var(--color-text-primary)' }}
+        />
+
+        {/* Progress bar — shown while uploading or processing */}
+        {(uploadStatus === 'uploading' || uploadStatus === 'processing') && (
+          <div style={{ marginTop: '0.75rem' }}>
+            <progress
+              value={uploadStatus === 'processing' ? undefined : uploadProgress}
+              max="100"
+              style={{ width: '100%', height: '8px', borderRadius: '4px' }}
+            />
+          </div>
+        )}
+
+        {/* Status text */}
+        {statusMeta && (
+          <p style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.4rem',
+            marginTop: '0.5rem',
+            fontSize: 'var(--text-sm)',
+            color: statusMeta.color,
+          }}>
+            {statusMeta.icon}
+            {statusMeta.text}
+          </p>
+        )}
+      </div>
+
+      <div className="form-group">
+        <label>Thumbnail URL (Optional)</label>
+        <input
+          type="text"
+          name="thumbnail_url"
+          value={formData.thumbnail_url?.startsWith('/') ? '' : formData.thumbnail_url}
+          onChange={handleChange}
+          placeholder="e.g. https://example.com/thumb.jpg"
+        />
+        {formData.thumbnail_url?.startsWith('/') && (
+          <small style={{ color: 'var(--color-text-muted)' }}>Currently using an uploaded thumbnail. Entering a URL will replace it.</small>
+        )}
+
+        <div style={{ margin: '1rem 0', textAlign: 'center', color: 'var(--color-text-muted)' }}>— OR —</div>
+        
+        <label>Upload Thumbnail File (Optional)</label>
+        {existingLesson?.thumbnail_url?.startsWith('/') && (
+          <div style={{ marginBottom: '1rem' }}>
+            <img 
+              src={`http://localhost:8000${existingLesson.thumbnail_url}`} 
+              alt="Thumbnail" 
+              style={{ maxWidth: '200px', borderRadius: '4px' }} 
+            />
+            <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)', marginTop: '0.5rem' }}>
+              Selecting a new file will replace the current thumbnail.
             </p>
-          )}
-        </div>
-
-        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
-          <button type="submit" className="btn btn-primary" disabled={submitting}>
-            {submitting ? 'Saving…' : isEditing ? 'Save Changes' : 'Save Lesson'}
-          </button>
-        </div>
-      </form>
-
-      {/* ── Quiz Section ─────────────────────────────────────────── */}
-      <div style={{ marginTop: '2rem', borderTop: '2px solid #e0e0e0', paddingTop: '1.5rem' }}>
-        <h4 style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <HelpCircle size={18} /> Quiz Questions
-        </h4>
-
-        {quizQuestions.length > 0 && (
-          <div style={{ marginBottom: '1rem' }}>
-            {quizQuestions.map((q, i) => (
-              <div key={q.id} style={{ background: '#f8f9fa', padding: '0.75rem 1rem', borderRadius: '6px', marginBottom: '0.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                <div>
-                  <strong>Q{i + 1}:</strong> {q.question_text}
-                  <div style={{ fontSize: '0.8rem', color: '#555', marginTop: '0.25rem' }}>
-                    Correct: <em>{q.options[q.correct_option_index]}</em>
-                  </div>
-                </div>
-                <button className="btn btn-danger btn-sm" onClick={() => handleDeleteQuiz(q.id)} style={{ flexShrink: 0, marginLeft: '1rem' }}>
-                  Remove
-                </button>
-              </div>
-            ))}
           </div>
         )}
+        <input
+          ref={thumbnailFileRef}
+          type="file"
+          accept="image/*"
+          style={{ color: 'var(--color-text-primary)' }}
+        />
+      </div>
+      </div>
+      )}
 
-        <div style={{ background: '#f0f4ff', padding: '1rem', borderRadius: '8px', border: '1px solid #d0deff' }}>
-          <p style={{ fontSize: '0.85rem', color: '#444', marginBottom: '0.75rem', fontWeight: 600 }}>Add a new question:</p>
-          <div className="form-group">
-            <label style={{ fontSize: '0.85rem' }}>Question Text</label>
-            <input type="text" value={newQuestion.question_text}
-              onChange={e => setNewQuestion(p => ({ ...p, question_text: e.target.value }))}
-              placeholder="e.g. What does VLOOKUP stand for?" />
-          </div>
-          {[0, 1, 2, 3].map(i => (
-            <div className="form-group" key={i} style={{ marginBottom: '0.5rem' }}>
-              <label style={{ fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <input type="radio" name="correct_option"
-                  checked={newQuestion.correct_option_index === i}
-                  onChange={() => setNewQuestion(p => ({ ...p, correct_option_index: i }))} />
-                Option {i + 1} {newQuestion.correct_option_index === i && <span style={{ color: '#0056D2', fontSize: '0.75rem' }}>(correct)</span>}
-              </label>
-              <input type="text" value={newQuestion.options[i]}
-                onChange={e => setNewQuestion(p => {
-                  const opts = [...p.options]; opts[i] = e.target.value; return { ...p, options: opts };
-                })}
-                placeholder={`Option ${i + 1}`} />
+      {/* ── Quizzes ─────────────────────────────────────────────────── */}
+      <div className="form-group" style={{ padding: '1rem', background: 'var(--bg-surface)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+          <h4 style={{ margin: 0 }}>Quiz Questions</h4>
+          <button type="button" className="btn btn-secondary btn-sm" onClick={() => setQuizzes(prev => [...prev, { question_text: '', options: ['', '', '', ''], correct_option_index: 0, explanation: '' }])}>
+            <Plus size={16} /> Add Question
+          </button>
+        </div>
+        
+        {quizzes.length === 0 && <p style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }}>No quiz questions.</p>}
+        {quizzes.map((q, idx) => (
+          <div key={idx} style={{ padding: '1rem', background: 'var(--color-bg-secondary)', borderRadius: '8px', marginBottom: '1rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+              <strong>Question {idx + 1}</strong>
+              <button type="button" className="btn btn-danger btn-sm" onClick={() => handleDeleteQuiz(idx)}><Trash2 size={14} /></button>
             </div>
-          ))}
-          <div className="form-group">
-            <label style={{ fontSize: '0.85rem' }}>Explanation (shown after answering)</label>
-            <textarea rows="2" value={newQuestion.explanation}
-              onChange={e => setNewQuestion(p => ({ ...p, explanation: e.target.value }))}
-              placeholder="Explain why the correct answer is right..." />
-          </div>
-          {quizError && <p style={{ color: '#dc3545', fontSize: '0.85rem' }}>{quizError}</p>}
-          <button className="btn btn-primary btn-sm flex-center" style={{ gap: '4px' }} onClick={handleAddQuiz} disabled={addingQuiz}>
-            {addingQuiz ? 'Adding…' : <><Plus size={14} /> Add Question</>}
-          </button>
-        </div>
-      </div>
-
-      {/* ── Assignment Section ───────────────────────────────────── */}
-      <div style={{ marginTop: '1.5rem', borderTop: '2px solid #e0e0e0', paddingTop: '1.5rem' }}>
-        <h4 style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <ClipboardList size={18} /> Assignment
-        </h4>
-
-        {assignments.length > 0 && (
-          <div style={{ marginBottom: '1rem' }}>
-            {assignments.map(a => (
-              <div key={a.id} style={{ background: '#f8f9fa', padding: '0.75rem 1rem', borderRadius: '6px', marginBottom: '0.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                <div>
-                  <strong>{a.title}</strong>
-                  <div style={{ fontSize: '0.8rem', color: '#555', marginTop: '0.25rem' }}>{a.instructions.substring(0, 80)}…</div>
+            <input type="text" placeholder="Question Text" value={q.question_text} style={{ marginBottom: '0.5rem' }} onChange={e => {
+              const newQuizzes = [...quizzes];
+              newQuizzes[idx].question_text = e.target.value;
+              setQuizzes(newQuizzes);
+            }} required />
+            
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', marginBottom: '0.5rem' }}>
+              {q.options.map((opt, oIdx) => (
+                <div key={oIdx} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <input type="radio" name={`correct-${idx}`} checked={q.correct_option_index === oIdx} onChange={() => {
+                    const newQuizzes = [...quizzes];
+                    newQuizzes[idx].correct_option_index = oIdx;
+                    setQuizzes(newQuizzes);
+                  }} />
+                  <input type="text" placeholder={`Option ${oIdx + 1}`} value={opt} onChange={e => {
+                    const newQuizzes = [...quizzes];
+                    newQuizzes[idx].options[oIdx] = e.target.value;
+                    setQuizzes(newQuizzes);
+                  }} required />
                 </div>
-                <button className="btn btn-danger btn-sm" onClick={() => handleDeleteAssignment(a.id)} style={{ flexShrink: 0, marginLeft: '1rem' }}>
-                  Remove
-                </button>
-              </div>
-            ))}
+              ))}
+            </div>
+            <input type="text" placeholder="Explanation (Optional)" value={q.explanation} onChange={e => {
+              const newQuizzes = [...quizzes];
+              newQuizzes[idx].explanation = e.target.value;
+              setQuizzes(newQuizzes);
+            }} />
           </div>
-        )}
+        ))}
+      </div>
 
-        <div style={{ background: '#fff8f0', padding: '1rem', borderRadius: '8px', border: '1px solid #ffe0b2' }}>
-          <p style={{ fontSize: '0.85rem', color: '#444', marginBottom: '0.75rem', fontWeight: 600 }}>Add an assignment:</p>
-          <div className="form-group">
-            <label style={{ fontSize: '0.85rem' }}>Assignment Title</label>
-            <input type="text" value={newAssignment.title}
-              onChange={e => setNewAssignment(p => ({ ...p, title: e.target.value }))}
-              placeholder="e.g. Build a Sales Dashboard" />
-          </div>
-          <div className="form-group">
-            <label style={{ fontSize: '0.85rem' }}>Instructions</label>
-            <textarea rows="4" value={newAssignment.instructions}
-              onChange={e => setNewAssignment(p => ({ ...p, instructions: e.target.value }))}
-              placeholder="Describe what the learner needs to do and how to submit..." />
-          </div>
-          {assignmentError && <p style={{ color: '#dc3545', fontSize: '0.85rem' }}>{assignmentError}</p>}
-          <button className="btn btn-primary btn-sm flex-center" style={{ gap: '4px' }} onClick={handleAddAssignment} disabled={addingAssignment}>
-            {addingAssignment ? 'Adding…' : <><Plus size={14} /> Add Assignment</>}
+      {/* ── Assignments ─────────────────────────────────────────────── */}
+      <div className="form-group" style={{ padding: '1rem', background: 'var(--bg-surface)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+          <h4 style={{ margin: 0 }}>Assignments</h4>
+          <button type="button" className="btn btn-secondary btn-sm" onClick={() => setAssignments(prev => [...prev, { title: '', instructions: '' }])}>
+            <Plus size={16} /> Add Assignment
           </button>
         </div>
+        
+        {assignments.length === 0 && <p style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }}>No assignments.</p>}
+        {assignments.map((a, idx) => (
+          <div key={idx} style={{ padding: '1rem', background: 'var(--color-bg-secondary)', borderRadius: '8px', marginBottom: '1rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+              <strong>Assignment {idx + 1}</strong>
+              <button type="button" className="btn btn-danger btn-sm" onClick={() => handleDeleteAssignment(idx)}><Trash2 size={14} /></button>
+            </div>
+            <input type="text" placeholder="Assignment Title" value={a.title} style={{ marginBottom: '0.5rem' }} onChange={e => {
+              const newAssignments = [...assignments];
+              newAssignments[idx].title = e.target.value;
+              setAssignments(newAssignments);
+            }} required />
+            <textarea placeholder="Instructions..." value={a.instructions} rows={3} onChange={e => {
+              const newAssignments = [...assignments];
+              newAssignments[idx].instructions = e.target.value;
+              setAssignments(newAssignments);
+            }} required />
+          </div>
+        ))}
       </div>
-    </div>
+
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1rem' }}>
+        <button type="submit" className="btn btn-primary" disabled={submitting}>
+          {submitting ? 'Saving...' : 'Save Lesson'}
+        </button>
+      </div>
+    </form>
   );
 }

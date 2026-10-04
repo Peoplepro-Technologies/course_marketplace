@@ -22,7 +22,9 @@ from app.models.assignment import Assignment
 from app.models.support_ticket import SupportTicket, TicketReply
 from app.models.platform_setting import PlatformSetting
 from app.models.transcript import Transcript
-
+from app.models.ticket_routing_rule import TicketRoutingRule
+from app.models.assignment_submission import AssignmentSubmission
+from app.models.quiz_attempt import QuizAttempt
 __all__ = [
     "User",
     "Course",
@@ -44,4 +46,7 @@ __all__ = [
     "TicketReply",
     "PlatformSetting",
     "Transcript",
+    "TicketRoutingRule",
+    "AssignmentSubmission",
+    "QuizAttempt",
 ]

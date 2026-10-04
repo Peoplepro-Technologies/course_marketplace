@@ -128,13 +128,13 @@ export default function CourseApprovals() {
     <div className="page-wrapper container animate-fade-in">
       <div className="section-header flex-between">
         <div>
-          <h2>Course Approvals</h2>
+          <h2>✅ Course Approvals</h2>
           <p>Review and approve newly submitted courses.</p>
         </div>
-        <Link to="/coordinator" className="btn btn-secondary">← Dashboard</Link>
+
       </div>
 
-      {error && <div className="alert alert-error">! {error}</div>}
+      {error && <div className="alert alert-error">⚠️ {error}</div>}
 
       {!error && data.courses.length === 0 && (
         <div className="empty-state">
@@ -192,7 +192,7 @@ export default function CourseApprovals() {
                           id={`preview-btn-${c.id}`}
                           onClick={() => openPreview(c.id)}
                           disabled={processingId === c.id}
-                        > Preview</button>
+                        >🔍 Preview</button>
                         <button
                           className="btn btn-success btn-sm"
                           onClick={() => handleApprove(c.id)}
@@ -243,7 +243,7 @@ export default function CourseApprovals() {
               )}
 
               {previewError && (
-                <div className="alert alert-error">! {previewError}</div>
+                <div className="alert alert-error">⚠️ {previewError}</div>
               )}
 
               {preview && previewCourse && (
@@ -252,9 +252,9 @@ export default function CourseApprovals() {
                   <div className="preview-meta-grid">
                     <div className="preview-thumb-wrap">
                       {previewCourse.thumbnail_url ? (
-                        <img src={previewCourse.thumbnail_url} alt={previewCourse.title} className="preview-thumb" />
+                        <img src={previewCourse.thumbnail_url.startsWith('/media/') ? `http://localhost:8000${previewCourse.thumbnail_url}` : previewCourse.thumbnail_url} alt={previewCourse.title} className="preview-thumb" />
                       ) : (
-                        <div className="preview-thumb-placeholder"></div>
+                        <div className="preview-thumb-placeholder">📚</div>
                       )}
                     </div>
                     <div className="preview-info-block">
@@ -335,7 +335,7 @@ export default function CourseApprovals() {
                                     <div key={lesson.id} className="preview-lesson-row">
                                       <span className="preview-lesson-num">{lIdx + 1}.</span>
                                       <span className="preview-lesson-icon">
-                                        {lesson.video_url ? '' : ''}
+                                        {lesson.video_url ? '🎬' : '📄'}
                                       </span>
                                       <span className="preview-lesson-title">{lesson.title}</span>
                                       {lesson.duration > 0 && (

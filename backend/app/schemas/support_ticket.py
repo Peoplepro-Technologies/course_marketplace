@@ -22,7 +22,7 @@ class TicketReplyOut(TicketReplyBase):
     author_name: Optional[str] = None
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class SupportTicketBase(BaseModel):
@@ -44,12 +44,18 @@ class SupportTicketUpdate(BaseModel):
 
 class SupportTicketOut(SupportTicketBase):
     id: UUID
+    ticket_number: str
     raised_by_id: UUID
     role_context: str
+    assigned_team: str
     status: str
     assigned_to_id: Optional[UUID] = None
+    last_activity_at: datetime
+    last_activity_by: Optional[UUID] = None
     created_at: datetime
     updated_at: datetime
+    
+    is_unread: bool = False
     
     raised_by_name: Optional[str] = None
     assigned_to_name: Optional[str] = None
@@ -57,4 +63,4 @@ class SupportTicketOut(SupportTicketBase):
     replies: List[TicketReplyOut] = []
 
     class Config:
-        orm_mode = True
+        from_attributes = True

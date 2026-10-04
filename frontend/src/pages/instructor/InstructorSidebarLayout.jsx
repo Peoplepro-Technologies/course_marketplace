@@ -1,13 +1,15 @@
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, BookPlus, Users, DollarSign, Video, MessageSquare, LifeBuoy, FileText, User } from 'lucide-react';
+import { LayoutDashboard, BookPlus, Users, IndianRupee, Video, MessageSquare, LifeBuoy, FileText, User, BarChart2 } from 'lucide-react';
+import SupportBadgeLink from '../../components/SupportBadgeLink';
 import '../RoleDashboard.css';
 
 const SIDEBAR_ITEMS = [
   { icon: LayoutDashboard, label: 'Dashboard', path: '/instructor/dashboard' },
   { icon: BookPlus, label: 'My Courses', path: '/instructor/courses' },
   { icon: FileText, label: 'Submissions & Status', path: '/instructor/submissions' },
+  { icon: BarChart2, label: 'Assignments/Quiz', path: '/instructor/analytics' },
   { icon: Users, label: 'Students', path: '/instructor/students' },
-  { icon: DollarSign, label: 'Earnings', path: '/instructor/earnings' },
+  { icon: IndianRupee, label: 'Earnings', path: '/instructor/earnings' },
   { icon: Video, label: 'Live Classes', path: '/instructor/live-classes' },
   { icon: MessageSquare, label: 'Reviews', path: '/instructor/reviews' },
   { icon: LifeBuoy, label: 'Support', path: '/instructor/support' },
@@ -36,6 +38,18 @@ export default function InstructorSidebarLayout({ children }) {
             const isActive = item.path === '/instructor/dashboard' 
               ? location.pathname === item.path
               : location.pathname.startsWith(item.path);
+
+            if (item.label === 'Support') {
+              return (
+                <SupportBadgeLink 
+                  key={item.label}
+                  icon={<Icon size={18} strokeWidth={2} />}
+                  label={item.label}
+                  path={item.path}
+                  apiEndpoint="/support-tickets/unread-count"
+                />
+              );
+            }
 
             return (
               <Link to={item.path} key={item.label} style={{ textDecoration: 'none' }}>

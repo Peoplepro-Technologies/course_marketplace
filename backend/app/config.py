@@ -16,7 +16,7 @@ class Settings(BaseSettings):
     """
 
     # ── Database ──────────────────────────────────────────────────────
-    DATABASE_URL: str = "postgresql://postgres:Priyanshu1$@localhost:5432/course_marketplace"
+    DATABASE_URL: str = "postgresql://postgres:postgres@localhost:5432/course_marketplace"
 
     # ── Redis ─────────────────────────────────────────────────────────
     REDIS_URL: str = "redis://localhost:6379/0"
@@ -26,9 +26,8 @@ class Settings(BaseSettings):
     KEYCLOAK_URL: str = "http://localhost:8080"
     KEYCLOAK_REALM: str = "course-marketplace"
     KEYCLOAK_CLIENT_ID: str = "course-frontend"
-
-    # ── FFmpeg ────────────────────────────────────────────────────────
-    FFMPEG_PATH: str = "ffmpeg"
+    KEYCLOAK_ADMIN_USER: str = "admin"
+    KEYCLOAK_ADMIN_PASS: str = "admin"
 
     # ── Computed Properties ───────────────────────────────────────────
     @property
@@ -47,7 +46,6 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
-        extra = "ignore"
 
 
 @lru_cache()

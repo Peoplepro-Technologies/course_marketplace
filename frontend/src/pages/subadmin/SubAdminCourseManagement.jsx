@@ -30,7 +30,7 @@ export default function SubAdminCourseManagement() {
   useEffect(() => { fetchCourses(); }, [fetchCourses]);
 
   const handleStatusOverride = async (courseId, newStatus) => {
-    if (!window.confirm(`Are you sure you want to change this course's status to "${newStatus}"?`)) return;
+    if (!window.confirm(`Are you sure you want to change this course's status to "₹{newStatus}"?`)) return;
     setActionLoading(courseId);
     try {
       await api.put(`/subadmin/courses/${courseId}/status`, { status: newStatus });
@@ -45,7 +45,7 @@ export default function SubAdminCourseManagement() {
   return (
     <SubAdminSidebarLayout>
       <div className="sa-page-header">
-        <h2>Course Management</h2>
+        <h2>📚 Course Management</h2>
         <p>View and manage all courses on the platform (delegated permissions).</p>
       </div>
 

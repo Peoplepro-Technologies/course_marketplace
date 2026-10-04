@@ -32,7 +32,7 @@ export default function SAUserManagement() {
   useEffect(() => { fetchUsers(); }, [fetchUsers]);
 
   const handleRoleChange = async (userId, newRole) => {
-    if (!window.confirm(`Change this user's role to "${newRole}"?`)) return;
+    if (!window.confirm(`Change this user's role to "₹{newRole}"?`)) return;
     setActionLoading(userId);
     try {
       await api.put(`/superadmin/users/${userId}/role`, { role: newRole });
@@ -73,7 +73,7 @@ export default function SAUserManagement() {
   return (
     <SASidebarLayout>
       <div className="sa-page-header">
-        <h2>User Management</h2>
+        <h2>👥 User Management</h2>
         <p>View, search, and manage all platform users.</p>
       </div>
 

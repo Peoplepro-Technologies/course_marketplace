@@ -3,11 +3,6 @@
  *
  * Shows: course info, instructor, curriculum (sections/lessons),
  * reviews, and enroll button for learners.
- *
- * Curriculum access logic:
- *   - is_preview lesson: visible to everyone, inline preview
- *   - enrolled + approved: all lessons clickable → LessonViewer
- *   - non-enrolled / logged-out: locked with enroll prompt
  */
 
 import { useState, useEffect } from 'react';
@@ -17,9 +12,6 @@ import useAuth from '../hooks/useAuth';
 import StarRating from '../components/StarRating';
 import ProgressBar from '../components/ProgressBar';
 import LoadingSpinner from '../components/LoadingSpinner';
-import CourseSkills from '../components/CourseSkills';
-import TranscriptSearch from '../components/TranscriptSearch';
-import { Heart, Clock } from 'lucide-react';
 import './CourseDetail.css';
 
 export default function CourseDetail() {
@@ -32,42 +24,16 @@ export default function CourseDetail() {
   const [reviews, setReviews] = useState([]);
   const [loading, setLoading] = useState(true);
   const [enrolling, setEnrolling] = useState(false);
-  const [checkingEnrollment, setCheckingEnrollment] = useState(authenticated && primaryRole === 'learner');
-  const [enrollmentStatus, setEnrollmentStatus] = useState(null); // null | "pending" | "approved" | "revoked" | etc.
+  const [enrolled, setEnrolled] = useState(false);
+  const [enrollmentStatus, setEnrollmentStatus] = useState(null);
   const [expandedSections, setExpandedSections] = useState({});
-  const [previewLesson, setPreviewLesson] = useState(null); // lesson being previewed inline
-  const [isWishlisted, setIsWishlisted] = useState(false);
-  const [togglingWishlist, setTogglingWishlist] = useState(false);
+  const [previewLesson, setPreviewLesson] = useState(null);
 
-  const isEnrolledAndApproved = enrollmentStatus === 'approved';
-
-  const normalizeId = (id) => String(id || '').replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
-
-  // Fetch enrollment status — called on mount and after enroll/re-enroll
-  const fetchEnrollmentStatus = () => {
-    if (!authenticated) return;
-    api.get('/learner/courses')
-      .then((res) => {
-        const target = normalizeId(courseId);
-        const enrollment = res.data.find(
-          (e) => normalizeId(e.course_id) === target
-        );
-        if (enrollment && (enrollment.status === 'approved' || !enrollment.status)) {
-          setEnrollmentStatus('approved');
-        } else if (enrollment) {
-          setEnrollmentStatus(enrollment.status);
-        } else {
-          // Double check with progress endpoint (returns 200 if enrolled & approved, 403 if not)
-          api.get(`/learner/courses/${courseId}/progress`)
-            .then(() => setEnrollmentStatus('approved'))
-            .catch(() => setEnrollmentStatus(null));
-        }
-      })
-      .catch(() => {
-        api.get(`/learner/courses/${courseId}/progress`)
-          .then(() => setEnrollmentStatus('approved'))
-          .catch(() => setEnrollmentStatus(null));
-      });
+  // Extract YouTube ID helper
+  const getYouTubeId = (url) => {
+    if (!url) return null;
+    const m = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([A-Za-z0-9_-]{11})/);
+    return m ? m[1] : null;
   };
 
   useEffect(() => {
@@ -76,67 +42,38 @@ export default function CourseDetail() {
         setCourse(res.data.course);
         setSections(res.data.sections);
         setReviews(res.data.reviews);
-        if (res.data.sections.length > 0) {
+        // Auto-expand the first section so the preview is immediately visible
+        if (res.data.sections?.length > 0) {
           setExpandedSections({ [res.data.sections[0].id]: true });
         }
       })
       .catch(console.error)
       .finally(() => setLoading(false));
 
-    // Check enrollment status (only if authenticated learner)
+    // Check if the learner is already enrolled (only if authenticated learner)
     if (authenticated && primaryRole === 'learner') {
       api.get('/learner/courses')
         .then((res) => {
-          const enrollment = res.data.find((e) => e.course_id === courseId);
-          setEnrollmentStatus(enrollment?.status || null);
-        })
-        .catch(() => {})
-        .finally(() => setCheckingEnrollment(false));
-        
-      api.get('/learner/wishlist')
-        .then((res) => {
-          const target = normalizeId(courseId);
-          setIsWishlisted(res.data.some(w => normalizeId(w.course_id) === target));
+          const enrollData = res.data.find((e) => e.course_id === courseId);
+          if (enrollData) {
+            setEnrolled(true);
+            setEnrollmentStatus(enrollData.enrollment_status);
+          }
         })
         .catch(() => {});
     }
-  }, [courseId, authenticated]);
+  }, [courseId, primaryRole, authenticated]);
 
   const handleEnroll = async () => {
     setEnrolling(true);
     try {
-      const res = await api.post(`/learner/enroll/${courseId}`);
-      setEnrollmentStatus(res.data.status || 'approved');
+      await api.post(`/learner/enroll/${courseId}`);
+      setEnrolled(true);
+      setEnrollmentStatus('pending');
     } catch (err) {
-      const detail = err.response?.data?.detail || '';
-      if (detail.toLowerCase().includes('already enrolled')) {
-        setEnrollmentStatus('approved');
-      } else {
-        alert(detail || 'Enrollment failed');
-      }
+      alert(err.response?.data?.detail || 'Enrollment failed');
     } finally {
       setEnrolling(false);
-    }
-  };
-
-  const handleWishlistToggle = async () => {
-    if (!authenticated) {
-      login();
-      return;
-    }
-    setTogglingWishlist(true);
-    try {
-      if (isWishlisted) {
-        await api.delete(`/learner/wishlist/${courseId}`);
-        setIsWishlisted(false);
-      } else {
-        await api.post(`/learner/wishlist/${courseId}`);
-        setIsWishlisted(true);
-      }
-    } catch (err) {
-      alert("Failed to update wishlist");
-    } finally {
-      setTogglingWishlist(false);
     }
   };
 
@@ -145,28 +82,6 @@ export default function CourseDetail() {
       ...prev,
       [sectionId]: !prev[sectionId],
     }));
-  };
-
-  const handleJumpToLesson = (lessonId, startSeconds) => {
-    if (isEnrolledAndApproved) {
-      navigate(`/learner/course/${course?.id || courseId}/learn?lessonId=${lessonId}&t=${startSeconds}`);
-    } else {
-      document.getElementById('enroll-cta')?.scrollIntoView({ behavior: 'smooth' });
-    }
-  };
-
-  const handleLessonClick = (lesson) => {
-    if (lesson.is_preview) {
-      // Toggle inline preview panel
-      setPreviewLesson(prev => prev?.id === lesson.id ? null : lesson);
-      return;
-    }
-    if (isEnrolledAndApproved) {
-      navigate(`/learner/course/${course?.id || courseId}/learn`);
-      return;
-    }
-    // Not accessible — scroll to enroll CTA
-    document.getElementById('enroll-cta')?.scrollIntoView({ behavior: 'smooth' });
   };
 
   if (loading) return <div className="page-wrapper"><LoadingSpinner /></div>;
@@ -178,206 +93,175 @@ export default function CourseDetail() {
     0
   );
 
+  const ytId = previewLesson ? getYouTubeId(previewLesson.video_url) : null;
+
   return (
     <div className="page-wrapper">
+      {/* ── Preview Modal ───────────────────────────────────────────── */}
+      {previewLesson && (
+        <div
+          style={{
+            position: 'fixed', inset: 0, zIndex: 9999,
+            background: 'rgba(0,0,0,0.85)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            padding: '1rem',
+          }}
+          onClick={() => setPreviewLesson(null)}
+        >
+          <div
+            style={{ width: '100%', maxWidth: '860px', background: '#111', borderRadius: '12px', overflow: 'hidden', boxShadow: '0 25px 60px rgba(0,0,0,0.7)' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem 1.25rem', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+              <div>
+                <span style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: '#0056D2', fontWeight: 700, letterSpacing: '0.05em' }}>Free Preview</span>
+                <h3 style={{ margin: '0.25rem 0 0', color: '#fff', fontSize: '1.1rem' }}>{previewLesson.title}</h3>
+              </div>
+              <button
+                onClick={() => setPreviewLesson(null)}
+                style={{ background: 'rgba(255,255,255,0.1)', border: 'none', color: '#fff', borderRadius: '50%', width: '36px', height: '36px', cursor: 'pointer', fontSize: '1.2rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              >✕</button>
+            </div>
+            <div style={{ position: 'relative', paddingTop: '56.25%', background: '#000' }}>
+              {ytId ? (
+                <iframe
+                  src={`https://www.youtube.com/embed/${ytId}?autoplay=1`}
+                  title={previewLesson.title}
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                  style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 'none' }}
+                />
+              ) : previewLesson.video_url ? (
+                <video
+                  src={
+                    previewLesson.video_url.startsWith('/media/videos/')
+                    || previewLesson.video_url.startsWith('/instructor/')
+                    || previewLesson.video_url.startsWith('/learner/lessons/')
+                      ? `http://localhost:8000/api/v1/public/lessons/${previewLesson.id}/preview/video`
+                      : `http://localhost:8000/api/v1${previewLesson.video_url}`
+                  }
+                  poster={
+                    previewLesson.thumbnail_url
+                      ? (previewLesson.thumbnail_url.startsWith('/media/') ? `http://localhost:8000${previewLesson.thumbnail_url}` : previewLesson.thumbnail_url)
+                      : undefined
+                  }
+                  controls
+                  autoPlay
+                  style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }}
+                />
+              ) : (
+                <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#666' }}>
+                  No video available for this preview lesson.
+                </div>
+              )}
+            </div>
+            {previewLesson.content && (
+              <div style={{ padding: '1rem 1.25rem', color: '#ccc', fontSize: '0.9rem', maxHeight: '120px', overflowY: 'auto', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+                {previewLesson.content}
+              </div>
+            )}
+            <div style={{ padding: '1rem 1.25rem', borderTop: '1px solid rgba(255,255,255,0.08)', textAlign: 'center' }}>
+              {!authenticated ? (
+                <button className="btn btn-primary" onClick={login}>
+                  Log in to Access Full Course
+                </button>
+              ) : primaryRole === 'learner' && !enrolled ? (
+                <button className="btn btn-primary" onClick={() => { setPreviewLesson(null); handleEnroll(); }}>
+                  Enroll Now to Access All Lessons
+                </button>
+              ) : primaryRole === 'learner' && enrollmentStatus === 'pending' ? (
+                <button className="btn btn-secondary" disabled>
+                  Enrollment Pending
+                </button>
+              ) : null}
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="container">
         <div className="course-detail-layout animate-fade-in">
           {/* ── Main Content ──────────────────────────────────────── */}
           <div className="course-detail-main">
-            {/* Hero Banner */}
+            {/* Header */}
             <div className="course-detail-header">
-              <span className="badge header-badge">{course.category}</span>
+              <span className="badge badge-primary">{course.category}</span>
               <h1 className="course-detail-title">{course.title}</h1>
-              <p className="course-detail-desc">{course.description}</p>
-              
               <div className="course-detail-meta">
                 <div className="course-meta-item">
                   <StarRating rating={course.avg_rating || 0} />
-                  <span className="meta-rating-value">{(course.avg_rating || 0).toFixed(1)}</span>
-                  <span>({reviews.length} reviews)</span>
+                  <span>{(course.avg_rating || 0).toFixed(1)} ({reviews.length} reviews)</span>
                 </div>
                 <span className="meta-divider">•</span>
-                <span>{course.instructor?.name || 'Instructor'}</span>
+                <span>{totalLessons} lessons</span>
+                <span className="meta-divider">•</span>
+                <span>{totalDuration} min total</span>
               </div>
+              <p className="course-detail-desc">{course.description}</p>
             </div>
 
-            {/* Details Strip */}
-            <div className="details-strip" style={{ display: 'flex', flexWrap: 'wrap', gap: '2.5rem', padding: '1.5rem 2.5rem', borderRadius: '12px', marginBottom: '2rem', background: '#fff', border: '1px solid var(--border)', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                <span style={{ fontSize: '1.5rem', opacity: 0.8 }}>⏱️</span>
-                <div>
-                  <div style={{ fontWeight: '700', color: 'var(--text-h)', fontSize: '1.05rem' }}>{totalDuration} min</div>
-                  <div style={{ fontSize: '0.85rem', color: 'var(--text)' }}>Total duration</div>
-                </div>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                <span style={{ fontSize: '1.5rem', opacity: 0.8 }}>📚</span>
-                <div>
-                  <div style={{ fontWeight: '700', color: 'var(--text-h)', fontSize: '1.05rem' }}>{totalLessons} lessons</div>
-                  <div style={{ fontSize: '0.85rem', color: 'var(--text)' }}>Course content</div>
-                </div>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                <span style={{ fontSize: '1.5rem', opacity: 0.8 }}>📂</span>
-                <div>
-                  <div style={{ fontWeight: '700', color: 'var(--text-h)', fontSize: '1.05rem' }}>{sections.length} sections</div>
-                  <div style={{ fontSize: '0.85rem', color: 'var(--text)' }}>Modules</div>
-                </div>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                <span style={{ fontSize: '1.5rem', opacity: 0.8 }}>🌐</span>
-                <div>
-                  <div style={{ fontWeight: '700', color: 'var(--text-h)', fontSize: '1.05rem' }}>{course.language || 'English'}</div>
-                  <div style={{ fontSize: '0.85rem', color: 'var(--text)' }}>Language</div>
-                </div>
-              </div>
-            </div>
-
-            <CourseSkills sections={sections} course={course} />
-
-            <div className="course-curriculum" style={{ padding: '2.5rem', borderRadius: '12px', marginBottom: '2rem', background: '#fff', border: '1px solid var(--border)' }}>
-              <h2 style={{ fontSize: '1.5rem', marginBottom: '1.5rem', fontWeight: 'bold', color: 'var(--text-h)' }}>Curriculum</h2>
-              {!isEnrolledAndApproved && (
-                <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)', marginBottom: '1rem' }}>
-                   Preview lessons are free. All other lessons require enrollment.
-                </p>
-              )}
+            {/* Curriculum */}
+            <div className="course-curriculum">
+              <h2>Curriculum</h2>
               {sections.length === 0 ? (
-                <p style={{ color: 'var(--text-muted)' }}>No content yet.</p>
+                <p style={{ color: 'var(--color-text-muted)' }}>No content yet.</p>
               ) : (
-                <div className="curriculum-list" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                  {sections.map((section) => {
-                    const sectionDuration = section.lessons?.reduce((a, l) => a + (l.duration || 0), 0) || 0;
-                    return (
-                    <div key={section.id} className="curriculum-section" style={{ border: '1px solid var(--border)', borderRadius: '8px', overflow: 'hidden', background: '#FAFBFC' }}>
+                <div className="curriculum-list">
+                  {sections.map((section) => (
+                    <div key={section.id} className="curriculum-section card-glass">
                       <div
                         className="section-header-row"
                         onClick={() => toggleSection(section.id)}
-                        style={{ padding: '1.25rem 1.5rem', background: '#fff', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', transition: 'background 0.2s', borderBottom: expandedSections[section.id] ? '1px solid var(--border)' : 'none' }}
-                        onMouseEnter={(e) => e.currentTarget.style.background = '#F7F9FA'}
-                        onMouseLeave={(e) => e.currentTarget.style.background = '#fff'}
                       >
-                        <div className="section-title-row" style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                          <span className="section-toggle" style={{ transition: 'transform 0.2s', transform: expandedSections[section.id] ? 'rotate(90deg)' : 'rotate(0deg)', color: 'var(--text)', fontWeight: 'bold' }}>
-                            ▸
+                        <div className="section-title-row">
+                          <span className="section-toggle">
+                            {expandedSections[section.id] ? '▾' : '▸'}
                           </span>
-                          <h4 style={{ margin: 0, fontSize: '1.15rem', fontWeight: '600', color: 'var(--text-h)' }}>{section.title}</h4>
+                          <h4>{section.title}</h4>
                         </div>
-                        <span className="section-lesson-count" style={{ fontSize: '0.95rem', color: 'var(--text)' }}>
-                          {section.lessons?.length || 0} lessons • {sectionDuration} min
+                        <span className="section-lesson-count">
+                          {section.lessons?.length || 0} lessons
                         </span>
                       </div>
-
                       {expandedSections[section.id] && (
                         <div className="section-lessons">
-                          {section.lessons?.map((lesson) => {
-                            const canAccess = lesson.is_preview || isEnrolledAndApproved;
-                            return (
-                              <div key={lesson.id}>
-                                <div
-                                  className={`lesson-row ${canAccess ? 'lesson-accessible' : 'lesson-locked'}`}
-                                  onClick={() => handleLessonClick(lesson)}
-                                  style={{ cursor: canAccess ? 'pointer' : 'default' }}
+                          {section.lessons?.map((lesson) => (
+                            <div key={lesson.id} className="lesson-row" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                              <span className="lesson-icon" style={{ color: lesson.is_preview ? 'var(--color-primary)' : 'var(--color-text-muted)' }}>
+                                {lesson.is_preview ? '▶' : '—'}
+                              </span>
+                              <span className="lesson-title" style={{ flex: 1 }}>{lesson.title}</span>
+                              {lesson.is_preview && (
+                                <button
+                                  onClick={() => setPreviewLesson(lesson)}
+                                  style={{
+                                    background: 'linear-gradient(135deg, #0056D2, #0099ff)',
+                                    color: '#fff',
+                                    border: 'none',
+                                    borderRadius: '20px',
+                                    padding: '0.2rem 0.75rem',
+                                    fontSize: '0.75rem',
+                                    fontWeight: 600,
+                                    cursor: 'pointer',
+                                    letterSpacing: '0.03em',
+                                    whiteSpace: 'nowrap',
+                                  }}
                                 >
-                                  <span className="lesson-icon">
-                                    {lesson.is_preview ? '▶' : isEnrolledAndApproved ? '' : ''}
-                                  </span>
-                                  <span className="lesson-title">{lesson.title}</span>
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginLeft: 'auto' }}>
-                                    {lesson.is_preview && (
-                                      <span style={{
-                                        fontSize: '0.7rem', fontWeight: 'bold', padding: '2px 8px',
-                                        background: '#22c55e', color: '#fff',
-                                        borderRadius: '999px', textTransform: 'uppercase', letterSpacing: '0.05em'
-                                      }}>
-                                        Free Preview
-                                      </span>
-                                    )}
-                                    {lesson.duration > 0 && (
-                                      <span className="lesson-duration">{lesson.duration} min</span>
-                                    )}
-                                  </div>
-                                </div>
-
-                                {/* Inline preview panel — visible only when this preview lesson is active */}
-                                {previewLesson?.id === lesson.id && lesson.is_preview && (
-                                  <div style={{
-                                    background: 'rgba(0,0,0,0.04)', borderRadius: '8px',
-                                    margin: '0.5rem 1rem 1rem', padding: '1rem',
-                                    borderLeft: '3px solid var(--color-primary)'
-                                  }}>
-                                    <div style={{ fontWeight: '600', marginBottom: '0.75rem' }}>
-                                      ▶ Preview: {lesson.title}
-                                    </div>
-                                    {lesson.video_url ? (() => {
-                                      const ytMatch = lesson.video_url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([A-Za-z0-9_-]{11})/);
-                                      if (ytMatch) {
-                                        return (
-                                          <div style={{ position: 'relative', paddingTop: '56.25%', borderRadius: '6px', overflow: 'hidden' }}>
-                                            <iframe
-                                              src={`https://www.youtube.com/embed/${ytMatch[1]}`}
-                                              title={lesson.title}
-                                              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                                              allowFullScreen
-                                              style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 'none' }}
-                                            />
-                                          </div>
-                                        );
-                                      }
-                                      return (
-                                        <video
-                                          controls
-                                          style={{ width: '100%', borderRadius: '6px', maxHeight: '360px' }}
-                                          src={`http://localhost:8000/api/v1/public/lessons/${lesson.id}/preview/video`}
-                                        />
-                                      );
-                                    })() : lesson.content ? (
-                                      <p style={{ whiteSpace: 'pre-wrap', fontSize: 'var(--text-sm)', margin: 0 }}>{lesson.content}</p>
-                                    ) : (
-                                      <p style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)', margin: 0 }}>
-                                        No preview content available for this lesson.
-                                      </p>
-                                    )}
-                                  </div>
-                                )}
-                              </div>
-                            );
-                          })}
-
-                          {/* Enroll-to-unlock prompt at bottom of each locked section */}
-                          {!isEnrolledAndApproved && section.lessons?.some(l => !l.is_preview) && (
-                            <div style={{
-                              padding: '0.75rem 1rem',
-                              background: 'rgba(0,86,210,0.07)',
-                              borderRadius: '6px',
-                              margin: '0.25rem 0',
-                              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                              fontSize: 'var(--text-sm)'
-                            }}>
-                              <span> {section.lessons.filter(l => !l.is_preview).length} lesson{section.lessons.filter(l => !l.is_preview).length !== 1 ? 's' : ''} locked</span>
-                              <button
-                                className="btn btn-primary"
-                                style={{ padding: '4px 14px', fontSize: '0.8rem' }}
-                                onClick={() => document.getElementById('enroll-cta')?.scrollIntoView({ behavior: 'smooth' })}
-                              >
-                                Enroll to unlock
-                              </button>
+                                  ▶ Preview
+                                </button>
+                              )}
+                              {lesson.duration > 0 && (
+                                <span className="lesson-duration">{lesson.duration} min</span>
+                              )}
                             </div>
-                          )}
+                          ))}
                         </div>
                       )}
                     </div>
-                    );
-                  })}
+                  ))}
                 </div>
               )}
             </div>
-            
-            <TranscriptSearch 
-              courseId={courseId} 
-              onJumpToLesson={handleJumpToLesson} 
-              sections={sections} 
-            />
 
             {/* Reviews */}
             <div className="course-reviews">
@@ -418,38 +302,22 @@ export default function CourseDetail() {
 
           {/* ── Sidebar ───────────────────────────────────────────── */}
           <aside className="course-detail-sidebar">
-            <div className="sidebar-card" id="enroll-cta" style={{ position: 'sticky', top: '2rem', border: '1px solid var(--border)', boxShadow: 'var(--shadow)', padding: '1.5rem', borderRadius: '16px', background: '#fff' }}>
+            <div className="sidebar-card card">
               {course.thumbnail_url ? (
-                <img src={course.thumbnail_url} alt={course.title} className="sidebar-thumb" style={{ width: '100%', borderRadius: '8px', marginBottom: '1.5rem', objectFit: 'cover' }} />
+                <img src={course.thumbnail_url.startsWith('/media/') ? `http://localhost:8000${course.thumbnail_url}` : course.thumbnail_url} alt={course.title} className="sidebar-thumb" />
               ) : (
-                <div className="sidebar-thumb-placeholder"></div>
+                <div className="sidebar-thumb-placeholder">📚</div>
               )}
 
-              <div className="sidebar-price" style={{ fontSize: '2rem', fontWeight: '800', color: 'var(--text-h)', marginBottom: '1.5rem' }}>
+              <div className="sidebar-price">
                 {course.price > 0 ? `₹${course.price.toFixed(2)}` : 'Free'}
-              </div>
-
-              <div style={{ marginBottom: '1.5rem' }}>
-                <button
-                  className="btn btn-outline"
-                  style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '0.75rem', fontWeight: '600', borderColor: 'var(--border)' }}
-                  onClick={handleWishlistToggle}
-                  disabled={togglingWishlist}
-                  onMouseEnter={(e) => !togglingWishlist && (e.currentTarget.style.background = 'var(--bg)')}
-                  onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
-                >
-                  <span style={{ color: isWishlisted ? '#e53e3e' : 'inherit', display: 'flex' }}>
-                    <Heart size={16} fill={isWishlisted ? '#e53e3e' : 'transparent'} stroke={isWishlisted ? '#e53e3e' : 'currentColor'} />
-                  </span>
-                  {isWishlisted ? 'Wishlisted' : 'Add to Wishlist'}
-                </button>
               </div>
 
               {/* Visitor: not logged in */}
               {!authenticated && (
                 <button
                   className="btn btn-primary"
-                  style={{ width: '100%', padding: '0.85rem', fontSize: '1.05rem', fontWeight: 'bold' }}
+                  style={{ width: '100%' }}
                   onClick={login}
                   id="enroll-login-button"
                 >
@@ -459,26 +327,24 @@ export default function CourseDetail() {
 
               {/* Authenticated learner */}
               {authenticated && primaryRole === 'learner' && (
-                checkingEnrollment ? (
-                  <button className="btn btn-secondary" style={{ width: '100%' }} disabled>
-                    Loading...
-                  </button>
-                ) : isEnrolledAndApproved ? (
-                  <button
-                    className="btn btn-success"
-                    style={{ width: '100%', padding: '0.85rem', fontSize: '1.05rem', fontWeight: 'bold' }}
-                    onClick={() => navigate(`/learner/course/${course?.id || courseId}/learn`)}
-                  >
-                    ✓ Enrolled — Start Learning
-                  </button>
-                ) : enrollmentStatus === 'pending' ? (
-                  <div style={{ textAlign: 'center', padding: '0.75rem', background: 'rgba(255,150,0,0.1)', borderRadius: '8px', fontSize: 'var(--text-sm)' }}>
-                    Enrollment pending approval
-                  </div>
+                enrolled ? (
+                  enrollmentStatus === 'pending' ? (
+                    <button className="btn btn-secondary" style={{ width: '100%' }} disabled>
+                      Enrollment Pending
+                    </button>
+                  ) : (
+                    <button
+                      className="btn btn-success"
+                      style={{ width: '100%' }}
+                      onClick={() => navigate('/learner')}
+                    >
+                      ✓ Enrolled — Go to Dashboard
+                    </button>
+                  )
                 ) : (
                   <button
                     className="btn btn-primary"
-                    style={{ width: '100%', padding: '0.85rem', fontSize: '1.05rem', fontWeight: 'bold' }}
+                    style={{ width: '100%' }}
                     onClick={handleEnroll}
                     disabled={enrolling}
                     id="enroll-button"
@@ -490,13 +356,13 @@ export default function CourseDetail() {
 
               <div className="sidebar-stats">
                 <div className="sidebar-stat">
-                  <span></span> {totalLessons} Lessons
+                  <span>📚</span> {totalLessons} Lessons
                 </div>
                 <div className="sidebar-stat">
-                  <span></span> {totalDuration} Minutes
+                  <span>⏱️</span> {totalDuration} Minutes
                 </div>
                 <div className="sidebar-stat">
-                  <span></span> {sections.length} Sections
+                  <span>📂</span> {sections.length} Sections
                 </div>
                 <div className="sidebar-stat">
                   <span>⭐</span> {(course.avg_rating || 0).toFixed(1)} Rating

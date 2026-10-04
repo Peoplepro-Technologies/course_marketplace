@@ -1,0 +1,320 @@
+"""
+routers/public.py — Public endpoints (no auth required).
+
+These endpoints are accessible to anyone and include:
+  - Course catalog with search/filter/pagination
+  - Single course detail
+  - Category listing
+
+The catalog endpoint uses Redis caching with a 5-minute TTL.
+"""
+
+from fastapi import APIRouter, Depends, Query, HTTPException, status
+from sqlalchemy.orm import Session, joinedload
+from sqlalchemy import func, or_
+from typing import Optional
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+
+from app.database import get_db
+from app.models.course import Course
+from app.models.section import Section
+from app.models.lesson import Lesson
+from app.models.review import Review
+from app.models.user import User
+from app.models.category import Category
+from app.models.enrollment import Enrollment
+from app.models.live_class import LiveClass
+from app.models.quiz import QuizQuestion
+from app.models.assignment import Assignment
+from app.schemas.course import CourseRead, CourseListRead
+from app.schemas.section import SectionRead
+from app.schemas.lesson import LessonRead
+from app.schemas.review import ReviewRead
+from app.schemas.live_class import JoinInfoRead
+from app.redis_client import get_cache, set_cache
+from app.auth.keycloak import get_current_user
+from app.auth.roles import require_role
+from app.auth.access import ensure_live_class_access
+
+router = APIRouter(prefix="/api/v1/public", tags=["Public"])
+
+
+@router.get("/courses", response_model=CourseListRead)
+def list_courses(
+    search: Optional[str] = Query(None, description="Search by title or description"),
+    category: Optional[str] = Query(None, description="Filter by category"),
+    page: int = Query(1, ge=1, description="Page number"),
+    page_size: int = Query(12, ge=1, le=50, description="Items per page"),
+    db: Session = Depends(get_db),
+):
+    """
+    Browse the public course catalog.
+
+    - Supports text search across title and description.
+    - Supports category filtering.
+    - Results are paginated (default 12 per page).
+    - Cached in Redis for 5 minutes.
+    """
+    # ── Check Redis cache ─────────────────────────────────────────────
+    cache_key = f"courses:list:{search}:{category}:{page}:{page_size}"
+    cached = get_cache(cache_key)
+    if cached:
+        return cached
+
+    # ── Build query ───────────────────────────────────────────────────
+    query = db.query(Course).options(
+        joinedload(Course.instructor)
+    ).filter(Course.status == "published")
+
+    if search:
+        search_term = f"%{search}%"
+        query = query.filter(
+            or_(
+                Course.title.ilike(search_term),
+                Course.description.ilike(search_term),
+            )
+        )
+
+    if category:
+        query = query.filter(Course.category == category)
+
+    # ── Get total count and paginated results ─────────────────────────
+    total = query.count()
+    courses = (
+        query.order_by(Course.created_at.desc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+        .all()
+    )
+
+    result = CourseListRead(
+        courses=[CourseRead.model_validate(c) for c in courses],
+        total=total,
+        page=page,
+        page_size=page_size,
+    )
+
+    # ── Cache the result ──────────────────────────────────────────────
+    set_cache(cache_key, result.model_dump(mode="json"), ttl=300)
+
+    return result
+
+
+@router.get("/courses/{course_id}")
+def get_course_detail(course_id: str, db: Session = Depends(get_db)):
+    """
+    Get full details for a single course, including:
+      - Course info with instructor details
+      - Sections and lessons (curriculum)
+      - Reviews with learner names
+    """
+    course = (
+        db.query(Course)
+        .options(
+            joinedload(Course.instructor),
+            joinedload(Course.sections)
+            .joinedload(Section.lessons)
+            .joinedload(Lesson.quiz_questions),
+            joinedload(Course.sections)
+            .joinedload(Section.lessons)
+            .joinedload(Lesson.assignments),
+        )
+        .filter(Course.id == course_id, Course.status == "published")
+        .first()
+    )
+
+    if not course:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="Course not found")
+
+    # Build reviews with learner names
+    reviews = (
+        db.query(Review, User.name)
+        .join(User, Review.learner_id == User.id)
+        .filter(Review.course_id == course_id, Review.status == "active")
+        .order_by(Review.created_at.desc())
+        .all()
+    )
+
+    review_list = []
+    for review, learner_name in reviews:
+        review_data = ReviewRead.model_validate(review)
+        review_data.learner_name = learner_name
+        review_list.append(review_data)
+
+    # Build sections with lessons — include is_preview in each lesson
+    sections_data = []
+    for section in sorted(course.sections, key=lambda s: s.order_index):
+        section_dict = {
+            "id": str(section.id),
+            "title": section.title,
+            "order_index": section.order_index,
+            "lessons": [
+                {
+                    "id": str(l.id),
+                    "title": l.title,
+                    "order_index": l.order_index,
+                    "duration": l.duration,
+                    "is_preview": l.is_preview,
+                    # Only expose video_url for preview lessons.
+                    # Remap local video paths to the public preview endpoint (no auth required).
+                    "video_url": (
+                        f"/public/lessons/{str(l.id)}/preview/video"
+                        if l.is_preview and l.video_url and not l.video_url.startswith('http')
+                        else (l.video_url if l.is_preview else None)
+                    ),
+                    "content": l.content if l.is_preview else None,
+                    "thumbnail_url": l.thumbnail_url,
+                    "quiz_questions": [
+                        {
+                            "id": str(q.id),
+                            "lesson_id": str(q.lesson_id),
+                            "question_text": q.question_text,
+                            "options": q.options,
+                            "correct_option_index": q.correct_option_index,
+                            "explanation": q.explanation,
+                        }
+                        for q in l.quiz_questions
+                    ],
+                    "assignments": [
+                        {
+                            "id": str(a.id),
+                            "lesson_id": str(a.lesson_id),
+                            "title": a.title,
+                            "instructions": a.instructions,
+                        }
+                        for a in l.assignments
+                    ],
+                }
+                for l in sorted(section.lessons, key=lambda x: x.order_index)
+            ],
+        }
+        sections_data.append(section_dict)
+
+    return {
+        "course": CourseRead.model_validate(course),
+        "sections": sections_data,
+        "reviews": review_list,
+    }
+
+
+@router.get("/lessons/{lesson_id}/preview")
+def get_lesson_preview(
+    lesson_id: str,
+    db: Session = Depends(get_db),
+):
+    """
+    Returns content/video_url for a preview-flagged lesson.
+    No authentication required — this is the free preview endpoint.
+    Returns 403 if the lesson is NOT marked as is_preview.
+    """
+    lesson = db.query(Lesson).filter(Lesson.id == lesson_id).first()
+    if not lesson:
+        raise HTTPException(status_code=404, detail="Lesson not found")
+
+    if not lesson.is_preview:
+        raise HTTPException(
+            status_code=403,
+            detail="This lesson is not available as a free preview. Please enroll to access."
+        )
+
+    return {
+        "id": str(lesson.id),
+        "title": lesson.title,
+        "is_preview": lesson.is_preview,
+        "content": lesson.content,
+        "video_url": lesson.video_url,
+        "duration": lesson.duration,
+    }
+
+
+@router.get("/categories")
+def list_categories(db: Session = Depends(get_db)):
+    """Return a list of all distinct course categories from the categories table."""
+    categories = db.query(Category.name).order_by(Category.name.asc()).all()
+    return [c[0] for c in categories if c[0]]
+
+
+@router.get("/categories-with-count")
+def list_categories_with_count(db: Session = Depends(get_db)):
+    """Return categories with published course counts."""
+    categories = db.query(Category).order_by(Category.name.asc()).all()
+    result = []
+    for cat in categories:
+        count = db.query(func.count(Course.id)).filter(
+            Course.category == cat.name,
+            Course.status == "published"
+        ).scalar()
+        result.append({"name": cat.name, "course_count": count or 0})
+    return result
+
+
+@router.get("/lessons/{lesson_id}/preview/video")
+def get_lesson_preview_video(
+    lesson_id: str,
+    db: Session = Depends(get_db),
+):
+    """
+    Serve the video file for a preview-flagged lesson.
+    No authentication required — enforced by the is_preview check.
+    Returns 403 if the lesson is NOT marked as is_preview.
+    """
+    import os
+    from fastapi.responses import FileResponse
+
+    lesson = db.query(Lesson).filter(Lesson.id == lesson_id).first()
+    if not lesson:
+        raise HTTPException(status_code=404, detail="Lesson not found")
+
+    if not lesson.is_preview:
+        raise HTTPException(
+            status_code=403,
+            detail="This lesson video is not available as a free preview. Please enroll to access."
+        )
+
+    _HERE = os.path.dirname(os.path.abspath(__file__))
+    _MEDIA_ROOT = os.path.normpath(os.path.join(_HERE, "..", "media"))
+    _VIDEOS_DIR = os.path.join(_MEDIA_ROOT, "videos")
+    video_path = os.path.join(_VIDEOS_DIR, f"{lesson_id}.mp4")
+
+    if not os.path.exists(video_path):
+        raise HTTPException(status_code=404, detail="Video file not found on server.")
+
+    return FileResponse(video_path, media_type="video/mp4")
+
+# ═══════════════════════════════════════════════════════════════════════
+#  LIVE CLASS JOIN INFO (shared, authenticated)
+# ═══════════════════════════════════════════════════════════════════════
+
+@router.get("/live-classes/{live_class_id}/join-info", response_model=JoinInfoRead)
+def get_live_class_join_info(
+    live_class_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Returns the Jitsi room_name and metadata needed to join a live class.
+
+    Access control:
+      - The instructor who owns the live class may always access it.
+      - A learner with an 'approved' enrollment in the course may access it.
+      - Everyone else (pending/rejected enrollment, unauthenticated) gets 403.
+    """
+    live_class = db.query(LiveClass).filter(
+        LiveClass.id == live_class_id
+    ).first()
+    if not live_class:
+        raise HTTPException(status_code=404, detail="Live class not found")
+
+    ensure_live_class_access(current_user, live_class, db)
+
+    return JoinInfoRead(
+        id=live_class.id,
+        room_name=live_class.room_name,
+        title=live_class.title,
+        scheduled_at=live_class.scheduled_at,
+        duration_minutes=live_class.duration_minutes,
+        status=live_class.status,
+        recording_status=live_class.recording_status or "none",
+        recording_url=live_class.recording_url,
+    )

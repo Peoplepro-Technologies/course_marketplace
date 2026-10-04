@@ -1,0 +1,28 @@
+# Discard node_modules and builds
+node_modules/
+dist/
+
+# Discard python cache
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Discard virtual envs
+venv/
+.venv/
+env/
+
+# Discard env files
+.env
+.env.local
+
+# OS files
+.DS_Store
+Thumbs.db
+
+
+keycloak-25.0.1/
+backend/app/media/
+backend/media/
+backend/app.db
+keycloak-24.0.4/

@@ -1,0 +1,234 @@
+/* ═══════════════════════════════════════════════════════════════════════
+   EarningsChart.css — Styles for instructor earnings page
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* ── Stat Cards ─────────────────────────────────────────────────────── */
+.ec-stat-card {
+  position: relative;
+  overflow: hidden;
+}
+
+.ec-stat-label {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 0.5rem;
+}
+
+.ec-stat-value {
+  font-family: var(--font-heading);
+  font-size: var(--text-3xl);
+  font-weight: 800;
+  margin-bottom: 0.25rem;
+  color: var(--color-text-primary);
+}
+
+.ec-stat-sub {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+
+/* ── Skeleton Loader ────────────────────────────────────────────────── */
+@keyframes ec-shimmer {
+  0%   { background-position: -400px 0; }
+  100% { background-position: 400px 0; }
+}
+
+.ec-skeleton .ec-skel-label,
+.ec-skeleton .ec-skel-value,
+.ec-skeleton .ec-skel-sub {
+  border-radius: 6px;
+  background: linear-gradient(
+    90deg,
+    var(--color-bg-tertiary) 25%,
+    rgba(255,255,255,0.08) 50%,
+    var(--color-bg-tertiary) 75%
+  );
+  background-size: 800px 100%;
+  animation: ec-shimmer 1.4s infinite linear;
+}
+
+.ec-skeleton .ec-skel-label {
+  height: 12px;
+  width: 60%;
+  margin-bottom: 0.75rem;
+}
+
+.ec-skeleton .ec-skel-value {
+  height: 36px;
+  width: 45%;
+  margin-bottom: 0.5rem;
+}
+
+.ec-skeleton .ec-skel-sub {
+  height: 10px;
+  width: 75%;
+}
+
+/* ── Error Banner ───────────────────────────────────────────────────── */
+.ec-error-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: rgba(220, 38, 38, 0.08);
+  border: 1px solid rgba(220, 38, 38, 0.3);
+  border-radius: var(--radius-md);
+  padding: 0.875rem 1.25rem;
+  margin-bottom: 1.5rem;
+  font-size: var(--text-sm);
+  color: #b91c1c;
+  font-weight: 500;
+}
+
+/* ── Chart Card ─────────────────────────────────────────────────────── */
+.ec-chart-card {
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: 1.5rem;
+}
+
+.ec-chart-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.5rem;
+}
+
+.ec-chart-header h3 {
+  font-size: var(--text-lg);
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+
+/* ── Live Data Badge ────────────────────────────────────────────────── */
+.ec-data-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.2rem 0.75rem;
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  border-radius: var(--radius-full);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  color: #059669;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.ec-data-badge::before {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #10b981;
+  animation: ec-pulse 2s infinite;
+}
+
+@keyframes ec-pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.3; }
+}
+
+/* ── Chart Wrapper + Overlay ────────────────────────────────────────── */
+.ec-chart-wrap {
+  position: relative;
+}
+
+.ec-chart-dimmed {
+  opacity: 0.35;
+  pointer-events: none;
+  user-select: none;
+}
+
+.ec-chart-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  text-align: center;
+  pointer-events: none;
+}
+
+.ec-overlay-icon {
+  font-size: 2.5rem;
+  margin-bottom: 0.25rem;
+}
+
+.ec-chart-overlay h4 {
+  font-size: var(--text-base);
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+
+.ec-chart-overlay p {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  max-width: 280px;
+  line-height: 1.5;
+}
+
+/* ── Tooltip ────────────────────────────────────────────────────────── */
+.ec-tooltip {
+  background: var(--color-bg-primary, #fff);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 0.5rem 0.875rem;
+  font-size: var(--text-sm);
+  color: var(--color-text-primary);
+  box-shadow: var(--shadow-md);
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.ec-tooltip strong {
+  font-weight: 700;
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.ec-tooltip span {
+  font-weight: 800;
+  font-size: var(--text-base);
+  color: #0056D2;
+}
+
+/* ── Footnote ───────────────────────────────────────────────────────── */
+.ec-footnote {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  margin-top: 1rem;
+  border-top: 1px solid var(--color-border);
+  padding-top: 0.75rem;
+}
+
+.ec-footnote code {
+  font-family: monospace;
+  background: var(--color-bg-tertiary);
+  padding: 0.1rem 0.35rem;
+  border-radius: 3px;
+  font-size: 0.75rem;
+}
+
+/* ── Responsive ─────────────────────────────────────────────────────── */
+@media (max-width: 640px) {
+  .ec-stats {
+    grid-template-columns: 1fr;
+  }
+
+  .ec-chart-card {
+    padding: 1rem;
+  }
+}

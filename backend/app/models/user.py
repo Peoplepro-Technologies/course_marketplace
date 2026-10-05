@@ -7,7 +7,7 @@ Each row corresponds to a Keycloak user, linked via `keycloak_sub` (the
 
 import uuid
 from datetime import datetime, timezone
-from sqlalchemy import Column, String, Text, DateTime, Boolean, Float
+from sqlalchemy import Column, String, Text, DateTime, Boolean, Float, ForeignKey
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
@@ -31,6 +31,8 @@ class User(Base):
     # Group 5: faculty flag. False = Faculty mode (no live classes). Default True.
     can_host_live_classes = Column(Boolean, default=True, nullable=False)
     can_upload_video = Column(Boolean, default=True, nullable=False)
+    # Department assignment (Part 1 — DB-driven department routing)
+    department_id = Column(UUID(as_uuid=True), ForeignKey("departments.id", ondelete="SET NULL"), nullable=True)
     created_at = Column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),
@@ -38,6 +40,7 @@ class User(Base):
     )
 
     # ── Relationships ─────────────────────────────────────────────────
+    department = relationship("Department", back_populates="users", foreign_keys=[department_id])
     courses = relationship("Course", back_populates="instructor", foreign_keys="Course.instructor_id", lazy="dynamic")
     enrollments = relationship(
         "Enrollment",

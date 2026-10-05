@@ -1,8 +1,8 @@
 /**
  * SAUserManagement.jsx — User Management for Super Admin.
  *
- * Lists all users with role, email, join date.
- * Allows changing user roles and deactivating/reactivating users.
+ * Lists all users with role, email, join date, department assignment.
+ * Allows changing user roles, deactivating/reactivating, and assigning departments.
  */
 
 import { useState, useEffect, useCallback } from 'react';
@@ -17,6 +17,13 @@ export default function SAUserManagement() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [actionLoading, setActionLoading] = useState(null);
+  const [departments, setDepartments] = useState([]);
+  const [showDeptModal, setShowDeptModal] = useState(null); // user object
+  const [selectedDeptId, setSelectedDeptId] = useState('');
+
+  useEffect(() => {
+    api.get('/superadmin/departments').then(res => setDepartments(res.data)).catch(() => {});
+  }, []);
 
   const fetchUsers = useCallback(() => {
     setLoading(true);
@@ -32,7 +39,7 @@ export default function SAUserManagement() {
   useEffect(() => { fetchUsers(); }, [fetchUsers]);
 
   const handleRoleChange = async (userId, newRole) => {
-    if (!window.confirm(`Change this user's role to "₹{newRole}"?`)) return;
+    if (!window.confirm(`Change this user's role to "${newRole}"?`)) return;
     setActionLoading(userId);
     try {
       await api.put(`/superadmin/users/${userId}/role`, { role: newRole });
@@ -70,11 +77,32 @@ export default function SAUserManagement() {
     }
   };
 
+  const openDeptModal = (user) => {
+    setShowDeptModal(user);
+    setSelectedDeptId(user.department_id || '');
+  };
+
+  const handleDeptAssign = async () => {
+    if (!showDeptModal) return;
+    setActionLoading(showDeptModal.id);
+    try {
+      await api.put(`/superadmin/users/${showDeptModal.id}/department`, {
+        department_id: selectedDeptId || null,
+      });
+      setShowDeptModal(null);
+      fetchUsers();
+    } catch (err) {
+      alert(err.response?.data?.detail || 'Failed to assign department');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
   return (
     <SASidebarLayout>
       <div className="sa-page-header">
-        <h2>👥 User Management</h2>
-        <p>View, search, and manage all platform users.</p>
+        <h2>User Management</h2>
+        <p>View, search, manage users and assign departments for ticket routing.</p>
       </div>
 
       <div className="sa-filter-bar">
@@ -100,6 +128,7 @@ export default function SAUserManagement() {
                   <th>Name</th>
                   <th>Email</th>
                   <th>Role</th>
+                  <th>Department</th>
                   <th>Joined</th>
                   <th style={{ textAlign: 'right' }}>Actions</th>
                 </tr>
@@ -130,6 +159,20 @@ export default function SAUserManagement() {
                           ))}
                         </select>
                       )}
+                    </td>
+                    <td>
+                      <button
+                        className="btn btn-secondary btn-sm"
+                        style={{ fontSize: '0.75rem', padding: '3px 8px' }}
+                        onClick={() => openDeptModal(u)}
+                        disabled={actionLoading === u.id}
+                      >
+                        {u.department_name ? (
+                          <span style={{ color: '#818cf8' }}>{u.department_name}</span>
+                        ) : (
+                          <span style={{ color: 'var(--color-text-muted)' }}>Assign dept</span>
+                        )}
+                      </button>
                     </td>
                     <td style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>
                       {new Date(u.created_at).toLocaleDateString()}
@@ -167,6 +210,44 @@ export default function SAUserManagement() {
               onClick={() => setData(p => ({ ...p, page: p.page + 1 }))}>Next →</button>
           </div>
         </>
+      )}
+
+      {/* Department Assignment Modal */}
+      {showDeptModal && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
+        }}>
+          <div style={{
+            background: '#ffffff', borderRadius: '16px', padding: '2rem',
+            width: '100%', maxWidth: '420px', boxShadow: '0 25px 50px rgba(0,0,0,0.4)', color: '#1a1a2e',
+          }}>
+            <h3 style={{ margin: '0 0 0.5rem' }}>Assign Department</h3>
+            <p style={{ color: '#666', fontSize: '0.875rem', marginBottom: '1.5rem' }}>
+              <strong>{showDeptModal.name}</strong> ({showDeptModal.email})<br />
+              Users assigned to a department get access to the Department Queue.
+            </p>
+
+            <select
+              className="form-control"
+              value={selectedDeptId}
+              onChange={e => setSelectedDeptId(e.target.value)}
+              style={{ marginBottom: '1.25rem', color: '#1a1a2e' }}
+            >
+              <option value="">— No Department (unassign) —</option>
+              {departments.filter(d => d.is_active).map(d => (
+                <option key={d.id} value={d.id}>{d.name}</option>
+              ))}
+            </select>
+
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+              <button className="btn btn-secondary" onClick={() => setShowDeptModal(null)}>Cancel</button>
+              <button className="btn btn-primary" onClick={handleDeptAssign} disabled={actionLoading === showDeptModal.id}>
+                {actionLoading === showDeptModal.id ? 'Saving…' : 'Save Assignment'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </SASidebarLayout>
   );

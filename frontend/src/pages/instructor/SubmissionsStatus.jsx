@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import api from '../../api/axios';
-import { BookOpen, AlertCircle, FileText, CheckCircle, Clock } from 'lucide-react';
 import StatusBadge from '../../components/StatusBadge';
 import EmptyState from '../../components/EmptyState';
 
@@ -23,21 +22,6 @@ export default function SubmissionsStatus() {
     }
   };
 
-  const getStatusIcon = (status) => {
-    switch (status) {
-      case 'published':
-        return <CheckCircle size={16} />;
-      case 'pending_review':
-        return <Clock size={16} />;
-      case 'rejected':
-      case 'flagged':
-      case 'removed':
-        return <AlertCircle size={16} />;
-      default:
-        return <FileText size={16} />;
-    }
-  };
-
   if (loading) {
     return <div className="loading">Loading submissions...</div>;
   }
@@ -45,12 +29,11 @@ export default function SubmissionsStatus() {
   return (
     <div className="submissions-status-page" style={{ padding: '24px' }}>
       <h1 style={{ marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-        <BookOpen size={24} /> Course Submissions & Status
+        Course Submissions & Status
       </h1>
       
       {courses.length === 0 ? (
         <EmptyState 
-          icon={FileText} 
           title="No Courses Yet"
           message="You haven't created any courses yet." 
         />
@@ -76,7 +59,6 @@ export default function SubmissionsStatus() {
                   </div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  {getStatusIcon(course.status)}
                   <StatusBadge status={course.status} />
                 </div>
               </div>
@@ -92,7 +74,6 @@ export default function SubmissionsStatus() {
                   gap: '8px',
                   fontSize: '14px'
                 }}>
-                  <AlertCircle size={16} style={{ marginTop: '2px', flexShrink: 0 }} />
                   <div>
                     <strong>Reason for {course.status}:</strong>
                     <p style={{ margin: '4px 0 0 0' }}>{course.rejection_reason}</p>

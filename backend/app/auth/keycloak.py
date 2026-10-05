@@ -134,6 +134,8 @@ async def get_current_user(
         role = "accounts"
     elif "instructor" in roles:
         role = "instructor"
+    elif "staff" in roles:
+        role = "staff"
     else:
         role = "learner"
 

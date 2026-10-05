@@ -85,7 +85,7 @@ export default function SAAuditLogs() {
       <div className="page-wrapper">
         <div className="section-header">
           <div>
-            <h2>📋 Audit Logs</h2>
+            <h2>Audit Logs</h2>
             <p>Complete record of all critical administrative and system actions.</p>
           </div>
           <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
@@ -93,7 +93,7 @@ export default function SAAuditLogs() {
               {total} total
             </span>
             <button className="btn btn-secondary btn-sm" onClick={fetchLogs}>
-              ↺ Refresh
+              Refresh
             </button>
           </div>
         </div>
@@ -147,7 +147,7 @@ export default function SAAuditLogs() {
                   {filtered.length === 0 ? (
                     <tr>
                       <td colSpan="5" style={{ textAlign: 'center', color: 'var(--color-text-muted)', padding: '2.5rem' }}>
-                        {logs.length === 0 ? '📭 No audit logs found.' : '🔍 No results match your filters.'}
+                        {logs.length === 0 ? 'No audit logs found.' : 'No results match your filters.'}
                       </td>
                     </tr>
                   ) : (

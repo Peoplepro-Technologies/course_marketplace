@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom';
 import api from '../../api/axios';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import EmptyState from '../../components/EmptyState';
-import { BookOpen, HeartOff } from 'lucide-react';
 
 export default function Wishlist() {
   const [wishlist, setWishlist] = useState([]);
@@ -44,7 +43,6 @@ export default function Wishlist() {
       
       {wishlist.length === 0 ? (
         <EmptyState 
-          icon={HeartOff}
           title="Your wishlist is empty"
           message="Save courses you're interested in by clicking the heart icon on the course page."
         />
@@ -56,7 +54,6 @@ export default function Wishlist() {
                 <img src={item.course_thumbnail.startsWith('/media/') ? `http://localhost:8000${item.course_thumbnail}` : item.course_thumbnail} alt={item.course_title} style={{ width: '100%', height: '160px', objectFit: 'cover' }} />
               ) : (
                 <div style={{ width: '100%', height: '160px', background: 'var(--color-bg-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-muted)' }}>
-                  <BookOpen size={48} strokeWidth={1} />
                 </div>
               )}
               
@@ -76,11 +73,9 @@ export default function Wishlist() {
                     <button 
                       className="btn btn-outline flex-center" 
                       onClick={() => removeFromWishlist(item.course_id)}
-                      style={{ padding: '0.5rem', width: '40px' }}
+                      style={{ padding: '0.5rem 0.75rem' }}
                       title="Remove from Wishlist"
-                    >
-                      <HeartOff size={18} />
-                    </button>
+                    >Remove</button>
                   </div>
                 </div>
               </div>

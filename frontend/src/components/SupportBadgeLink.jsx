@@ -3,7 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import api from '../api/axios';
 import useAuth from '../hooks/useAuth';
 
-export default function SupportBadgeLink({ icon, label, path, apiEndpoint }) {
+export default function SupportBadgeLink({ label, path, apiEndpoint }) {
   const location = useLocation();
   const { user } = useAuth();
   const [unreadCount, setUnreadCount] = useState(0);
@@ -26,7 +26,6 @@ export default function SupportBadgeLink({ icon, label, path, apiEndpoint }) {
     <Link to={path} style={{ textDecoration: 'none' }}>
       <li className={`sidebar-nav-item${location.pathname.startsWith(path) ? ' active' : ''}`} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div>
-          <span className="sidebar-nav-icon">{icon}</span>
           {label}
         </div>
         {unreadCount > 0 && (

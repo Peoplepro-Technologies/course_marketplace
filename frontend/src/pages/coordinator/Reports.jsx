@@ -26,14 +26,14 @@ export default function Reports() {
     <div className="page-wrapper container animate-fade-in">
       <div className="section-header flex-between">
         <div>
-          <h2>📈 Course Reports</h2>
+          <h2>Course Reports</h2>
           <p>Aggregated performance metrics for all courses.</p>
         </div>
 
       </div>
 
       {error ? (
-        <div className="alert alert-error">⚠️ {error}</div>
+        <div className="alert alert-error">{error}</div>
       ) : loading ? (
         <LoadingSpinner />
       ) : data.reports.length === 0 ? (
@@ -63,7 +63,7 @@ export default function Reports() {
                     </td>
                     <td>{r.instructor_name}</td>
                     <td>{r.enrollments_count.toLocaleString()}</td>
-                    <td>{r.avg_rating > 0 ? `⭐ ${r.avg_rating.toFixed(1)}` : 'N/A'}</td>
+                    <td>{r.avg_rating > 0 ? `${r.avg_rating.toFixed(1)}` : 'N/A'}</td>
                     <td>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                         <div style={{ flex: 1, background: '#eee', height: '8px', borderRadius: '4px', overflow: 'hidden' }}>

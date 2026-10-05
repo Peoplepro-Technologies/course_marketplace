@@ -16,14 +16,16 @@ All calls use the master-realm admin credentials stored in env vars:
   KEYCLOAK_ADMIN_PASS  (default: admin)
 """
 
-import os
 import requests
 from fastapi import HTTPException
 
-KEYCLOAK_URL   = os.getenv("KEYCLOAK_URL",   "http://localhost:8080")
-KEYCLOAK_REALM = os.getenv("KEYCLOAK_REALM", "course-marketplace")
-ADMIN_USER     = os.getenv("KEYCLOAK_ADMIN_USER", "admin")
-ADMIN_PASS     = os.getenv("KEYCLOAK_ADMIN_PASS", "admin")
+from app.config import get_settings
+
+_s             = get_settings()
+KEYCLOAK_URL   = _s.KEYCLOAK_URL
+KEYCLOAK_REALM = _s.KEYCLOAK_REALM
+ADMIN_USER     = _s.KEYCLOAK_ADMIN_USER
+ADMIN_PASS     = _s.KEYCLOAK_ADMIN_PASS
 
 
 def _get_admin_token() -> str:

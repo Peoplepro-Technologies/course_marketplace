@@ -59,10 +59,10 @@ export default function InstructorDashboard() {
         </div>
         <div className="flex" style={{ gap: '0.75rem' }}>
           <Link to="/instructor/earnings" className="btn btn-secondary">
-            💰 Earnings
+            Earnings
           </Link>
           <Link to="/instructor/reviews" className="btn btn-secondary">
-            📬 Review Inbox
+            Review Inbox
           </Link>
           <Link to="/instructor/course/new" className="btn btn-primary">
             + Create New Course
@@ -137,7 +137,7 @@ export default function InstructorDashboard() {
                         Curriculum
                       </Link>
                       <Link to={`/instructor/course/${course.id}/students`} className="btn btn-secondary btn-sm">
-                        👥 Students
+                        Students
                       </Link>
                       {course.status === 'pending_review' ? (
                         <button className="btn btn-secondary btn-sm" disabled>

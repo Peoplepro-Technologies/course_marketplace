@@ -11,6 +11,7 @@
 
 import { createContext, useState, useEffect, useCallback, useRef } from 'react';
 import keycloak from './keycloak';
+import axios from 'axios';
 
 export const AuthContext = createContext(null);
 
@@ -52,6 +53,18 @@ export default function AuthProvider({ children }) {
           const realmRoles = (tokenData.realm_access?.roles || []).map(r => r.toLowerCase());
           console.log("EXTRACTED ROLES:", realmRoles);
           setRoles(realmRoles);
+
+          // Fetch department info from backend
+          const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
+          axios.get(`${apiBase}/me`, {
+            headers: { Authorization: `Bearer ${keycloak.token}` },
+          }).then(res => {
+            setUser(prev => ({
+              ...prev,
+              department_id: res.data.department_id || null,
+              department_name: res.data.department_name || null,
+            }));
+          }).catch(() => {/* non-critical */});
         }
 
         setLoading(false);
@@ -115,6 +128,8 @@ export default function AuthProvider({ children }) {
     ? 'accounts'
     : roles.includes('instructor')
     ? 'instructor'
+    : roles.includes('staff')
+    ? 'staff'
     : 'learner';
 
   if (loading) {

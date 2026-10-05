@@ -145,7 +145,7 @@ export default function InstructorRoster() {
     <div className="page-wrapper container animate-fade-in">
       <div className="section-header flex-between" style={{ marginBottom: '2rem' }}>
         <div>
-          <h2>👨‍🏫 Instructor Roster</h2>
+          <h2>Instructor Roster</h2>
           <p>Monitor performance, set custom payout rates, and manage live class access.</p>
         </div>
         <div style={{ display: 'flex', gap: '12px' }}>
@@ -165,7 +165,7 @@ export default function InstructorRoster() {
         </div>
       </div>
 
-      {error && <div className="alert alert-error">⚠️ {error}</div>}
+      {error && <div className="alert alert-error">{error}</div>}
 
       {!error && instructors.length === 0 && (
         <div className="empty-state">
@@ -205,9 +205,9 @@ export default function InstructorRoster() {
                   </td>
                   <td style={{ textAlign: 'center' }}>
                     {inst.can_host_live_classes && inst.can_upload_video !== false ? (
-                      <span title="Full Instructor">👨‍🏫 Full</span>
+                      <span title="Full Instructor">Full</span>
                     ) : (
-                      <span title="Faculty (Assignments & Quizzes only)">📝 Faculty</span>
+                      <span title="Faculty (Assignments & Quizzes only)">Faculty</span>
                     )}
                   </td>
                   <td style={{ textAlign: 'center' }}>
@@ -224,7 +224,7 @@ export default function InstructorRoster() {
                     </small>
                   </td>
                   <td style={{ textAlign: 'center' }}>
-                    {inst.avg_rating > 0 ? `⭐ ${inst.avg_rating}` : '—'}
+                    {inst.avg_rating > 0 ? `${inst.avg_rating}` : '—'}
                   </td>
                   <td style={{ textAlign: 'center' }}>
                     <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
@@ -311,11 +311,11 @@ export default function InstructorRoster() {
             width: '100%', maxWidth: '500px', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)',
             maxHeight: '90vh', overflowY: 'auto'
           }}>
-            <h3 style={{ marginTop: 0 }}>➕ Add New Instructor</h3>
+            <h3 style={{ marginTop: 0 }}>Add New Instructor</h3>
             
             {generatedCreds ? (
               <div className="alert alert-success" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <h4>✅ Instructor Created in Keycloak!</h4>
+                <h4>Instructor Created in Keycloak!</h4>
                 <p>Share these credentials securely with the instructor. They can log in immediately.</p>
                 <div style={{ background: 'rgba(0,0,0,0.08)', padding: '14px', borderRadius: '8px', fontFamily: 'monospace', fontSize: '0.95rem', lineHeight: '1.8' }}>
                   <div><strong>Email / Login ID:</strong> {generatedCreds.email}</div>

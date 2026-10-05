@@ -95,7 +95,7 @@ export default function ReviewInbox() {
       {/* ── Header ─────────────────────────────────────────────────── */}
       <div className="section-header flex-between">
         <div>
-          <h2>📬 Review Inbox</h2>
+          <h2>Review Inbox</h2>
           <p>Read learner feedback and reply to reviews on your courses.</p>
         </div>
         <Link to="/instructor" className="btn btn-secondary">
@@ -106,14 +106,14 @@ export default function ReviewInbox() {
       {/* ── Error ──────────────────────────────────────────────────── */}
       {error && (
         <div className="ri-alert ri-alert-error">
-          ⚠️ {error}
+          {error}
         </div>
       )}
 
       {/* ── Empty State ─────────────────────────────────────────────── */}
       {!error && reviews.length === 0 && (
         <div className="empty-state ri-empty">
-          <div className="empty-icon">💬</div>
+
           <h3>No reviews yet</h3>
           <p>Learner reviews on your published courses will appear here.</p>
         </div>
@@ -134,7 +134,7 @@ export default function ReviewInbox() {
             >
               {/* ── Top row: course badge + date ─── */}
               <div className="ri-card-header">
-                <span className="ri-course-badge">📚 {review.course_title}</span>
+                <span className="ri-course-badge">{review.course_title}</span>
                 <span className="ri-date">
                   {new Date(review.created_at).toLocaleDateString('en-IN', {
                     day: 'numeric', month: 'short', year: 'numeric',
@@ -183,8 +183,8 @@ export default function ReviewInbox() {
                 />
 
                 <div className="ri-reply-actions">
-                  {rs.error && <span className="ri-inline-error">⚠️ {rs.error}</span>}
-                  {rs.saved && <span className="ri-inline-success">✓ Reply saved</span>}
+                  {rs.error && <span className="ri-inline-error">{rs.error}</span>}
+                  {rs.saved && <span className="ri-inline-success">Reply saved</span>}
                   <button
                     id={`submit-reply-${review.id}`}
                     className="btn btn-primary btn-sm"

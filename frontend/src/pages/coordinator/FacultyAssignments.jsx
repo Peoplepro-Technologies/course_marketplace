@@ -97,13 +97,13 @@ export default function FacultyAssignments() {
     <div className="page-wrapper container animate-fade-in">
       <div className="section-header flex-between" style={{ marginBottom: '1.5rem' }}>
         <div>
-          <h2>👥 Faculty Management</h2>
+          <h2>Faculty Management</h2>
           <p>Manage faculty members and handle course handovers.</p>
         </div>
       </div>
 
       {error ? (
-        <div className="alert alert-error">⚠️ {error}</div>
+        <div className="alert alert-error">{error}</div>
       ) : loading ? (
         <LoadingSpinner />
       ) : instructors.length === 0 ? (
@@ -176,7 +176,7 @@ export default function FacultyAssignments() {
             maxHeight: '90vh', display: 'flex', flexDirection: 'column'
           }}>
             <h3 style={{ marginTop: 0, marginBottom: '0.5rem', color: '#dc2626' }}>
-              ⚠️ Deactivate {deactivateInst.name}
+              Deactivate {deactivateInst.name}
             </h3>
             
             {!assignedCourses ? (

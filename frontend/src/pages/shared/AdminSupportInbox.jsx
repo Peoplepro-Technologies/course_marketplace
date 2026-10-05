@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../../api/axios';
-import { MessageSquare, Clock, Filter, Check, X } from 'lucide-react';
 import StatusBadge from '../../components/StatusBadge';
 import EmptyState from '../../components/EmptyState';
 import LoadingSpinner from '../../components/LoadingSpinner';
@@ -101,7 +100,6 @@ export default function AdminSupportInbox({ apiPrefix, roleName, hideCategoryFil
           {/* Inbox List View */}
           <div className="card flex-between" style={{ marginBottom: '1.5rem', padding: '1rem' }}>
             <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-              <Filter size={18} color="var(--color-text-muted)" />
               <select className="form-control" style={{ width: '150px' }} value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
                 <option value="">All Statuses</option>
                 <option value="open">Open</option>
@@ -130,24 +128,25 @@ export default function AdminSupportInbox({ apiPrefix, roleName, hideCategoryFil
             </div>
             
             <button className="btn btn-secondary btn-sm flex-center" onClick={fetchTickets}>
-              <Clock size={14} style={{ marginRight: '6px' }} /> Refresh
+              Refresh
             </button>
           </div>
 
           {tickets.length === 0 ? (
             <EmptyState 
-              icon={MessageSquare} 
               title="Inbox Zero" 
               message="There are no support tickets matching your filters." 
             />
           ) : (
-            <div className="table-responsive card" style={{ padding: 0 }}>
+          <div className="table-responsive card" style={{ padding: 0 }}>
               <table className="table">
                 <thead>
                   <tr>
-                    <th>Subject</th>
-                    <th>Requester</th>
-                    {!hideCategoryFilter && <th>Category</th>}
+                    <th>Ticket ID</th>
+                    <th>Raised By</th>
+                    <th>Category</th>
+                    <th>Request</th>
+                    <th>Department</th>
                     <th>Priority</th>
                     <th>Status</th>
                     <th>Last Updated</th>
@@ -156,27 +155,47 @@ export default function AdminSupportInbox({ apiPrefix, roleName, hideCategoryFil
                 <tbody>
                   {tickets.map(ticket => (
                     <tr key={ticket.id} onClick={() => handleSelectTicket(ticket)} style={{ cursor: 'pointer', background: ticket.is_unread ? 'var(--color-bg-secondary)' : 'transparent' }}>
-                      <td style={{ fontWeight: 600 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                          {ticket.ticket_number ? `#${ticket.ticket_number} - ` : ''}{ticket.subject}
-                          {ticket.is_unread && (
-                            <span className="badge" style={{ backgroundColor: 'var(--color-danger)', color: 'white', fontSize: '0.7rem' }}>New Reply</span>
-                          )}
-                        </div>
+                      <td>
+                        <code style={{ background: 'rgba(99,102,241,0.1)', color: '#818cf8', padding: '2px 6px', borderRadius: '5px', fontSize: '0.78rem' }}>
+                          {ticket.ticket_number || ticket.id?.slice(0,8)}
+                        </code>
+                        {ticket.is_unread && (
+                          <span className="badge" style={{ backgroundColor: 'var(--color-danger)', color: 'white', fontSize: '0.68rem', marginLeft: '6px' }}>New</span>
+                        )}
                       </td>
                       <td>
-                        {ticket.raised_by_name}
-                        <div style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>Role: {ticket.role_context}</div>
+                        <div style={{ fontWeight: 600, fontSize: '0.875rem' }}>{ticket.raised_by_name}</div>
+                        <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', textTransform: 'capitalize' }}>{ticket.role_context}</div>
                       </td>
-                      {!hideCategoryFilter && <td style={{ textTransform: 'capitalize' }}>{ticket.category}</td>}
-                      <td style={{ textTransform: 'capitalize' }}>{ticket.priority}</td>
+                      <td style={{ fontSize: '0.85rem' }}>{ticket.category}</td>
+                      <td style={{ fontSize: '0.83rem', color: 'var(--color-text-muted)' }}>{ticket.subcategory || ticket.subject}</td>
+                      <td>
+                        {ticket.department_name ? (
+                          <span style={{
+                            background: 'rgba(99,102,241,0.1)', color: '#818cf8',
+                            padding: '2px 8px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 600,
+                          }}>
+                            {ticket.department_name}
+                          </span>
+                        ) : '—'}
+                      </td>
+                      <td>
+                        <span style={{
+                          background: ticket.priority === 'high' ? 'rgba(239,68,68,0.1)' : ticket.priority === 'medium' ? 'rgba(245,158,11,0.1)' : 'rgba(16,185,129,0.1)',
+                          color: ticket.priority === 'high' ? '#ef4444' : ticket.priority === 'medium' ? '#f59e0b' : '#10b981',
+                          padding: '2px 8px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 600, textTransform: 'capitalize',
+                        }}>
+                          {ticket.priority}
+                        </span>
+                      </td>
                       <td><StatusBadge status={ticket.status} /></td>
-                      <td>{new Date(ticket.updated_at).toLocaleDateString()}</td>
+                      <td style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)' }}>{new Date(ticket.updated_at).toLocaleDateString()}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
+
           )}
         </>
       ) : (
@@ -196,7 +215,7 @@ export default function AdminSupportInbox({ apiPrefix, roleName, hideCategoryFil
                   </div>
                 </div>
                 <button className="btn btn-secondary btn-sm flex-center" onClick={() => setSelectedTicket(null)}>
-                  <X size={16} /> Close Thread
+                  Close Thread
                 </button>
               </div>
               
@@ -269,9 +288,7 @@ export default function AdminSupportInbox({ apiPrefix, roleName, hideCategoryFil
                     <option value="closed">Closed</option>
                   </select>
                   {updateStatus !== selectedTicket.status && (
-                    <button className="btn btn-primary btn-sm flex-center" onClick={handleUpdateStatus} style={{ padding: '0 8px' }}>
-                      <Check size={14} />
-                    </button>
+                    <button className="btn btn-primary btn-sm flex-center" onClick={handleUpdateStatus} style={{ padding: '0 8px' }}>Update</button>
                   )}
                 </div>
               </div>

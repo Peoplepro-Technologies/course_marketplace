@@ -90,7 +90,7 @@ export default function JitsiRoomModal({ roomName, displayName, onClose }) {
   return (
     <div className="jitsi-modal-overlay">
       <button className="jitsi-close-btn" onClick={onClose} title="Leave meeting">
-        ✕ Leave
+        Leave
       </button>
       <div className="jitsi-container" ref={containerRef} />
     </div>

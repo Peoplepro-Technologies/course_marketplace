@@ -8,13 +8,12 @@
 import React, { useState, useEffect } from 'react';
 import AccountsSidebarLayout from './AccountsSidebarLayout';
 import api from '../../api/axios';
-import { RefreshCcw, CheckCircle, AlertTriangle, Download, Upload } from 'lucide-react';
 import StatusBadge from '../../components/StatusBadge';
 
 const STATUS_COLORS = {
-  completed: { bg: '#f0fdf4', text: '#15803d', icon: <CheckCircle size={14} /> },
-  pending: { bg: '#fefce8', text: '#ca8a04', icon: <RefreshCcw size={14} /> },
-  flagged: { bg: '#fef2f2', text: '#dc2626', icon: <AlertTriangle size={14} /> },
+  completed: { bg: '#f0fdf4', text: '#15803d', },
+  pending: { bg: '#fefce8', text: '#ca8a04', },
+  flagged: { bg: '#fef2f2', text: '#dc2626', },
 };
 
 function ReconciliationBadge({ status }) {
@@ -25,7 +24,7 @@ function ReconciliationBadge({ status }) {
       background: s.bg, color: s.text,
       padding: '3px 8px', borderRadius: '999px', fontSize: '12px', fontWeight: '600'
     }}>
-      {s.icon} {status.charAt(0).toUpperCase() + status.slice(1)}
+      {status.charAt(0).toUpperCase() + status.slice(1)}
     </span>
   );
 }
@@ -83,7 +82,7 @@ export default function ACReconciliation() {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
           <div>
             <h1 style={{ marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <RefreshCcw size={24} /> Reconciliation
+              Reconciliation
             </h1>
             <p style={{ color: '#6b7280', fontSize: '14px' }}>
               Match internal transactions against simulated gateway records. Flag discrepancies for review.
@@ -98,7 +97,7 @@ export default function ACReconciliation() {
               padding: '10px 16px', fontSize: '14px', fontWeight: '600', cursor: 'pointer',
             }}
           >
-            <Upload size={15} /> Simulate Settlement Import
+            Simulate Settlement Import
           </button>
         </div>
 

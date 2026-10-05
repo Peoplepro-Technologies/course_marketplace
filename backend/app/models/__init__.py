@@ -3,6 +3,7 @@ models/__init__.py — Import all models so Alembic and Base.metadata see them.
 """
 
 from app.models.user import User
+from app.models.department import Department
 from app.models.course import Course
 from app.models.section import Section
 from app.models.lesson import Lesson
@@ -49,4 +50,5 @@ __all__ = [
     "TicketRoutingRule",
     "AssignmentSubmission",
     "QuizAttempt",
+    "Department",
 ]

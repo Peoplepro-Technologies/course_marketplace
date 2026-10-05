@@ -88,7 +88,7 @@ export default function StudentsProgress() {
       {/* ── Header ─────────────────────────────────────────────────── */}
       <div className="section-header flex-between">
         <div>
-          <h2>👥 Students & Progress</h2>
+          <h2>Students & Progress</h2>
           {data && (
             <p>
               {data.course_title !== "All Courses" && (
@@ -108,13 +108,13 @@ export default function StudentsProgress() {
 
       {/* ── Error ──────────────────────────────────────────────────── */}
       {error && (
-        <div className="sp-alert sp-alert-error">⚠️ {error}</div>
+        <div className="sp-alert sp-alert-error">{error}</div>
       )}
 
       {/* ── Empty state ─────────────────────────────────────────────── */}
       {!error && activeTab === 'enrolled' && approvedStudents.length === 0 && (
         <div className="empty-state sp-empty">
-          <div className="empty-icon">🎓</div>
+
           <h3>No students enrolled yet</h3>
           <p>Approved learners will appear here once they enrol in this course.</p>
         </div>
@@ -122,7 +122,7 @@ export default function StudentsProgress() {
       
       {!error && activeTab === 'pending' && pendingStudents.length === 0 && (
         <div className="empty-state sp-empty">
-          <div className="empty-icon">⏳</div>
+
           <h3>No pending enrollments</h3>
           <p>You have no new enrollment requests to review.</p>
         </div>

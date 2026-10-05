@@ -37,6 +37,7 @@ from app.schemas.category import CategoryRead, CategoryCreate, CategoryUpdate
 from app.models.support_ticket import SupportTicket, TicketReply, TicketRead
 from app.schemas.support_ticket import SupportTicketOut, SupportTicketUpdate, TicketReplyCreate, TicketReplyOut
 from app.models.ticket_routing_rule import TicketRoutingRule
+from app.models.department import Department
 from app.services.audit import record_audit_log
 from app.redis_client import invalidate_cache
 
@@ -84,8 +85,15 @@ async def list_users(
         .limit(page_size)
         .all()
     )
+    users_out = []
+    for u in users:
+        u_dict = UserRead.model_validate(u).model_dump()
+        if u.department_id:
+            dept = db.query(Department).filter(Department.id == u.department_id).first()
+            u_dict["department_name"] = dept.name if dept else None
+        users_out.append(u_dict)
     return {
-        "users": [UserRead.model_validate(u) for u in users],
+        "users": users_out,
         "total": total,
         "page": page,
         "page_size": page_size,
@@ -902,3 +910,212 @@ def delete_routing_rule(
         raise HTTPException(status_code=404, detail="Routing rule not found")
     db.delete(rule)
     db.commit()
+
+
+# ══════════════════════════════════════════════════════════════════
+# DEPARTMENTS CRUD (Part 1)
+# ══════════════════════════════════════════════════════════════════
+
+class DepartmentCreate(BaseModel):
+    name: str
+    description: Optional[str] = None
+
+class DepartmentUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    is_active: Optional[bool] = None
+
+
+@router.get("/departments")
+def list_departments(
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_role("admin")),
+):
+    """List all departments."""
+    depts = db.query(Department).order_by(Department.name).all()
+    return [
+        {
+            "id": str(d.id),
+            "name": d.name,
+            "description": d.description,
+            "is_active": d.is_active,
+            "created_at": d.created_at.isoformat(),
+            "user_count": db.query(User).filter(User.department_id == d.id).count(),
+        }
+        for d in depts
+    ]
+
+
+@router.post("/departments", status_code=201)
+def create_department(
+    data: DepartmentCreate,
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_role("admin")),
+):
+    """Create a new department."""
+    existing = db.query(Department).filter(Department.name == data.name).first()
+    if existing:
+        raise HTTPException(status_code=409, detail=f"Department '{data.name}' already exists")
+    dept = Department(name=data.name, description=data.description)
+    db.add(dept)
+    db.commit()
+    db.refresh(dept)
+    return {"id": str(dept.id), "name": dept.name, "is_active": dept.is_active}
+
+
+@router.put("/departments/{dept_id}")
+def update_department(
+    dept_id: str,
+    data: DepartmentUpdate,
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_role("admin")),
+):
+    dept = db.query(Department).filter(Department.id == dept_id).first()
+    if not dept:
+        raise HTTPException(status_code=404, detail="Department not found")
+    if data.name is not None:
+        dept.name = data.name
+    if data.description is not None:
+        dept.description = data.description
+    if data.is_active is not None:
+        dept.is_active = data.is_active
+    db.commit()
+    return {"id": str(dept.id), "name": dept.name, "is_active": dept.is_active}
+
+
+@router.delete("/departments/{dept_id}", status_code=204)
+def delete_department(
+    dept_id: str,
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_role("admin")),
+):
+    dept = db.query(Department).filter(Department.id == dept_id).first()
+    if not dept:
+        raise HTTPException(status_code=404, detail="Department not found")
+    # Check if any users are assigned
+    user_count = db.query(User).filter(User.department_id == dept.id).count()
+    if user_count > 0:
+        raise HTTPException(status_code=409, detail=f"Cannot delete: {user_count} users are assigned to this department. Reassign them first.")
+    db.delete(dept)
+    db.commit()
+
+
+# Assign/unassign a user's department
+class UserDepartmentAssign(BaseModel):
+    department_id: Optional[str] = None  # None = unassign
+
+
+@router.put("/users/{user_id}/department")
+def assign_user_department(
+    user_id: str,
+    data: UserDepartmentAssign,
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_role("admin")),
+):
+    """Assign or unassign a user to/from a department."""
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    if data.department_id:
+        dept = db.query(Department).filter(Department.id == data.department_id).first()
+        if not dept:
+            raise HTTPException(status_code=404, detail="Department not found")
+        user.department_id = dept.id
+        _audit(db, admin.id, "dept_assigned", "user", user_id,
+               f"User '{user.name}' assigned to department '{dept.name}'")
+    else:
+        user.department_id = None
+        _audit(db, admin.id, "dept_unassigned", "user", user_id,
+               f"User '{user.name}' unassigned from department")
+
+    db.commit()
+    return {"message": "Department updated", "department_id": data.department_id}
+
+
+# ══════════════════════════════════════════════════════════════════
+# UPDATED TICKET ROUTING RULES (two-level: role/category/subcategory → dept)
+# ══════════════════════════════════════════════════════════════════
+
+@router.get("/ticket-routing-rules-v2")
+def list_routing_rules_v2(
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_role("admin")),
+):
+    """List all two-level routing rules with department info."""
+    rules = (
+        db.query(TicketRoutingRule)
+        .filter(TicketRoutingRule.role_context != None)
+        .order_by(TicketRoutingRule.role_context, TicketRoutingRule.category, TicketRoutingRule.subcategory)
+        .all()
+    )
+    out = []
+    for r in rules:
+        dept = db.query(Department).filter(Department.id == r.department_id).first() if r.department_id else None
+        out.append({
+            "id": str(r.id),
+            "role_context": r.role_context,
+            "category": r.category,
+            "subcategory": r.subcategory,
+            "department_id": str(r.department_id) if r.department_id else None,
+            "department_name": dept.name if dept else None,
+            "is_active": r.is_active,
+            "created_at": r.created_at.isoformat(),
+        })
+    return out
+
+
+class RoutingRuleV2Create(BaseModel):
+    role_context: str
+    category: str
+    subcategory: str
+    department_id: Optional[str] = None
+
+class RoutingRuleV2Update(BaseModel):
+    department_id: Optional[str] = None
+    is_active: Optional[bool] = None
+
+
+@router.post("/ticket-routing-rules-v2", status_code=201)
+def create_routing_rule_v2(
+    data: RoutingRuleV2Create,
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_role("admin")),
+):
+    existing = db.query(TicketRoutingRule).filter(
+        TicketRoutingRule.role_context == data.role_context,
+        TicketRoutingRule.category == data.category,
+        TicketRoutingRule.subcategory == data.subcategory,
+    ).first()
+    if existing:
+        raise HTTPException(status_code=409, detail="Rule already exists")
+    rule = TicketRoutingRule(
+        role_context=data.role_context,
+        category=data.category,
+        subcategory=data.subcategory,
+        department_id=data.department_id,
+    )
+    db.add(rule)
+    db.commit()
+    db.refresh(rule)
+    return {"id": str(rule.id), "role_context": rule.role_context,
+            "category": rule.category, "subcategory": rule.subcategory}
+
+
+@router.put("/ticket-routing-rules-v2/{rule_id}")
+def update_routing_rule_v2(
+    rule_id: str,
+    data: RoutingRuleV2Update,
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_role("admin")),
+):
+    rule = db.query(TicketRoutingRule).filter(TicketRoutingRule.id == rule_id).first()
+    if not rule:
+        raise HTTPException(status_code=404, detail="Rule not found")
+    if data.department_id is not None:
+        rule.department_id = data.department_id if data.department_id else None
+    if data.is_active is not None:
+        rule.is_active = data.is_active
+    db.commit()
+    return {"id": str(rule.id), "is_active": rule.is_active}
+

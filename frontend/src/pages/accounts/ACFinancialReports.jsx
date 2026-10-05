@@ -69,7 +69,7 @@ export default function ACFinancialReports() {
             padding: 'var(--space-md) var(--space-lg)', marginBottom: 'var(--space-xl)',
             display: 'flex', gap: 'var(--space-sm)', alignItems: 'flex-start',
           }}>
-            <span style={{ fontSize: '1.2rem' }}>ℹ️</span>
+
             <div>
               <strong>Note:</strong> Revenue figures are <strong>estimated</strong> — calculated from course
               prices × approved enrollments. No real payment gateway is connected. Payout totals reflect

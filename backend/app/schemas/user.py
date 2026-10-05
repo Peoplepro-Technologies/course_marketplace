@@ -28,6 +28,8 @@ class UserRead(UserBase):
     id: UUID
     keycloak_sub: str
     created_at: datetime
+    department_id: Optional[UUID] = None
+    department_name: Optional[str] = None
 
     class Config:
         from_attributes = True

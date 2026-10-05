@@ -29,7 +29,7 @@ export default function CourseSkills({ sections, course }) {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1rem', marginBottom: tagChips.length > 0 ? '2.5rem' : '0' }}>
         {skills.map((skill, idx) => (
           <div key={idx} style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem' }}>
-            <span style={{ color: 'var(--accent)', fontWeight: 'bold' }}>✓</span>
+
             <span style={{ fontSize: '0.95rem', lineHeight: '1.4', color: 'var(--text-h)' }}>{skill}</span>
           </div>
         ))}

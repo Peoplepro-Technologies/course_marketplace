@@ -1,193 +1,271 @@
 /**
- * CoordinatorDashboard.jsx — Landing page for the coursecoordinator role.
+ * CoordinatorDashboard.jsx — Premium coordinator home page.
  *
- * Displays four live data widgets:
- *   1. Pending Reviews count  — from /coordinator/stats
- *   2. Recently Published     — last 5 published courses
- *   3. Instructor Roster      — total instructor count + link
- *   4. Category Health        — published courses per category (inline bar chart)
- *
- * Below widgets: Quick Access shortcut cards to sub-pages.
+ * Full-page layout with:
+ *   - Hero header with greeting + date
+ *   - 5 KPI metric cards (clickable for quick nav)
+ *   - 4 rich content widgets (pending, published, instructors, categories)
+ *   - Quick access shortcuts
  */
 
 import { useState, useEffect } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import api from '../../api/axios';
 import useAuth from '../../hooks/useAuth';
 import LoadingSpinner from '../../components/LoadingSpinner';
-import '../RoleDashboard.css';
 import './CoordinatorDashboard.css';
 
-const SIDEBAR_ITEMS = [
-  { icon: '📊', label: 'Dashboard', path: '/coordinator' },
-  { icon: '✅', label: 'Course Approvals', path: '/coordinator/courses/pending' },
-  { icon: '📚', label: 'Course Catalog', path: '/coordinator/courses' },
-  { icon: '🏷️', label: 'Categories', path: '/coordinator/categories' },
-  { icon: '👨‍🏫', label: 'Instructors', path: '/coordinator/instructors' },
-  { icon: '⭐', label: 'Quality & Reviews', path: '/coordinator/quality-reviews' },
-  { icon: '🛟', label: 'Support', path: '/coordinator/support' },
-  { icon: '📈', label: 'Reports', path: '/coordinator/reports' },
-];
+/* ── helpers ─────────────────────────────────────────────────────────── */
+const fmt = new Intl.DateTimeFormat('en-IN', {
+  weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
+});
 
-const QUICK_ACCESS = SIDEBAR_ITEMS.slice(1); // skip Dashboard itself
+const timeFmt = new Intl.DateTimeFormat('en-IN', {
+  hour: '2-digit', minute: '2-digit', second: '2-digit',
+});
+
+const ACCENT = {
+  pending:     '#f59e0b',
+  published:   '#10b981',
+  instructors: '#6366f1',
+  categories:  '#8b5cf6',
+};
+
+function KpiCard({ label, value, sub, color, to }) {
+  return (
+    <Link to={to} style={{ textDecoration: 'none' }}>
+      <div className="cd-kpi-card" style={{ '--kpi-color': color }}>
+        <div className="cd-kpi-value">{value ?? '—'}</div>
+        <div className="cd-kpi-label">{label}</div>
+        {sub && <div className="cd-kpi-sub">{sub}</div>}
+      </div>
+    </Link>
+  );
+}
 
 export default function CoordinatorDashboard() {
   const { user } = useAuth();
-  const location = useLocation();
-
   const [stats, setStats] = useState(null);
-  const [statsLoading, setStatsLoading] = useState(true);
-  const [statsError, setStatsError] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError]   = useState(null);
+  const [now, setNow]       = useState(new Date());
+
+  useEffect(() => {
+    const t = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(t);
+  }, []);
 
   useEffect(() => {
     api.get('/coordinator/stats')
-      .then(res => setStats(res.data))
-      .catch(err => setStatsError(err.response?.data?.detail || 'Failed to load stats'))
-      .finally(() => setStatsLoading(false));
+      .then(r => setStats(r.data))
+      .catch(e => setError(e.response?.data?.detail || 'Failed to load stats'))
+      .finally(() => setLoading(false));
   }, []);
 
-  // Category health bar: max count for proportional widths
-  const maxCatCount = stats?.category_health?.length
+  const maxCat = stats?.category_health?.length
     ? Math.max(...stats.category_health.map(c => c.count))
     : 1;
 
+  const totalCourses = stats
+    ? (stats.category_health || []).reduce((s, c) => s + c.count, 0)
+    : 0;
+
   return (
-    <div className="page-wrapper container animate-fade-in">
-      {/* Welcome */}
-      <div className="role-welcome">
-          <h1>Welcome, <span>Course Coordinator</span></h1>
-          <p>
-            Hello {user?.name || 'Coordinator'}! Here's a live overview of the platform.
-          </p>
-        </div>
+    <>
+      <div className="cd-page">
 
-        {/* ── Live Stats Widgets ──────────────────────────────────────── */}
-        {statsLoading ? (
-          <div style={{ padding: 'var(--space-2xl) 0' }}><LoadingSpinner /></div>
-        ) : statsError ? (
-          <div className="alert alert-error" style={{ marginBottom: 'var(--space-xl)' }}>
-            ⚠️ Could not load stats: {statsError}
+        {/* ── Hero header ────────────────────────────────────────── */}
+        <div className="cd-hero">
+          <div className="cd-hero-left">
+            <div className="cd-hero-tag">Course Coordinator</div>
+            <h1 className="cd-hero-title">
+              Hello, <span style={{ color: '#6366f1' }}>{user?.name?.split(' ')[0] || 'Coordinator'}</span> 
+            </h1>
+            <p className="cd-hero-sub">{fmt.format(now)} · {timeFmt.format(now)} · Platform overview</p>
           </div>
-        ) : (
-          <div className="coord-widgets-grid">
-
-            {/* Widget 1 — Pending Reviews */}
-            <div className="coord-widget coord-widget--pending animate-fade-in-up" style={{ animationDelay: '0.05s' }}>
-              <div className="coord-widget-header">
-                <span className="coord-widget-icon">✅</span>
-                <h3>Pending Reviews</h3>
-              </div>
-              <div className="coord-widget-body">
-                <div className="coord-stat-number" id="pending-reviews-count">
-                  {stats.pending_count}
-                </div>
-                <p className="coord-stat-label">
-                  {stats.pending_count === 1 ? 'course awaiting review' : 'courses awaiting review'}
-                </p>
-              </div>
-              <Link to="/coordinator/courses/pending" className="coord-widget-action btn btn-primary btn-sm">
-                {stats.pending_count > 0 ? 'Review Now →' : 'View Queue →'}
-              </Link>
-            </div>
-
-            {/* Widget 2 — Recently Published */}
-            <div className="coord-widget coord-widget--published animate-fade-in-up" style={{ animationDelay: '0.10s' }}>
-              <div className="coord-widget-header">
-                <span className="coord-widget-icon">🚀</span>
-                <h3>Recently Published</h3>
-              </div>
-              <div className="coord-widget-body">
-                {stats.recently_published.length === 0 ? (
-                  <p className="coord-empty-note">No published courses yet.</p>
-                ) : (
-                  <ul className="coord-recent-list">
-                    {stats.recently_published.map(c => (
-                      <li key={c.id} className="coord-recent-item">
-                        <div className="coord-recent-title">{c.title}</div>
-                        <div className="coord-recent-meta">
-                          <span className="badge badge-success" style={{ fontSize: '0.65rem' }}>
-                            {c.category}
-                          </span>
-                          <span className="coord-recent-instructor">
-                            👤 {c.instructor_name}
-                          </span>
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-              <Link to="/coordinator/courses?status=published" className="coord-widget-action btn btn-secondary btn-sm">
-                View All →
-              </Link>
-            </div>
-
-            {/* Widget 3 — Instructor Roster */}
-            <div className="coord-widget coord-widget--instructors animate-fade-in-up" style={{ animationDelay: '0.15s' }}>
-              <div className="coord-widget-header">
-                <span className="coord-widget-icon">👨‍🏫</span>
-                <h3>Instructor Roster</h3>
-              </div>
-              <div className="coord-widget-body">
-                <div className="coord-stat-number" id="instructor-count">
-                  {stats.instructor_count}
-                </div>
-                <p className="coord-stat-label">
-                  {stats.instructor_count === 1 ? 'registered instructor' : 'registered instructors'}
-                </p>
-              </div>
-              <Link to="/coordinator/instructors" className="coord-widget-action btn btn-secondary btn-sm">
-                View Roster →
-              </Link>
-            </div>
-
-            {/* Widget 4 — Category Health */}
-            <div className="coord-widget coord-widget--categories animate-fade-in-up" style={{ animationDelay: '0.20s' }}>
-              <div className="coord-widget-header">
-                <span className="coord-widget-icon">🏷️</span>
-                <h3>Category Health</h3>
-              </div>
-              <div className="coord-widget-body">
-                {stats.category_health.length === 0 ? (
-                  <p className="coord-empty-note">No published courses yet.</p>
-                ) : (
-                  <div className="coord-category-bars">
-                    {stats.category_health.map(cat => (
-                      <div key={cat.category} className="coord-cat-row">
-                        <span className="coord-cat-name">{cat.category}</span>
-                        <div className="coord-cat-bar-track">
-                          <div
-                            className="coord-cat-bar-fill"
-                            style={{ width: `${Math.round((cat.count / maxCatCount) * 100)}%` }}
-                          />
-                        </div>
-                        <span className="coord-cat-count">{cat.count}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-              <Link to="/coordinator/categories" className="coord-widget-action btn btn-secondary btn-sm">
-                Manage Categories →
-              </Link>
-            </div>
-
-          </div>
-        )}
-
-        {/* ── Quick Access ─────────────────────────────────────────────── */}
-        <h3 className="coord-section-label">Quick Access</h3>
-        <div className="role-cards-grid">
-          {QUICK_ACCESS.map((item) => (
-            <Link to={item.path} key={item.label} style={{ textDecoration: 'none', display: 'block' }}>
-              <div className="role-placeholder-card" style={{ cursor: 'pointer', height: '100%' }}>
-                <div className="card-icon">{item.icon}</div>
-                <h4>{item.label}</h4>
-                <p>View {item.label.toLowerCase()}</p>
-              </div>
+          <div className="cd-hero-actions">
+            <Link to="/coordinator/courses/pending" className="btn btn-primary">
+              Review Queue
             </Link>
-          ))}
+            <Link to="/coordinator/courses" className="btn btn-secondary">
+              Course Catalog
+            </Link>
+          </div>
         </div>
-    </div>
+
+        {loading ? (
+          <div style={{ padding: '3rem 0' }}><LoadingSpinner /></div>
+        ) : error ? (
+          <div className="alert alert-error">{error}</div>
+        ) : (
+          <>
+            {/* ── KPI strip ──────────────────────────────────────── */}
+            <div className="cd-kpi-strip">
+              <KpiCard label="Pending Review"    value={stats.pending_count}    color={ACCENT.pending}     to="/coordinator/courses/pending" />
+              <KpiCard label="Total Published"   value={totalCourses}            color={ACCENT.published}    to="/coordinator/courses?status=published" />
+              <KpiCard label="Instructors"       value={stats.instructor_count} color={ACCENT.instructors}  to="/coordinator/instructors" />
+              <KpiCard label="Categories"        value={stats.category_health?.length} color={ACCENT.categories} to="/coordinator/categories" />
+              <KpiCard label="Quality & Reviews"  value="—"                       color="#ec4899"             to="/coordinator/quality-reviews" />
+            </div>
+
+            {/* ── Widget grid ────────────────────────────────────── */}
+            <div className="cd-widget-grid">
+
+              {/* Pending Reviews */}
+              <div className="cd-widget cd-widget--alert">
+                <div className="cd-widget-head">
+
+                  <div>
+                    <div className="cd-widget-title">Pending Reviews</div>
+                    <div className="cd-widget-sub">Courses awaiting your approval</div>
+                  </div>
+                </div>
+                <div className="cd-widget-body">
+                  <div className="cd-big-number" style={{ color: ACCENT.pending }}>
+                    {stats.pending_count}
+                  </div>
+                  <p className="cd-big-label">
+                    {stats.pending_count === 0
+                      ? 'All caught up!'
+                      : stats.pending_count === 1
+                      ? 'course waiting for review'
+                      : 'courses waiting for review'
+                    }
+                  </p>
+                  {stats.pending_count > 0 && (
+                    <div className="cd-alert-pill">
+                      Action needed
+                    </div>
+                  )}
+                </div>
+                <Link to="/coordinator/courses/pending" className="cd-widget-btn" style={{ background: ACCENT.pending }}>
+                  {stats.pending_count > 0 ? 'Review Now →' : 'View Queue →'}
+                </Link>
+              </div>
+
+              {/* Recently Published */}
+              <div className="cd-widget cd-widget--list">
+                <div className="cd-widget-head">
+
+                  <div>
+                    <div className="cd-widget-title">Recently Published</div>
+                    <div className="cd-widget-sub">Latest courses on the platform</div>
+                  </div>
+                </div>
+                <div className="cd-widget-body">
+                  {stats.recently_published.length === 0 ? (
+                    <p className="cd-empty">No published courses yet.</p>
+                  ) : (
+                    <ul className="cd-course-list">
+                      {stats.recently_published.map((c, i) => (
+                        <li key={c.id} className="cd-course-item" style={{ animationDelay: `${i * 0.05}s` }}>
+                          <div className="cd-course-rank">{i + 1}</div>
+                          <div className="cd-course-info">
+                            <div className="cd-course-title">{c.title}</div>
+                            <div className="cd-course-meta">
+                              <span className="cd-cat-chip">{c.category}</span>
+                              <span className="cd-inst-name">{c.instructor_name}</span>
+                            </div>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+                <Link to="/coordinator/courses?status=published" className="cd-widget-btn" style={{ background: ACCENT.published }}>
+                  View All Published →
+                </Link>
+              </div>
+
+              {/* Instructor Roster */}
+              <div className="cd-widget cd-widget--stat">
+                <div className="cd-widget-head">
+
+                  <div>
+                    <div className="cd-widget-title">Instructor Roster</div>
+                    <div className="cd-widget-sub">Platform teaching faculty</div>
+                  </div>
+                </div>
+                <div className="cd-widget-body cd-widget-body--centered">
+                  <div className="cd-big-number" style={{ color: ACCENT.instructors }}>
+                    {stats.instructor_count}
+                  </div>
+                  <p className="cd-big-label">
+                    {stats.instructor_count === 1 ? 'registered instructor' : 'registered instructors'}
+                  </p>
+                  <div className="cd-stat-pill" style={{ background: `${ACCENT.instructors}15`, color: ACCENT.instructors }}>
+                    Active Faculty
+                  </div>
+                </div>
+                <Link to="/coordinator/instructors" className="cd-widget-btn" style={{ background: ACCENT.instructors }}>
+                  View Roster →
+                </Link>
+              </div>
+
+              {/* Category Health */}
+              <div className="cd-widget cd-widget--bars">
+                <div className="cd-widget-head">
+
+                  <div>
+                    <div className="cd-widget-title">Category Health</div>
+                    <div className="cd-widget-sub">Published courses per category</div>
+                  </div>
+                </div>
+                <div className="cd-widget-body">
+                  {stats.category_health.length === 0 ? (
+                    <p className="cd-empty">No published courses yet.</p>
+                  ) : (
+                    <div className="cd-bars">
+                      {stats.category_health.map((cat, i) => (
+                        <div key={cat.category} className="cd-bar-row" style={{ animationDelay: `${i * 0.04}s` }}>
+                          <span className="cd-bar-label">{cat.category}</span>
+                          <div className="cd-bar-track">
+                            <div className="cd-bar-fill" style={{ width: `${(cat.count / maxCat) * 100}%`, background: ACCENT.categories }} />
+                          </div>
+                          <span className="cd-bar-count">{cat.count}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <Link to="/coordinator/categories" className="cd-widget-btn" style={{ background: ACCENT.categories }}>
+                  Manage Categories →
+                </Link>
+              </div>
+
+            </div>
+
+            {/* ── Quick Access ────────────────────────────────────── */}
+            <div className="cd-qa-section">
+              <div className="cd-qa-header">
+                <h3 className="cd-qa-title">Quick Access</h3>
+                <p className="cd-qa-sub">Jump to any section</p>
+              </div>
+              <div className="cd-qa-grid">
+                {[
+                  { label: 'Course Approvals',   sub: 'Review pending submissions',      to: '/coordinator/courses/pending',     color: ACCENT.pending },
+                  { label: 'Course Catalog',      sub: 'Browse all platform courses',     to: '/coordinator/courses',             color: ACCENT.published },
+                  { label: 'Faculty Management',  sub: 'Manage faculty assignments',      to: '/coordinator/faculty-assignments',  color: '#3b82f6' },
+                  { label: 'Assignment Stats',    sub: 'View quiz & assignment data',     to: '/coordinator/faculty-analytics',   color: '#06b6d4' },
+                  { label: 'Categories',          sub: 'Manage course categories',        to: '/coordinator/categories',          color: ACCENT.categories },
+                  { label: 'Instructors',          sub: 'View teaching faculty',           to: '/coordinator/instructors',         color: ACCENT.instructors },
+                  { label: 'Quality & Reviews',   sub: 'Monitor course quality',          to: '/coordinator/quality-reviews',     color: '#ec4899' },
+                  { label: 'Support',             sub: 'Manage support requests',         to: '/coordinator/support',             color: '#ef4444' },
+                ].map(item => (
+                  <Link key={item.to} to={item.to} className="cd-qa-card" style={{ '--qa-color': item.color }}>
+                    <div>
+                      <div className="cd-qa-label">{item.label}</div>
+                      <div className="cd-qa-desc">{item.sub}</div>
+                    </div>
+                    <div className="cd-qa-arrow">→</div>
+                  </Link>
+                ))}
+              </div>
+            </div>
+
+          </>
+        )}
+      </div>
+    </>
   );
 }

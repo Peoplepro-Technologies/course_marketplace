@@ -18,7 +18,6 @@ import JitsiRoomModal from '../../components/JitsiRoomModal';
 import VideoPlayer from '../../components/VideoPlayer';
 import Modal from '../../components/Modal';
 import keycloak from '../../auth/keycloak';
-import { Video, Calendar, Plus, X, Play, Square, RefreshCcw } from 'lucide-react';
 import EmptyState from '../../components/EmptyState';
 
 function formatDateTime(isoStr) {
@@ -50,10 +49,10 @@ function StatusBadge({ status }) {
 function RecordingBadge({ status }) {
   const map = {
     none: { bg: '#f8fafc', color: '#64748b', label: 'No Recording' },
-    recording: { bg: '#fef2f2', color: '#dc2626', label: '🔴 Recording' },
-    processing: { bg: '#fef3c7', color: '#d97706', label: '⏳ Processing' },
-    ready: { bg: '#dcfce7', color: '#15803d', label: '📹 Ready' },
-    failed: { bg: '#fee2e2', color: '#991b1b', label: '⚠️ Failed' },
+    recording: { bg: '#fef2f2', color: '#dc2626', label: 'Recording' },
+    processing: { bg: '#fef3c7', color: '#d97706', label: 'Processing' },
+    ready: { bg: '#dcfce7', color: '#15803d', label: 'Ready' },
+    failed: { bg: '#fee2e2', color: '#991b1b', label: 'Failed' },
   };
   const s = map[status] || { bg: '#f8fafc', color: '#64748b', label: status };
   return (
@@ -398,7 +397,7 @@ export default function LiveClassManager() {
         <div className="section-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
             <h2 style={{ marginTop: '0.5rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Video size={24} /> Live Classes
+              Live Classes
             </h2>
             <p>Schedule and host live video sessions for your students.</p>
           </div>
@@ -408,7 +407,7 @@ export default function LiveClassManager() {
             onClick={() => setShowForm(s => !s)}
             id="instructor-schedule-live-class-btn"
           >
-            {showForm ? <><X size={16} /> Cancel</> : <><Plus size={16} /> Schedule Live Class</>}
+            {showForm ? <>Cancel</> : <>Schedule Live Class</>}
           </button>
         </div>
 
@@ -489,7 +488,7 @@ export default function LiveClassManager() {
                   style={{ gap: '6px' }}
                   disabled={submitting || courses.length === 0}
                 >
-                  {submitting ? 'Scheduling…' : <><Calendar size={16} /> Schedule Session</>}
+                  {submitting ? 'Scheduling…' : <>Schedule Session</>}
                 </button>
                 <button
                   type="button"
@@ -512,7 +511,6 @@ export default function LiveClassManager() {
         {/* Live Classes Table */}
         {liveClasses.length === 0 ? (
           <EmptyState 
-            icon={Video}
             title="No live classes yet"
             message="Click 'Schedule Live Class' to get started."
           />
@@ -553,14 +551,14 @@ export default function LiveClassManager() {
                               style={{ gap: '4px' }}
                               onClick={() => handleStart(lc)}
                             >
-                              <Play size={14} /> Start
+                              Start
                             </button>
                             <button
                               className="btn btn-primary btn-sm"
                               onClick={() => handleStart(lc, true)}
                               title="Start session and capture browser screen/tab recording"
                             >
-                              🎥 Start & Record
+                              Start & Record
                             </button>
                             <button
                               id={`instructor-cancel-live-class-${lc.id}`}
@@ -579,7 +577,7 @@ export default function LiveClassManager() {
                               style={{ gap: '4px' }}
                               onClick={() => handleRejoin(lc)}
                             >
-                              <RefreshCcw size={14} /> Re-join Room
+                              Re-join Room
                             </button>
 
                             {!isRecording ? (
@@ -587,14 +585,14 @@ export default function LiveClassManager() {
                                 className="btn btn-secondary btn-sm"
                                 onClick={() => startBrowserRecording(lc.id)}
                               >
-                                🔴 Record Screen
+                                Record Screen
                               </button>
                             ) : activeRecordingClassId === lc.id ? (
                               <button
                                 className="btn btn-danger btn-sm"
                                 onClick={stopBrowserRecording}
                               >
-                                ⏹ Stop Record
+                                Stop Record
                               </button>
                             ) : null}
 
@@ -604,7 +602,7 @@ export default function LiveClassManager() {
                               style={{ gap: '4px' }}
                               onClick={() => handleEnd(lc)}
                             >
-                              <Square size={14} /> End Session
+                              End Session
                             </button>
                           </>
                         )}
@@ -615,7 +613,7 @@ export default function LiveClassManager() {
                                 className="btn btn-secondary btn-sm"
                                 onClick={() => setPreviewClass(lc)}
                               >
-                                📹 Watch Recording
+                                Watch Recording
                               </button>
                             )}
                             <button
@@ -626,7 +624,7 @@ export default function LiveClassManager() {
                                 setSelectedFile(null);
                               }}
                             >
-                              {lc.recording_status === 'ready' ? 'Re-upload Recording' : '⬆ Upload Recording'}
+                              {lc.recording_status === 'ready' ? 'Re-upload Recording' : 'Upload Recording'}
                             </button>
                           </>
                         )}

@@ -34,7 +34,7 @@ export default function LearnerDashboard() {
 
       {enrollments.length === 0 ? (
         <div className="empty-state card">
-          <div className="empty-icon">🎒</div>
+
           <h3>You aren't enrolled in any courses</h3>
           <p style={{ marginBottom: '1.5rem' }}>Start exploring the catalog to find your next course.</p>
           <Link to="/" className="btn btn-primary">Browse Catalog</Link>
@@ -46,9 +46,7 @@ export default function LearnerDashboard() {
               <div style={{ height: '140px', background: 'var(--color-bg-tertiary)', position: 'relative' }}>
                 {enrollment.course_thumbnail ? (
                   <img src={enrollment.course_thumbnail.startsWith('/media/') ? `http://localhost:8000${enrollment.course_thumbnail}` : enrollment.course_thumbnail} alt={enrollment.course_title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                ) : (
-                  <div className="flex-center" style={{ width: '100%', height: '100%', fontSize: '2rem' }}>📚</div>
-                )}
+                ) : null}
                 <div style={{ position: 'absolute', bottom: '0.5rem', left: '0.5rem', background: 'rgba(0,0,0,0.6)', padding: '0.25rem 0.5rem', borderRadius: '4px', fontSize: '0.75rem' }}>
                   {enrollment.course_category}
                 </div>
@@ -60,7 +58,7 @@ export default function LearnerDashboard() {
                 <div style={{ flex: 1 }}>
                   {enrollment.enrollment_status === 'pending' ? (
                     <div style={{ padding: '0.75rem 0', color: 'var(--color-warning)', fontWeight: 600, fontSize: '0.875rem' }}>
-                      ⏳ Enrollment request is pending instructor approval.
+                      Enrollment request is pending instructor approval.
                     </div>
                   ) : (
                     <ProgressBar percent={enrollment.progress_percent} label={`${enrollment.completed_lessons} / ${enrollment.total_lessons} lessons`} />

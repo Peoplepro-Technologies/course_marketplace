@@ -73,7 +73,7 @@ export default function ACPaymentsRefunds() {
           padding: '12px 20px', borderRadius: 'var(--radius-md)',
           boxShadow: 'var(--shadow-lg)', fontWeight: 600, fontSize: 'var(--text-sm)',
         }}>
-          {toast.ok ? '✓ ' : '✗ '}{toast.msg}
+          {toast.msg}
         </div>
       )}
 
@@ -102,7 +102,6 @@ export default function ACPaymentsRefunds() {
         <div className="alert alert-error">! {error}</div>
       ) : data?.refunds?.length === 0 ? (
         <div className="empty-state card">
-          <div className="empty-icon"></div>
           <h3>No refund requests found</h3>
           <p>{filter ? `No ${filter} requests.` : 'No refund requests have been submitted yet.'}</p>
         </div>
@@ -159,7 +158,7 @@ export default function ACPaymentsRefunds() {
                             onClick={() => handleAction(rr.id, 'approve')}
                             style={{ fontSize: '12px', padding: '4px 10px' }}
                           >
-                            {isActing === 'approve' ? '...' : '✓ Approve'}
+                            {isActing === 'approve' ? '...' : 'Approve'}
                           </button>
                           <button
                             id={`ac-refund-reject-${rr.id}`}
@@ -168,7 +167,7 @@ export default function ACPaymentsRefunds() {
                             onClick={() => handleAction(rr.id, 'reject')}
                             style={{ fontSize: '12px', padding: '4px 10px', color: '#dc3545', borderColor: '#dc3545' }}
                           >
-                            {isActing === 'reject' ? '...' : '✗ Reject'}
+                            {isActing === 'reject' ? '...' : 'Reject'}
                           </button>
                         </div>
                       ) : (

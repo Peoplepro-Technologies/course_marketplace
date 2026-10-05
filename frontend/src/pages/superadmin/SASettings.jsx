@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import api from '../../api/axios';
-import { Settings, Save, AlertCircle, CheckCircle, ToggleLeft, ToggleRight } from 'lucide-react';
 import SASidebarLayout from './SASidebarLayout';
 
 const DEFAULTS = {
@@ -59,7 +58,7 @@ export default function SASettings() {
     <SASidebarLayout>
       <div style={{ padding: '24px', maxWidth: '720px' }}>
         <h1 style={{ marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <Settings size={24} /> Platform Settings
+          Platform Settings
         </h1>
         <p style={{ color: '#6b7280', fontSize: '14px', marginBottom: '28px' }}>
           Global configuration for your platform.
@@ -67,12 +66,12 @@ export default function SASettings() {
 
         {error && (
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#fef2f2', color: '#991b1b', padding: '12px 16px', borderRadius: '8px', marginBottom: '20px' }}>
-            <AlertCircle size={16} /> {error}
+            {error}
           </div>
         )}
         {saved && (
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#f0fdf4', color: '#15803d', padding: '12px 16px', borderRadius: '8px', marginBottom: '20px' }}>
-            <CheckCircle size={16} /> Settings saved successfully.
+            Settings saved successfully.
           </div>
         )}
 
@@ -123,7 +122,6 @@ export default function SASettings() {
                 fontWeight: '600', fontSize: '14px',
               }}
             >
-              {isMaintenance ? <ToggleRight size={28} /> : <ToggleLeft size={28} />}
               {isMaintenance ? 'Enabled' : 'Disabled'}
             </button>
           </div>
@@ -142,7 +140,6 @@ export default function SASettings() {
               opacity: saving ? 0.7 : 1,
             }}
           >
-            <Save size={16} />
             {saving ? 'Saving...' : 'Save Settings'}
           </button>
         </div>

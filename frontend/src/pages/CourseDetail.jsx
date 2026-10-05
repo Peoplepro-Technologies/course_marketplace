@@ -228,7 +228,7 @@ export default function CourseDetail() {
                           {section.lessons?.map((lesson) => (
                             <div key={lesson.id} className="lesson-row" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                               <span className="lesson-icon" style={{ color: lesson.is_preview ? 'var(--color-primary)' : 'var(--color-text-muted)' }}>
-                                {lesson.is_preview ? '▶' : '—'}
+                                {lesson.is_preview ? 'Preview' : '—'}
                               </span>
                               <span className="lesson-title" style={{ flex: 1 }}>{lesson.title}</span>
                               {lesson.is_preview && (
@@ -247,7 +247,7 @@ export default function CourseDetail() {
                                     whiteSpace: 'nowrap',
                                   }}
                                 >
-                                  ▶ Preview
+                                  Preview
                                 </button>
                               )}
                               {lesson.duration > 0 && (
@@ -305,9 +305,7 @@ export default function CourseDetail() {
             <div className="sidebar-card card">
               {course.thumbnail_url ? (
                 <img src={course.thumbnail_url.startsWith('/media/') ? `http://localhost:8000${course.thumbnail_url}` : course.thumbnail_url} alt={course.title} className="sidebar-thumb" />
-              ) : (
-                <div className="sidebar-thumb-placeholder">📚</div>
-              )}
+              ) : null}
 
               <div className="sidebar-price">
                 {course.price > 0 ? `₹${course.price.toFixed(2)}` : 'Free'}
@@ -338,7 +336,7 @@ export default function CourseDetail() {
                       style={{ width: '100%' }}
                       onClick={() => navigate('/learner')}
                     >
-                      ✓ Enrolled — Go to Dashboard
+                      Enrolled — Go to Dashboard
                     </button>
                   )
                 ) : (
@@ -356,16 +354,16 @@ export default function CourseDetail() {
 
               <div className="sidebar-stats">
                 <div className="sidebar-stat">
-                  <span>📚</span> {totalLessons} Lessons
+{totalLessons} Lessons
                 </div>
                 <div className="sidebar-stat">
-                  <span>⏱️</span> {totalDuration} Minutes
+{totalDuration} Minutes
                 </div>
                 <div className="sidebar-stat">
-                  <span>📂</span> {sections.length} Sections
+{sections.length} Sections
                 </div>
                 <div className="sidebar-stat">
-                  <span>⭐</span> {(course.avg_rating || 0).toFixed(1)} Rating
+{(course.avg_rating || 0).toFixed(1)} Rating
                 </div>
               </div>
 

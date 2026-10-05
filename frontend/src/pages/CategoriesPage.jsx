@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../api/axios';
-import { Tag, BookOpen, Search } from 'lucide-react';
 
 export default function CategoriesPage() {
   const [categories, setCategories] = useState([]);
@@ -28,15 +27,11 @@ export default function CategoriesPage() {
     <div style={{ minHeight: '100vh', background: '#f9fafb' }}>
       {/* Hero */}
       <div style={{ background: 'linear-gradient(135deg, #0056D2, #1565c0)', padding: '64px 24px', textAlign: 'center', color: 'white' }}>
-        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '16px' }}>
-          <Tag size={40} />
-        </div>
         <h1 style={{ fontSize: '36px', fontWeight: '700', marginBottom: '12px' }}>Browse Categories</h1>
         <p style={{ fontSize: '18px', opacity: 0.85, maxWidth: '520px', margin: '0 auto 28px' }}>
           Explore our course library by subject area. Click a category to browse all related courses.
         </p>
         <div style={{ position: 'relative', maxWidth: '440px', margin: '0 auto' }}>
-          <Search size={18} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: '#6b7280' }} />
           <input
             placeholder="Filter categories..."
             value={searchTerm}
@@ -81,9 +76,6 @@ export default function CategoriesPage() {
                   e.currentTarget.style.transform = 'translateY(0)';
                 }}
               >
-                <div style={{ background: '#eff6ff', borderRadius: '8px', padding: '10px', display: 'inline-flex', marginBottom: '14px' }}>
-                  <BookOpen size={22} color="#0056D2" />
-                </div>
                 <div style={{ fontWeight: '700', fontSize: '16px', color: '#111827', marginBottom: '6px' }}>{cat.name}</div>
                 <div style={{ fontSize: '14px', color: '#6b7280' }}>
                   {cat.course_count} {cat.course_count === 1 ? 'Course' : 'Courses'}

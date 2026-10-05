@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import api from '../../api/axios';
-import { ArrowLeft, Send } from 'lucide-react';
 import StatusBadge from '../../components/StatusBadge';
 import LoadingSpinner from '../../components/LoadingSpinner';
 
@@ -59,7 +58,7 @@ export default function SupportTicketDetail() {
     <div className="page-wrapper">
       <div className="section-header">
         <button className="btn btn-secondary btn-sm flex-center gap-xs" style={{ marginBottom: '1rem' }} onClick={() => navigate(`/${rolePrefix}/support`)}>
-          <ArrowLeft size={16} /> Back to Tickets
+          Back to Tickets
         </button>
         <div className="flex-between">
           <h2>
@@ -108,7 +107,7 @@ export default function SupportTicketDetail() {
             ></textarea>
             <div style={{ alignSelf: 'flex-end' }}>
               <button type="submit" className="btn btn-primary flex-center gap-xs" disabled={submitting}>
-                <Send size={16} /> {submitting ? 'Sending...' : 'Send Reply'}
+                {submitting ? 'Sending...' : 'Send Reply'}
               </button>
             </div>
           </form>

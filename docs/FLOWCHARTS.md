@@ -1,5 +1,7 @@
 # Platform Workflow Flowcharts
 
+> **Updated**: flowchart 5 (custom payout rate), flowchart 6 (department routing) and new flowchart 8 (instructor reassignment).
+>
 > All diagrams are based on actual backend code — router logic, status transitions, and service calls verified before drawing.
 
 ---
@@ -151,7 +153,7 @@ flowchart TD
 ```mermaid
 flowchart TD
     A([Learners enroll\nin Instructor's courses]) -->|enrollment.status = 'approved'| B[Earnings accumulate:\nSum of course.price\nfor approved enrollments]
-    B --> C[Platform fee: 20% deducted\nNet payout = gross × 0.80]
+    B --> C[Instructor share = instructor_payout_rate if set,\nelse 80% default. Platform keeps the rest]
     C --> D([Accounts Team])
     D -->|GET /accounts/payouts| E[Views per-instructor\nearnings breakdown]
     E --> F{Decides to pay instructor\nvia external channel\ne.g. bank transfer / PayPal}
@@ -167,31 +169,34 @@ flowchart TD
 
 ---
 
-## 6. Support Ticket Lifecycle
+## 6. Support Ticket Lifecycle (department routing)
 
 **Code basis:**
-- `support.py` — `GET` and `POST` for `raise_ticket` and `reply_to_ticket` accessible via `require_any_role(["learner", "instructor", "coursecoordinator"])`.
-- `POST /support-tickets` → creates `SupportTicket(status="open")`, assigns to either `admin` or `accounts` based on category, generates `ticket_number`.
-- `accounts.py`, `subadmin.py`, `superadmin.py` — Staff endpoints to list tickets by assigned team, reply, update status, and track unread state (`TicketRead`).
-- Unread badge logic: `GET /support-tickets/unread-count` checks if `last_activity_at > last_read_at` and `last_activity_by != self`.
-- `POST /.../support-tickets/{id}/read` clears the unread badge.
-- `POST /.../support-tickets/{id}/reply` adds a `TicketReply`. If ticket was `resolved`/`closed`, it **re-opens** it (`ticket.status = "open"`).
-- Audit events are logged via `app/services/audit.py` for creation, reopening, and replies.
+- `support.py` — `GET /support-tickets/routing-options` supplies category / sub-category dropdowns for the caller's role from `ticket_routing_rules`.
+- `POST /support-tickets` (roles `learner`, `instructor`, `coursecoordinator`) looks up `(role, category, subcategory)` → `department_id`, falls back to a category-only rule, otherwise `department_id` stays `NULL` and legacy `assigned_team="admin"`. Ticket numbers are `SRnnn`.
+- Department users work tickets through `/support-tickets/department-queue*` (requires `users.department_id`; the ticket must belong to that department).
+- Accounts, Sub Admin and Super Admin keep their own inbox endpoints; Super Admin also has `/support-tickets/analytics`.
+- Unread badge: `last_activity_at > last_read_at` and `last_activity_by != self` (`TicketRead`).
+- A reply by the raiser re-opens a resolved ticket (`open`); a reply by department staff moves a resolved/closed ticket to `in_progress`.
+- Audit events are logged via `app/services/audit.py` (e.g. `ticket_created`).
 
 ```mermaid
 flowchart TD
-    A([Learner / Instructor / Coordinator]) -->|POST /api/v1/support-tickets\ncategory: billing -> accounts, else admin| B[SupportTicket created\nstatus='open', assigned_team\nticket_number]
-    B -->|Audit Log| C[ticket_created]
-    B --> D[Admin or Accounts views Inbox]
-    D --> E[Unread badge polling\nGET /.../unread-count]
-    D -->|Click ticket| F[Clear badge\nPOST /.../{id}/read]
-    F --> G[Admin updates status\nor replies]
-    G --> H[User adds reply\nPOST /.../{id}/reply]
-    H --> I{Ticket was resolved/closed?}
-    I -->|Yes| J[ticket.status reset to 'open']
-    I -->|No| K[Reply added, ticket stays open]
-    J -->|Audit Log| L[ticket_reopened]
-    K --> M[Ticket unread badge for Staff]
+    A([Learner / Instructor / Coordinator]) -->|GET /routing-options| R[Pick category, then sub-category]
+    R -->|POST /support-tickets| B[SupportTicket created\nSRnnn, status=open]
+    B --> M{Routing rule for\nrole + category + subcategory?}
+    M -->|Exact match| D[department_id set]
+    M -->|Category-only match| D
+    M -->|None| N[department_id NULL\nassigned_team = admin]
+    D --> Q[Department queue\nGET /support-tickets/department-queue]
+    Q --> S([Staff in that department])
+    S -->|PUT status / assignee| U[Ticket in_progress / resolved]
+    S -->|POST reply| V[Reply stored,\nunread badge for raiser]
+    V --> W{Raiser replies back?}
+    W -->|Ticket was resolved| X[Status reset to open]
+    W -->|No| Y[Ticket unchanged]
+    N --> Z([Admin inboxes:\nSub Admin / Super Admin])
+    B --> AN([Super Admin analytics\nGET /support-tickets/analytics\nKPIs + SLA overdue])
 ```
 
 ---
@@ -236,3 +241,20 @@ flowchart TD
 ```
 
 > ⚠️ **Known limitation**: YouTube's transcript API may block server IPs. The `manual-paste` path exists specifically as a workaround. The `whisper_model` field is set to `"manual-paste"` (not an actual model name) to flag manually-entered transcripts in the database.
+
+---
+
+## 8. Instructor Reassignment (Coordinator)
+
+**Code basis:** `coordinator.py` — `deactivate_instructor`, `get_instructor_courses`, `assign_instructor_to_course`, `get_course_assignment_detail`.
+
+```mermaid
+flowchart TD
+    A([Coordinator]) -->|PUT /coordinator/instructors/id/deactivate| B[Instructor is_active = False\ncourses and content untouched]
+    A -->|GET /coordinator/instructors/id/courses| C[List the instructor's courses]
+    C -->|POST /coordinator/courses/id/assign-instructor| D{New instructor?}
+    D -->|Instructor id| E[course.instructor_id = new\nprevious_instructor_id = old]
+    D -->|null or discard| F[Instructor cleared]
+    E --> G[Sections, lessons, quizzes,\nassignments and videos stay with the course]
+    A -->|GET /coordinator/courses/id/assignment-detail| H[Shows current and previous instructor]
+```

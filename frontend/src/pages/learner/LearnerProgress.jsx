@@ -13,7 +13,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../../api/axios';
-import { BookOpen, CheckCircle, TrendingUp, BarChart2, PlayCircle, Trophy } from 'lucide-react';
 import EmptyState from '../../components/EmptyState';
 
 function ProgressBar({ value }) {
@@ -50,13 +49,6 @@ function CourseCard({ enr }) {
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '14px', gap: '12px' }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', flex: 1, minWidth: 0 }}>
-          <div style={{
-            width: '36px', height: '36px', borderRadius: '8px', flexShrink: 0,
-            background: isDone ? 'linear-gradient(135deg, #16a34a, #22c55e)' : 'linear-gradient(135deg, #0056D2, #7B2FBE)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white',
-          }}>
-            {isDone ? <Trophy size={16} /> : <BookOpen size={16} />}
-          </div>
           <div style={{ minWidth: 0 }}>
             <div style={{ fontWeight: '700', fontSize: '15px', color: 'var(--color-text-primary, #111827)', lineHeight: '1.3', marginBottom: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {enr.course_title}
@@ -79,7 +71,7 @@ function CourseCard({ enr }) {
         <ProgressBar value={pct} />
         {isDone && (
           <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#16a34a', fontSize: '12px', fontWeight: '600', whiteSpace: 'nowrap' }}>
-            <CheckCircle size={13} /> Done
+            Done
           </span>
         )}
       </div>
@@ -97,7 +89,7 @@ function CourseCard({ enr }) {
             color: isDone ? '#16a34a' : '#0056D2',
           }}
         >
-          <PlayCircle size={14} /> {isDone ? 'Review' : 'Resume'}
+          {isDone ? 'Review' : 'Resume'}
         </Link>
       </div>
     </div>
@@ -139,7 +131,7 @@ export default function LearnerProgress() {
 
       {/* ── Page header ─────────────────────────────────────────────── */}
       <h1 style={{ marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '10px', fontSize: '22px' }}>
-        <TrendingUp size={24} /> My Progress
+        My Progress
       </h1>
       <p style={{ color: 'var(--color-text-muted, #6b7280)', fontSize: '14px', marginBottom: '28px' }}>
         Your learning journey across all enrolled courses.
@@ -155,13 +147,12 @@ export default function LearnerProgress() {
       {overview && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '16px', marginBottom: '36px' }}>
           {[
-            { icon: BookOpen,    label: 'Enrolled',       value: overview.total_enrolled,       color: '#0056D2' },
-            { icon: CheckCircle, label: 'Completed',      value: overview.completed_courses,     color: '#16a34a' },
-            { icon: BarChart2,   label: 'Avg. Progress',  value: `${overview.average_progress}%`, color: '#7c3aed' },
-          ].map(({ icon: Icon, label, value, color }) => (
+            { label: 'Enrolled',       value: overview.total_enrolled,       color: '#0056D2' },
+            { label: 'Completed',      value: overview.completed_courses,     color: '#16a34a' },
+            { label: 'Avg. Progress',  value: `${overview.average_progress}%`, color: '#7c3aed' },
+          ].map(({ label, value, color }) => (
             <div key={label} style={{ background: 'var(--color-bg-secondary, white)', borderRadius: '12px', padding: '18px 20px', boxShadow: '0 2px 6px rgba(0,0,0,0.05)', border: '1px solid var(--color-border, #eaeaea)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
-                <Icon size={16} color={color} />
                 <span style={{ fontSize: '12px', fontWeight: '500', color: 'var(--color-text-muted, #6b7280)' }}>{label}</span>
               </div>
               <div style={{ fontSize: '26px', fontWeight: '800', color: 'var(--color-text-primary, #111827)' }}>{value}</div>
@@ -172,14 +163,13 @@ export default function LearnerProgress() {
 
       {/* ── No enrollments at all ────────────────────────────────────── */}
       {enrollments.length === 0 && !error && (
-        <EmptyState icon={BookOpen} title="No Courses Yet" message="Enrol in a course to track your progress here." />
+        <EmptyState title="No Courses Yet" message="Enrol in a course to track your progress here." />
       )}
 
       {/* ── IN PROGRESS section ──────────────────────────────────────── */}
       {inProgress.length > 0 && (
         <div style={{ marginBottom: '36px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
-            <PlayCircle size={18} color="#0056D2" />
             <h2 style={{ fontSize: '16px', fontWeight: '700', color: 'var(--color-text-primary, #111827)', margin: 0 }}>
               In Progress <span style={{ fontWeight: '400', color: 'var(--color-text-muted, #6b7280)', fontSize: '13px' }}>({inProgress.length})</span>
             </h2>
@@ -194,7 +184,6 @@ export default function LearnerProgress() {
       {completed.length > 0 && (
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
-            <Trophy size={18} color="#16a34a" />
             <h2 style={{ fontSize: '16px', fontWeight: '700', color: '#16a34a', margin: 0 }}>
               Completed <span style={{ fontWeight: '400', color: 'var(--color-text-muted, #6b7280)', fontSize: '13px' }}>({completed.length})</span>
             </h2>

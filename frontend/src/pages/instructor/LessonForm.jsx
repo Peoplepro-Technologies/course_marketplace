@@ -7,7 +7,6 @@
  */
 
 import { useState, useRef, useEffect } from 'react';
-import { Loader2, CheckCircle2, AlertCircle, Plus, Trash2 } from 'lucide-react';
 import api from '../../api/axios';
 import VideoPlayer from '../../components/VideoPlayer';
 import keycloak from '../../auth/keycloak';
@@ -182,13 +181,13 @@ export default function LessonForm({ sectionId, existingLesson, onSuccess, order
     }
   };
 
-  // Upload status metadata: { icon, text, color }
+  // Upload status metadata: { text, color }
   const statusMeta = {
     idle:       null,
-    uploading:  { icon: <Loader2 size={14} className="spin" />, text: `Uploading ${uploadProgress}%`,                         color: 'var(--color-text-muted)' },
-    processing: { icon: <CheckCircle2 size={14} />,             text: 'File uploaded. Transcoding in progress — you can close this form.', color: 'var(--color-success, #22c55e)' },
-    done:       { icon: <CheckCircle2 size={14} />,             text: 'Video queued for transcoding.',                          color: 'var(--color-success, #22c55e)' },
-    error:      { icon: <AlertCircle  size={14} />,             text: `Upload error: ${uploadError}`,                          color: 'var(--color-danger, #ef4444)' },
+    uploading:  { text: `Uploading ${uploadProgress}%`,                         color: 'var(--color-text-muted)' },
+    processing: { text: 'File uploaded. Transcoding in progress — you can close this form.', color: 'var(--color-success, #22c55e)' },
+    done:       { text: 'Video queued for transcoding.',                          color: 'var(--color-success, #22c55e)' },
+    error:      { text: `Upload error: ${uploadError}`,                          color: 'var(--color-danger, #ef4444)' },
   }[uploadStatus];
 
   return (
@@ -263,7 +262,6 @@ export default function LessonForm({ sectionId, existingLesson, onSuccess, order
                 borderRadius: '6px',
                 border: '1px solid rgba(245,158,11,0.3)',
               }}>
-                <Loader2 size={14} className="spin" />
                 Video is being transcoded in the background. Refresh the lesson in a few minutes to see it.
               </div>
             ) : (
@@ -313,7 +311,6 @@ export default function LessonForm({ sectionId, existingLesson, onSuccess, order
             fontSize: 'var(--text-sm)',
             color: statusMeta.color,
           }}>
-            {statusMeta.icon}
             {statusMeta.text}
           </p>
         )}
@@ -362,7 +359,7 @@ export default function LessonForm({ sectionId, existingLesson, onSuccess, order
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
           <h4 style={{ margin: 0 }}>Quiz Questions</h4>
           <button type="button" className="btn btn-secondary btn-sm" onClick={() => setQuizzes(prev => [...prev, { question_text: '', options: ['', '', '', ''], correct_option_index: 0, explanation: '' }])}>
-            <Plus size={16} /> Add Question
+            Add Question
           </button>
         </div>
         
@@ -371,7 +368,7 @@ export default function LessonForm({ sectionId, existingLesson, onSuccess, order
           <div key={idx} style={{ padding: '1rem', background: 'var(--color-bg-secondary)', borderRadius: '8px', marginBottom: '1rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
               <strong>Question {idx + 1}</strong>
-              <button type="button" className="btn btn-danger btn-sm" onClick={() => handleDeleteQuiz(idx)}><Trash2 size={14} /></button>
+              <button type="button" className="btn btn-danger btn-sm" onClick={() => handleDeleteQuiz(idx)}>Remove</button>
             </div>
             <input type="text" placeholder="Question Text" value={q.question_text} style={{ marginBottom: '0.5rem' }} onChange={e => {
               const newQuizzes = [...quizzes];
@@ -409,7 +406,7 @@ export default function LessonForm({ sectionId, existingLesson, onSuccess, order
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
           <h4 style={{ margin: 0 }}>Assignments</h4>
           <button type="button" className="btn btn-secondary btn-sm" onClick={() => setAssignments(prev => [...prev, { title: '', instructions: '' }])}>
-            <Plus size={16} /> Add Assignment
+            Add Assignment
           </button>
         </div>
         
@@ -418,7 +415,7 @@ export default function LessonForm({ sectionId, existingLesson, onSuccess, order
           <div key={idx} style={{ padding: '1rem', background: 'var(--color-bg-secondary)', borderRadius: '8px', marginBottom: '1rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
               <strong>Assignment {idx + 1}</strong>
-              <button type="button" className="btn btn-danger btn-sm" onClick={() => handleDeleteAssignment(idx)}><Trash2 size={14} /></button>
+              <button type="button" className="btn btn-danger btn-sm" onClick={() => handleDeleteAssignment(idx)}>Remove</button>
             </div>
             <input type="text" placeholder="Assignment Title" value={a.title} style={{ marginBottom: '0.5rem' }} onChange={e => {
               const newAssignments = [...assignments];

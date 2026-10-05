@@ -5,7 +5,6 @@ import LoadingSpinner from '../../components/LoadingSpinner';
 import Modal from '../../components/Modal';
 import ReviewForm from './ReviewForm';
 import keycloak from '../../auth/keycloak';
-import { PenTool, ClipboardList, CheckCircle2, Star, BookOpen, FileText, ChevronUp, ChevronDown, Clock, Search, Loader2 } from 'lucide-react';
 import EmptyState from '../../components/EmptyState';
 import VideoPlayer from '../../components/VideoPlayer';
 import './LessonViewer.css';
@@ -109,7 +108,7 @@ function QuizViewer({ quizzes }) {
   return (
     <div className="quiz-container" style={{ marginTop: '2rem' }}>
       <h3 style={{ marginBottom: '1rem', color: '#0056D2', display: 'flex', alignItems: 'center', gap: '8px' }}>
-        <PenTool size={20} /> Quiz: Knowledge Check
+        Quiz: Knowledge Check
       </h3>
       {quizzes.map((quiz, index) => {
         const isSubmitted = submitted[quiz.id];
@@ -169,7 +168,7 @@ function AssignmentViewer({ assignments }) {
   return (
     <div style={{ marginTop: '2rem' }}>
       <h3 style={{ marginBottom: '1rem', color: '#0056D2', display: 'flex', alignItems: 'center', gap: '8px' }}>
-        <ClipboardList size={20} /> Assignment
+        Assignment
       </h3>
       {assignments.map(a => (
         <div key={a.id} style={{ background: 'white', padding: '1.5rem', borderRadius: '8px', marginBottom: '1.5rem', boxShadow: '0 4px 12px rgba(0,0,0,0.05)', borderLeft: '4px solid #0056D2' }}>
@@ -332,7 +331,7 @@ export default function LessonViewer() {
                     className={`sidebar-lesson ${activeLesson?.id === lesson.id ? 'active' : ''} ${progressData[lesson.id] === 'completed' ? 'completed' : ''}`}
                     onClick={() => handleLessonSelect(lesson)}
                   >
-                    <span className="status-icon">{progressData[lesson.id] === 'completed' ? '✓' : ' '}</span>
+                    <span className="status-icon">{progressData[lesson.id] === 'completed' ? '' : ' '}</span>
                     <span className="lesson-name">{lesson.title}</span>
                   </div>
                 ))}
@@ -347,7 +346,7 @@ export default function LessonViewer() {
           <h2>{activeLesson ? activeLesson.title : 'Select a lesson'}</h2>
           <div className="header-actions">
             <button className="btn btn-secondary btn-sm flex-center" style={{ gap: '6px' }} onClick={() => setReviewModalOpen(true)}>
-              <Star size={14} /> Leave a Review
+              Leave a Review
             </button>
             <button
               className={`btn ${progressData[activeLesson?.id] === 'completed' ? 'btn-success' : 'btn-primary'} btn-sm flex-center`}
@@ -355,7 +354,7 @@ export default function LessonViewer() {
               onClick={() => markComplete(activeLesson)}
               disabled={!activeLesson || progressData[activeLesson.id] === 'completed'}
             >
-              {progressData[activeLesson?.id] === 'completed' ? <><CheckCircle2 size={14} /> Completed</> : 'Mark as Complete'}
+              {progressData[activeLesson?.id] === 'completed' ? <>Completed</> : 'Mark as Complete'}
             </button>
           </div>
         </header>
@@ -378,7 +377,6 @@ export default function LessonViewer() {
                     color: 'var(--color-warning, #f59e0b)',
                     marginBottom: '1.5rem',
                   }}>
-                    <Loader2 size={32} className="spin" />
                     <div>
                       <strong style={{ display: 'block', marginBottom: '0.25rem' }}>Video is being processed</strong>
                       <span style={{ fontSize: 'var(--text-sm)', opacity: 0.85 }}>
@@ -423,7 +421,6 @@ export default function LessonViewer() {
                       aria-expanded={transcriptOpen}
                     >
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <FileText size={18} />
                         <span>Transcript & Timestamps</span>
                         {transcript?.status === 'completed' && (
                           <span className="badge badge-success" style={{ marginLeft: '8px' }}>Ready</span>
@@ -438,7 +435,6 @@ export default function LessonViewer() {
                           <span className="badge badge-muted" style={{ marginLeft: '8px' }}>Loading…</span>
                         )}
                       </div>
-                      <span className="transcript-chevron">{transcriptOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}</span>
                     </button>
 
                     {transcriptOpen && transcript?.status === 'completed' && (
@@ -450,7 +446,7 @@ export default function LessonViewer() {
                             style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'none', border: 'none', padding: '0.5rem 1rem', cursor: 'pointer', color: transcriptTab === 'timestamps' ? '#0056D2' : '#666', borderBottom: transcriptTab === 'timestamps' ? '2px solid #0056D2' : 'none', fontWeight: transcriptTab === 'timestamps' ? '600' : '400' }}
                             onClick={() => setTranscriptTab('timestamps')}
                           >
-                            <Clock size={16} /> Timestamps
+                            Timestamps
                           </button>
                           <button
                             type="button"
@@ -458,7 +454,7 @@ export default function LessonViewer() {
                             style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'none', border: 'none', padding: '0.5rem 1rem', cursor: 'pointer', color: transcriptTab === 'text' ? '#0056D2' : '#666', borderBottom: transcriptTab === 'text' ? '2px solid #0056D2' : 'none', fontWeight: transcriptTab === 'text' ? '600' : '400' }}
                             onClick={() => setTranscriptTab('text')}
                           >
-                            <FileText size={16} /> Full Text
+                            Full Text
                           </button>
                         </div>
                       </div>
@@ -495,7 +491,6 @@ export default function LessonViewer() {
                             )}
                             {transcriptTab === 'timestamps' && (
                               <div style={{ position: 'relative', flex: 1, maxWidth: '300px', marginLeft: 'auto' }}>
-                                <Search size={16} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#999' }} />
                                 <input
                                   type="text"
                                   className="transcript-search-input"
@@ -527,7 +522,7 @@ export default function LessonViewer() {
                                         handleSeek(seg.start);
                                       }}
                                     >
-                                      <Clock size={14} /> {formatTime(seg.start)}
+                                      {formatTime(seg.start)}
                                     </button>
                                     <span className="transcript-cue-text">{seg.text}</span>
                                   </div>
@@ -562,13 +557,12 @@ export default function LessonViewer() {
                   style={{ cursor: progressData[activeLesson.id] === 'completed' ? 'default' : 'pointer' }}
                 />
                 <label htmlFor="markCompleteBottom" style={{ margin: 0, fontSize: '1rem', fontWeight: 600, color: progressData[activeLesson.id] === 'completed' ? '#155724' : '#333', cursor: progressData[activeLesson.id] === 'completed' ? 'default' : 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  {progressData[activeLesson.id] === 'completed' ? <><CheckCircle2 size={18} /> Lesson Completed</> : 'Mark Lesson as Complete'}
+                  {progressData[activeLesson.id] === 'completed' ? <>Lesson Completed</> : 'Mark Lesson as Complete'}
                 </label>
               </div>
             </div>
           ) : (
             <EmptyState 
-              icon={BookOpen}
               title="Select a lesson from the sidebar to begin"
               message="Choose a lesson on the left to start learning."
             />

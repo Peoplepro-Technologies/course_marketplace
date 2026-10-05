@@ -44,7 +44,7 @@ export default function SubAdminReviewsModeration() {
   return (
     <SubAdminSidebarLayout>
       <div className="sa-page-header">
-        <h2>⭐ Review Moderation</h2>
+        <h2>Review Moderation</h2>
         <p>Monitor and moderate learner reviews across all courses.</p>
       </div>
 

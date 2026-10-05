@@ -91,7 +91,7 @@ export default function ACTransactions() {
                     </td>
                     <td style={{ padding: '12px 16px' }}>
                       <span style={{ background: '#d4edda', color: '#155724', padding: '3px 10px', borderRadius: 'var(--radius-full)', fontSize: 'var(--text-xs)', fontWeight: 600 }}>
-                        ✓ Completed
+                        Completed
                       </span>
                     </td>
                   </tr>

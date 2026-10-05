@@ -68,6 +68,12 @@ import SAReviewsModeration from './pages/superadmin/SAReviewsModeration';
 import SAAuditLogs from './pages/superadmin/SAAuditLogs';
 import SASettings from './pages/superadmin/SASettings';
 import SATicketRouting from './pages/superadmin/SATicketRouting';
+import SADepartments from './pages/superadmin/SADepartments';
+import SAServiceRequests from './pages/superadmin/SAServiceRequests';
+
+// Shared / Generic
+import DepartmentQueue from './pages/shared/DepartmentQueue';
+import StaffDashboard from './pages/shared/StaffDashboard';
 
 // Sub Admin Sub-pages
 import SubAdminUserManagement from './pages/subadmin/SubAdminUserManagement';
@@ -402,6 +408,10 @@ export default function App() {
             <Route path="/super-admin/ticket-routing" element={<ProtectedRoute role="super_admin"><SATicketRouting /></ProtectedRoute>} />
             <Route path="/super-admin/settings" element={<ProtectedRoute role="super_admin"><SASettings /></ProtectedRoute>} />
             <Route path="/super-admin/audit-logs" element={<ProtectedRoute role="super_admin"><SAAuditLogs /></ProtectedRoute>} />
+            <Route path="/super-admin/departments" element={<ProtectedRoute role="super_admin"><SADepartments /></ProtectedRoute>} />
+            <Route path="/super-admin/service-requests" element={<ProtectedRoute role="super_admin"><SAServiceRequests /></ProtectedRoute>} />
+            {/* Generic department queue — works for any dept-assigned user */}
+            <Route path="/department-queue" element={<ProtectedRoute role="any"><DepartmentQueue /></ProtectedRoute>} />
 
             {/* ── Sub Admin Routes ───────────────────────────────────── */}
             <Route 
@@ -548,6 +558,11 @@ export default function App() {
             <Route path="/accounts/reconciliation" element={<ProtectedRoute role="accounts"><ACReconciliation /></ProtectedRoute>} />
             <Route path="/accounts/support" element={<ProtectedRoute role="accounts"><ACSupportTickets /></ProtectedRoute>} />
             <Route path="/accounts/enrollments" element={<ProtectedRoute role="accounts"><ACEnrollmentApprovals /></ProtectedRoute>} />
+
+            {/* ── Staff / Dept Portal (any dept user) ─────────────────── */}
+            <Route path="/staff" element={<ProtectedRoute role="any"><StaffDashboard /></ProtectedRoute>} />
+            <Route path="/staff/*" element={<ProtectedRoute role="any"><StaffDashboard /></ProtectedRoute>} />
+            <Route path="/department-queue" element={<ProtectedRoute role="any"><DepartmentQueue /></ProtectedRoute>} />
           </Routes>
         </main>
       </BrowserRouter>

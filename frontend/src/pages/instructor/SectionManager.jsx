@@ -101,7 +101,7 @@ export default function SectionManager() {
       <div className="flex-col gap-lg">
         {sections.length === 0 ? (
           <div className="empty-state card">
-            <div className="empty-icon">📂</div>
+
             <h3>No curriculum yet</h3>
             <p>Start by creating your first section below.</p>
           </div>

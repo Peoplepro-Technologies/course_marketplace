@@ -1,7 +1,6 @@
 import React from 'react';
-import { FileSearch } from 'lucide-react';
 
-export default function EmptyState({ icon: Icon = FileSearch, title, message }) {
+export default function EmptyState({ title, message }) {
   return (
     <div style={{
       display: 'flex',
@@ -14,15 +13,6 @@ export default function EmptyState({ icon: Icon = FileSearch, title, message }) 
       border: '1px solid var(--border)',
       borderRadius: 'var(--radius-md)'
     }}>
-      <div style={{
-        backgroundColor: 'var(--bg)',
-        padding: '16px',
-        borderRadius: '50%',
-        marginBottom: '16px',
-        color: 'var(--text)'
-      }}>
-        <Icon size={32} strokeWidth={1.5} />
-      </div>
       <h3 style={{ margin: '0 0 8px 0', color: 'var(--text-h)', fontSize: '18px', fontWeight: 600 }}>
         {title}
       </h3>

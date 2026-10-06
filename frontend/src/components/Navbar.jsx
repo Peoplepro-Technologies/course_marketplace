@@ -23,7 +23,6 @@ export default function Navbar() {
       <div className="navbar-inner container">
         {/* ── Logo ──────────────────────────────────────────────────── */}
         <Link to="/" className="navbar-brand">
-          <span className="navbar-logo">🎓</span>
           <span className="navbar-title">CourseHub</span>
         </Link>
 
@@ -98,7 +97,19 @@ export default function Navbar() {
               Accounts
             </Link>
           )}
+
+          {/* Staff role users always get their portal link */}
+          {authenticated && primaryRole === 'staff' && (
+            <Link
+              to="/staff"
+              className={`nav-link ${isActive('/staff') ? 'active' : ''}`}
+              style={{ color: '#818cf8', fontWeight: 700 }}
+            >
+              {user?.department_name || 'Staff Portal'}
+            </Link>
+          )}
         </div>
+
 
         {/* ── User Info & Auth Buttons ──────────────────────────────── */}
         <div className="navbar-user">

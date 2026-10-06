@@ -4,7 +4,6 @@ import useAuth from '../../hooks/useAuth';
 import api from '../../api/axios';
 import StatusBadge from '../../components/StatusBadge';
 import EmptyState from '../../components/EmptyState';
-import { Receipt } from 'lucide-react';
 import '../RoleDashboard.css';
 
 export default function PurchasesHistory() {
@@ -129,7 +128,6 @@ export default function PurchasesHistory() {
         </div>
       ) : (
         <EmptyState 
-          icon={Receipt}
           title="No purchases found"
           message="You haven't purchased any courses yet."
         />

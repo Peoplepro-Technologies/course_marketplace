@@ -25,7 +25,6 @@ function CompletionBadge({ submitted, total, type = 'submitted' }) {
 function EmptyState({ message }) {
   return (
     <div className="ia-empty">
-      <span className="ia-empty-icon">📭</span>
       <p>{message}</p>
     </div>
   );
@@ -38,7 +37,6 @@ function CourseCard({ course }) {
   return (
     <div className="ia-course-card">
       <div className="ia-course-card-header">
-        <span className="ia-course-icon">📚</span>
         <h3>{course.course_title}</h3>
       </div>
 
@@ -49,7 +47,7 @@ function CourseCard({ course }) {
           {hasAssignments && (
             <div className="ia-section">
               <h4 className="ia-section-heading">
-                <span>📝</span> Assignments
+Assignments
               </h4>
               <table className="ia-table">
                 <thead>
@@ -79,7 +77,7 @@ function CourseCard({ course }) {
           {hasQuizzes && (
             <div className="ia-section">
               <h4 className="ia-section-heading">
-                <span>❓</span> Quiz Questions
+Quiz Questions
               </h4>
               <table className="ia-table">
                 <thead>
@@ -143,7 +141,7 @@ export default function InstructorAnalytics() {
         {loading ? (
           <div className="ia-loading"><LoadingSpinner /></div>
         ) : error ? (
-          <div className="ia-error">⚠️ {error}</div>
+          <div className="ia-error">{error}</div>
         ) : data.length === 0 ? (
           <EmptyState message="You don't have any courses with assignments or quizzes yet." />
         ) : (

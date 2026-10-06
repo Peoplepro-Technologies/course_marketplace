@@ -49,13 +49,13 @@ export default function AdminDashboard() {
       <h3 style={{ marginBottom: '1.5rem' }}>Management Areas</h3>
       <div className="grid grid-3">
         <Link to="/admin/users" className="card flex-col gap-sm">
-          <div style={{ fontSize: '2rem' }}>👥</div>
+
           <h4>User Management</h4>
           <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>View and manage platform users.</p>
         </Link>
         
         <Link to="/admin/courses" className="card flex-col gap-sm">
-          <div style={{ fontSize: '2rem' }}>📚</div>
+
           <h4>Course Moderation</h4>
           <div className="flex-between">
             <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>Approve or flag courses.</p>
@@ -64,7 +64,7 @@ export default function AdminDashboard() {
         </Link>
 
         <Link to="/admin/reviews" className="card flex-col gap-sm">
-          <div style={{ fontSize: '2rem' }}>⭐</div>
+
           <h4>Review Moderation</h4>
           <div className="flex-between">
             <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>Monitor course reviews.</p>
@@ -73,7 +73,7 @@ export default function AdminDashboard() {
         </Link>
 
         <Link to="/admin/audit-logs" className="card flex-col gap-sm">
-          <div style={{ fontSize: '2rem' }}>📜</div>
+
           <h4>Audit Logs</h4>
           <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>View system and administrative actions.</p>
         </Link>

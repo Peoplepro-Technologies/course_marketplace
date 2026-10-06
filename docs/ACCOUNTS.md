@@ -60,10 +60,12 @@ When an Accounts user logs in, they see the following items:
 - **User Interaction**: Accounts staff reviews the owed amounts and payout details (e.g., PayPal email). Once the money is sent via the external system, they click "Mark Paid" here to zero out the balance and record the payout transaction.
 - **Backend API Endpoints**:
   - `GET /accounts/payouts`
-    - **Purpose**: Lists instructors and their accumulated unpaid earnings.
+    - **Purpose**: Lists instructors and their accumulated unpaid earnings. The split uses the instructor's custom `instructor_payout_rate` (set by the Coordinator) when present, otherwise the 80% instructor / 20% platform default. The response includes `payout_rate_pct` and `custom_rate` so the UI can show which rate was applied.
   - `POST /accounts/payouts/{instructorId}/mark-paid`
-    - **Purpose**: Records that a payout has been manually processed, resetting the owed balance.
+    - **Purpose**: Records that a payout has been manually processed. The recorded gross/fee/net uses the same custom-or-default rate.
     - **Role Restriction**: `accounts`
+  - `POST /accounts/payouts/batches/run`, `GET /accounts/payouts/batches`, `PUT /accounts/payouts/batches/{payoutId}/release`
+    - **Purpose**: Batch payout workflow. These endpoints exist but no frontend page calls them yet.
 
 ### 6. Invoices
 - **What it does**: A searchable table of invoices generated for learners/B2B clients.
@@ -100,7 +102,7 @@ When an Accounts user logs in, they see the following items:
 - **What it does**: Allows Accounts to manage support tickets assigned to the billing team.
 - **Backend API Endpoints**:
   - `GET /api/v1/accounts/support-tickets`
-    - **Purpose**: Lists all support tickets assigned to the 'accounts' team.
+    - **Purpose**: Lists tickets for the Accounts team: legacy `assigned_team = "accounts"` tickets **plus** tickets routed to any department whose name contains "finance" or "accounts" (e.g. Accounts/Finance).
   - `GET /api/v1/accounts/support-tickets/unread-count`
     - **Purpose**: Fetches the count of unread tickets for the badge.
   - `PUT /api/v1/accounts/support-tickets/{ticket_id}`

@@ -100,14 +100,23 @@ When a learner logs in, they see the following items in their navigation sidebar
     - **Role Restriction**: `learner`
 
 ### 8. Support
-- **What it does**: Ticketing interface for the learner to reach out to admins.
-- **User Interaction**: User fills out a form to create a ticket, or clicks on an existing ticket to add a reply.
+- **What it does**: Ticketing interface for the learner to reach the right team.
+- **User Interaction**: The learner picks a **category** (e.g. "Payment & Refund") and then a **sub-category** (e.g. "Refund request"). Both lists come from the routing rules for the `learner` role. The ticket is created as `SRnnn` and sent to the department mapped to that pair. The learner can open a ticket to read staff replies and reply back (replying to a resolved ticket re-opens it).
 - **Backend API Endpoints**:
-  - `GET /support` (Gets my tickets)
-  - `POST /support` (Raises a new ticket)
-  - `GET /support/{ticket_id}` (Gets specific ticket details)
-  - `POST /support/{ticket_id}/reply` (Adds a comment to the ticket)
-  - **Role Restriction**: Generally accessible to any authenticated user (requires validation of `support.py` decorators).
+  - `GET /api/v1/support-tickets/routing-options` (and `?category=...`) — dropdown data
+  - `GET /api/v1/support-tickets` — my tickets
+  - `POST /api/v1/support-tickets` — raise a ticket
+  - `GET /api/v1/support-tickets/{ticket_id}` — ticket detail (own tickets only)
+  - `POST /api/v1/support-tickets/{ticket_id}/reply`, `POST /api/v1/support-tickets/{ticket_id}/read`, `GET /api/v1/support-tickets/unread-count`
+  - **Role Restriction**: raising a ticket requires `learner`, `instructor` or `coursecoordinator`; the others require an authenticated user and only expose the caller's own tickets.
+  - See [SUPPORT_AND_DEPARTMENTS.md](./SUPPORT_AND_DEPARTMENTS.md).
+
+### 8b. Assignments & Quizzes
+- **What it does**: Inside the lesson viewer, learners submit assignments and answer quiz questions.
+- **Backend API Endpoints**:
+  - `POST /learner/assignments/{assignmentId}/submit` — submits or re-submits an assignment.
+  - `POST /learner/quiz-questions/{questionId}/attempt` — body `{ selected_option_index }`; the attempt and its correctness are stored (`quiz_attempts`).
+  - **Role Restriction**: `learner`
 
 ### 9. Profile Management
 - **What it does**: Allows the learner to update their basic information (name, bio).

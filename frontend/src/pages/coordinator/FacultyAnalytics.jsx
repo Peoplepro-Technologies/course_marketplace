@@ -25,7 +25,6 @@ function CompletionBadge({ submitted, total, type = 'submitted' }) {
 function EmptyState({ message }) {
   return (
     <div className="fa-empty">
-      <span className="fa-empty-icon">📭</span>
       <p>{message}</p>
     </div>
   );
@@ -39,7 +38,6 @@ function CourseSection({ course }) {
     return (
       <div className="fa-course">
         <div className="fa-course-header">
-          <span className="fa-course-icon">📚</span>
           <h4>{course.course_title}</h4>
         </div>
         <EmptyState message="No assignments or quizzes in this course yet." />
@@ -50,14 +48,13 @@ function CourseSection({ course }) {
   return (
     <div className="fa-course">
       <div className="fa-course-header">
-        <span className="fa-course-icon">📚</span>
         <h4>{course.course_title}</h4>
       </div>
 
       {hasAssignments && (
         <div className="fa-table-section">
           <h5 className="fa-table-heading">
-            <span className="fa-table-icon">📝</span> Assignments
+Assignments
           </h5>
           <table className="fa-table">
             <thead>
@@ -87,7 +84,7 @@ function CourseSection({ course }) {
       {hasQuizzes && (
         <div className="fa-table-section">
           <h5 className="fa-table-heading">
-            <span className="fa-table-icon">❓</span> Quizzes
+Quizzes
           </h5>
           <table className="fa-table">
             <thead>
@@ -152,7 +149,6 @@ export default function FacultyAnalytics() {
 
         {/* Search */}
         <div className="fa-search-bar">
-          <span className="fa-search-icon">🔍</span>
           <input
             type="text"
             placeholder="Search by instructor name…"
@@ -170,7 +166,7 @@ export default function FacultyAnalytics() {
         {loading ? (
           <div className="fa-loading"><LoadingSpinner /></div>
         ) : error ? (
-          <div className="fa-error">⚠️ {error}</div>
+          <div className="fa-error">{error}</div>
         ) : filtered.length === 0 ? (
           <EmptyState message={search ? `No instructors matching "${search}".` : 'No instructors with assignments or quizzes yet.'} />
         ) : (

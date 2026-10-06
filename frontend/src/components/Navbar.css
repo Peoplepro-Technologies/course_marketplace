@@ -31,10 +31,6 @@
   flex-shrink: 0;
 }
 
-.navbar-logo {
-  font-size: 1.5rem;
-}
-
 .navbar-title {
   font-family: var(--font-heading);
   font-size: var(--text-xl);

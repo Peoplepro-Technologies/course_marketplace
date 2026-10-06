@@ -11,14 +11,14 @@ import '../RoleDashboard.css';
 import '../superadmin/SuperAdminDashboard.css';
 
 const SIDEBAR_ITEMS = [
-  { icon: '📊', label: 'Dashboard', path: '/sub-admin' },
-  { icon: '👥', label: 'User Management', path: '/sub-admin/users' },
-  { icon: '📚', label: 'Course Management', path: '/sub-admin/courses' },
-  { icon: '🏷️', label: 'Categories', path: '/sub-admin/categories' },
-  { icon: '✅', label: 'Approvals', path: '/sub-admin/approvals' },
-  { icon: '⭐', label: 'Reviews & Moderation', path: '/sub-admin/reviews' },
-  { icon: '🛟', label: 'Support', path: '/sub-admin/support' },
-  { icon: '📈', label: 'Reports', path: '/sub-admin/reports' },
+  { label: 'Dashboard', path: '/sub-admin' },
+  { label: 'User Management', path: '/sub-admin/users' },
+  { label: 'Course Management', path: '/sub-admin/courses' },
+  { label: 'Categories', path: '/sub-admin/categories' },
+  { label: 'Approvals', path: '/sub-admin/approvals' },
+  { label: 'Reviews & Moderation', path: '/sub-admin/reviews' },
+  { label: 'Support', path: '/sub-admin/support' },
+  { label: 'Reports', path: '/sub-admin/reports' },
 ];
 
 export { SIDEBAR_ITEMS };
@@ -31,7 +31,7 @@ export default function SubAdminSidebarLayout({ children }) {
       {/* ── Sidebar ────────────────────────────────────────────────── */}
       <aside className="role-sidebar">
         <div className="role-sidebar-header">
-          <h3>🔧 Sub Admin</h3>
+          <h3>Sub Admin</h3>
           <p>Delegated Management</p>
         </div>
         <ul className="sidebar-nav">
@@ -40,7 +40,6 @@ export default function SubAdminSidebarLayout({ children }) {
               return (
                 <SupportBadgeLink 
                   key={item.label}
-                  icon={item.icon}
                   label={item.label}
                   path={item.path}
                   apiEndpoint="/subadmin/support-tickets/unread-count"
@@ -50,7 +49,6 @@ export default function SubAdminSidebarLayout({ children }) {
             return (
               <Link to={item.path} key={item.label} style={{ textDecoration: 'none' }}>
                 <li className={`sidebar-nav-item${location.pathname === item.path ? ' active' : ''}`}>
-                  <span className="sidebar-nav-icon">{item.icon}</span>
                   {item.label}
                 </li>
               </Link>

@@ -19,7 +19,6 @@ import api from '../../api/axios';
 import useAuth from '../../hooks/useAuth';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import AccountsSidebarLayout, { SIDEBAR_ITEMS } from './AccountsSidebarLayout';
-import { IndianRupee, RefreshCcw, CreditCard, AlertTriangle } from 'lucide-react';
 import '../RoleDashboard.css';
 
 const QUICK_ACCESS = SIDEBAR_ITEMS.slice(1);
@@ -57,14 +56,13 @@ export default function AccountsDashboard() {
         <div style={{ padding: 'var(--space-2xl) 0' }}><LoadingSpinner /></div>
       ) : error ? (
         <div className="alert alert-error" style={{ marginBottom: 'var(--space-xl)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <AlertTriangle size={18} /> {error}
+          {error}
         </div>
       ) : (
         <>
           <div className="ac-kpi-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 'var(--space-lg)', marginBottom: 'var(--space-2xl)' }}>
             {/* Total Revenue */}
             <div className="card" style={{ borderTop: '4px solid #0056D2', padding: 'var(--space-xl)' }}>
-              <div style={{ marginBottom: 'var(--space-sm)', color: '#0056D2' }}><IndianRupee size={32} /></div>
               <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 'var(--space-xs)' }}>
                 Total Revenue <span style={{ background: '#FFF3CD', color: '#856404', padding: '1px 6px', borderRadius: '4px', fontSize: '10px', fontWeight: 600 }}>Estimated</span>
               </div>
@@ -78,7 +76,6 @@ export default function AccountsDashboard() {
 
             {/* Pending Refunds */}
             <div className="card" style={{ borderTop: `4px solid ${kpis?.pending_refunds_count > 0 ? '#dc3545' : '#28a745'}`, padding: 'var(--space-xl)' }}>
-              <div style={{ marginBottom: 'var(--space-sm)', color: kpis?.pending_refunds_count > 0 ? '#dc3545' : '#28a745' }}><RefreshCcw size={32} /></div>
               <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 'var(--space-xs)' }}>
                 Pending Refunds
               </div>
@@ -92,7 +89,6 @@ export default function AccountsDashboard() {
 
             {/* Recent Transactions */}
             <div className="card" style={{ borderTop: '4px solid #6f42c1', padding: 'var(--space-xl)' }}>
-              <div style={{ marginBottom: 'var(--space-sm)', color: '#6f42c1' }}><CreditCard size={32} /></div>
               <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 'var(--space-xs)' }}>
                 Recent Transactions
               </div>
@@ -117,9 +113,6 @@ export default function AccountsDashboard() {
                 style={{ textDecoration: 'none', display: 'block' }}
               >
                 <div className="role-placeholder-card" style={{ cursor: 'pointer' }}>
-                  <div className="card-icon" style={{ display: 'flex', justifyContent: 'center', marginBottom: '0.75rem' }}>
-                    <item.Icon size={32} strokeWidth={1.5} />
-                  </div>
                   <h4>{item.label}</h4>
                   <p>{item.comingSoon ? 'Coming soon' : `Manage ${item.label.toLowerCase()}`}</p>
                 </div>

@@ -90,7 +90,7 @@ export default function HomePage() {
           <LoadingSpinner message="Loading courses..." />
         ) : courses.length === 0 ? (
           <div className="empty-state">
-            <div className="empty-icon">📭</div>
+
             <h3>No courses found</h3>
             <p>Try adjusting your search or filters.</p>
           </div>

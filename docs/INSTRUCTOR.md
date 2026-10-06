@@ -12,6 +12,7 @@ When an instructor logs in, they see the following items in their navigation sid
 - **Earnings**: Financial dashboard showing generated revenue.
 - **Live Classes**: Scheduling and managing live sessions for their courses.
 - **Reviews**: Reading and replying to student reviews.
+- **Assignments/Quiz** (`/instructor/analytics`): Assignment submission and quiz attempt statistics for the instructor's own courses.
 - **Support**: Ticketing system to get help from platform administrators.
 - **Profile & Payout**: Updating personal information and payout details.
 
@@ -76,6 +77,19 @@ When an instructor logs in, they see the following items in their navigation sid
   - `POST /instructor/lessons/{lessonId}/assignments` / `PUT ...` / `DELETE ...`
     - **Purpose**: CRUD operations for assignments attached to a lesson.
     - **Role Restriction**: `instructor`
+
+### 2b. Coordinator-controlled permissions ("Faculty mode")
+Two flags on the instructor's user record are set by the Coordinator and enforced by the backend:
+- `can_upload_video = False` → `POST /instructor/lessons/{lessonId}/upload-video` returns 403.
+- `can_host_live_classes = False` → scheduling, starting, ending and deleting live classes return 403.
+
+The instructor's payout share is `instructor_payout_rate` (percent, nullable). `NULL` means the platform default of 80%. A coordinator can also reassign any course to another instructor; the content stays with the course and the earlier instructor is recorded as `previous_instructor_id`.
+
+### 2c. Assignments/Quiz Stats
+- **Page**: `InstructorAnalytics.jsx`
+- **Backend API Endpoints**:
+  - `GET /instructor/my-assignments-quizzes` — per course: enrolled count, submissions per assignment, attempts per quiz.
+  - **Role Restriction**: `instructor`
 
 ### 3. Submissions & Status
 - **What it does**: Shows the instructor the approval status of their courses (e.g., Draft, Pending Review, Approved, Rejected).
@@ -153,5 +167,5 @@ When an instructor logs in, they see the following items in their navigation sid
     - **Role Restriction**: `instructor`
 
 ### 9. Support
-- **What it does**: Ticketing interface for the instructor to reach out to admins.
-- **Backend API Endpoints**: (Shares the generic `/support` endpoints).
+- **What it does**: Ticketing interface for the instructor. The raise-ticket form uses a two-level category → sub-category selection (loaded from `GET /api/v1/support-tickets/routing-options`), and the ticket is routed to the matching department with an `SRnnn` number.
+- **Backend API Endpoints**: shared `/api/v1/support-tickets/...` endpoints. See [SUPPORT_AND_DEPARTMENTS.md](./SUPPORT_AND_DEPARTMENTS.md).

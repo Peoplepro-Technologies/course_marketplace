@@ -37,7 +37,7 @@ export default function CourseEarningsDashboard() {
     <div className="page-wrapper container animate-fade-in">
       <div className="section-header flex-between">
         <div>
-          <h2>📊 Course Earnings</h2>
+          <h2>Course Earnings</h2>
           <p>Detailed breakdown of earnings per course.</p>
         </div>
         <Link to="/instructor" className="btn btn-secondary">

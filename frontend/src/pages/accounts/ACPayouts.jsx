@@ -61,7 +61,7 @@ export default function ACPayouts() {
           padding: '12px 20px', borderRadius: 'var(--radius-md)',
           boxShadow: 'var(--shadow-lg)', fontWeight: 600, fontSize: 'var(--text-sm)',
         }}>
-          {toast.ok ? '✓ ' : '✗ '}{toast.msg}
+          {toast.msg}
         </div>
       )}
 
@@ -90,7 +90,6 @@ export default function ACPayouts() {
         <div className="alert alert-error">! {error}</div>
       ) : data?.payouts?.length === 0 ? (
         <div className="empty-state card">
-          <div className="empty-icon"></div>
           <h3>No payout data available</h3>
           <p>No instructors have approved enrollments yet.</p>
         </div>
@@ -131,7 +130,7 @@ export default function ACPayouts() {
                       onClick={() => handleMarkPaid(p.instructor_id, p.instructor_name)}
                       style={{ whiteSpace: 'nowrap' }}
                     >
-                      {marking[p.instructor_id] ? '...' : '✓ Mark as Paid'}
+                      {marking[p.instructor_id] ? '...' : 'Mark as Paid'}
                     </button>
                   </td>
                 </tr>

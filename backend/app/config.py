@@ -5,8 +5,12 @@ Uses pydantic-settings to automatically read from .env file and provide
 typed configuration values throughout the app.
 """
 
+import os
 from pydantic_settings import BaseSettings
 from functools import lru_cache
+
+# Resolve .env relative to this file so it works from any working directory.
+_ENV_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".env")
 
 
 class Settings(BaseSettings):
@@ -44,7 +48,7 @@ class Settings(BaseSettings):
         return f"{self.KEYCLOAK_URL}/realms/{self.KEYCLOAK_REALM}"
 
     class Config:
-        env_file = ".env"
+        env_file = _ENV_FILE
         env_file_encoding = "utf-8"
 
 

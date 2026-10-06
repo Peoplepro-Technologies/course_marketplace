@@ -17,8 +17,6 @@ class TicketReplyOut(TicketReplyBase):
     ticket_id: UUID
     author_id: UUID
     created_at: datetime
-    
-    # We might want author name
     author_name: Optional[str] = None
 
     class Config:
@@ -28,7 +26,8 @@ class TicketReplyOut(TicketReplyBase):
 class SupportTicketBase(BaseModel):
     subject: str
     description: str
-    category: str = Field(..., description="billing, course, technical, account, other")
+    category: str = Field(..., description="First-level category, e.g. 'Payment & Refund'")
+    subcategory: Optional[str] = Field(None, description="Sub-category / service request")
     priority: str = Field("medium", description="low, medium, high")
 
 
@@ -45,21 +44,24 @@ class SupportTicketUpdate(BaseModel):
 class SupportTicketOut(SupportTicketBase):
     id: UUID
     ticket_number: str
+    sr_sequence: Optional[int] = None
     raised_by_id: UUID
     role_context: str
-    assigned_team: str
+    department_id: Optional[UUID] = None
+    department_name: Optional[str] = None
+    assigned_team: Optional[str] = None
     status: str
     assigned_to_id: Optional[UUID] = None
     last_activity_at: datetime
     last_activity_by: Optional[UUID] = None
     created_at: datetime
     updated_at: datetime
-    
+
     is_unread: bool = False
-    
+
     raised_by_name: Optional[str] = None
     assigned_to_name: Optional[str] = None
-    
+
     replies: List[TicketReplyOut] = []
 
     class Config:

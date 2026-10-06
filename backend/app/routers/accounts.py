@@ -605,21 +605,36 @@ def accounts_get_support_tickets(
     db: Session = Depends(get_db),
     admin: User = Depends(require_role("accounts")),
 ):
-    query = db.query(SupportTicket).filter(SupportTicket.assigned_team == "accounts")
+    from app.models.department import Department
+    from sqlalchemy import or_
+
+    # Collect department IDs whose name contains 'finance' or 'accounts'
+    finance_dept_ids = [
+        d.id for d in db.query(Department).all()
+        if any(kw in d.name.lower() for kw in ["finance", "accounts"])
+    ]
+
+    # Match: old assigned_team="accounts" OR new department_id in finance depts
+    query = db.query(SupportTicket).filter(
+        or_(
+            SupportTicket.assigned_team == "accounts",
+            SupportTicket.department_id.in_(finance_dept_ids) if finance_dept_ids else False,
+        )
+    )
     if status:
         query = query.filter(SupportTicket.status == status)
     if priority:
         query = query.filter(SupportTicket.priority == priority)
-    
+
     tickets = query.order_by(SupportTicket.updated_at.desc()).all()
     for t in tickets:
         t.raised_by_name = t.raised_by.name if t.raised_by else "Unknown"
         if t.assigned_to:
             t.assigned_to_name = t.assigned_to.name
-            
+        if t.department:
+            t.department_name = t.department.name
         read_record = db.query(TicketRead).filter_by(ticket_id=t.id, user_id=admin.id).first()
         last_read = read_record.last_read_at if read_record else datetime.min.replace(tzinfo=timezone.utc)
-        
         t.is_unread = (
             t.last_activity_at > last_read and
             t.last_activity_by != admin.id
@@ -631,7 +646,18 @@ def accounts_get_unread_count(
     db: Session = Depends(get_db),
     admin: User = Depends(require_role("accounts"))
 ):
-    tickets = db.query(SupportTicket).filter(SupportTicket.assigned_team == "accounts").all()
+    from app.models.department import Department
+    from sqlalchemy import or_
+    finance_dept_ids = [
+        d.id for d in db.query(Department).all()
+        if any(kw in d.name.lower() for kw in ["finance", "accounts"])
+    ]
+    tickets = db.query(SupportTicket).filter(
+        or_(
+            SupportTicket.assigned_team == "accounts",
+            SupportTicket.department_id.in_(finance_dept_ids) if finance_dept_ids else False,
+        )
+    ).all()
     count = 0
     for ticket in tickets:
         read_record = db.query(TicketRead).filter_by(ticket_id=ticket.id, user_id=admin.id).first()

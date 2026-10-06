@@ -32,7 +32,7 @@ export default function TranscriptSearch({ courseId, onJumpToLesson, sections })
   return (
     <div className="transcript-search" style={{ marginBottom: '2rem', padding: '2.5rem 2rem', borderRadius: '12px', background: '#fff', border: '2px solid var(--accent-border)', boxShadow: '0 4px 12px rgba(0, 86, 210, 0.05)' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.5rem' }}>
-        <span style={{ fontSize: '1.5rem', color: 'var(--accent)' }}>🔍</span>
+
         <h2 style={{ fontSize: '1.5rem', margin: 0, fontWeight: 'bold', color: 'var(--text-h)' }}>Search this course's lectures</h2>
       </div>
       <form onSubmit={handleSearch} style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem' }}>

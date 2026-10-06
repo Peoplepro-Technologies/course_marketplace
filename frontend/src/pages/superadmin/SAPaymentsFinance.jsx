@@ -33,12 +33,12 @@ export default function SAPaymentsFinance() {
   return (
     <SASidebarLayout>
       <div className="sa-page-header">
-        <h2>💳 Payments & Finance</h2>
+        <h2>Payments & Finance</h2>
         <p>Overview of platform revenue and recent transactions.</p>
       </div>
 
       <div className="sa-demo-banner">
-        <span className="demo-icon">ℹ️</span>
+
         <span><strong>Demo Data Mode:</strong> Revenue is estimated from course prices × approved enrollments. No real payment gateway is currently connected to the platform.</span>
       </div>
 

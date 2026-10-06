@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import api from '../../api/axios';
-import { User, CreditCard, Save, AlertCircle } from 'lucide-react';
 
 export default function InstructorProfile() {
   const [form, setForm] = useState({
@@ -54,19 +53,19 @@ export default function InstructorProfile() {
   return (
     <div style={{ padding: '24px', maxWidth: '720px' }}>
       <h1 style={{ marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '10px' }}>
-        <User size={24} /> Profile &amp; Payout
+        Profile &amp; Payout
       </h1>
 
       {error && (
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#fef2f2', color: '#991b1b', padding: '12px 16px', borderRadius: '8px', marginBottom: '20px' }}>
-          <AlertCircle size={16} /> {error}
+          {error}
         </div>
       )}
 
       {/* Profile Section */}
       <section style={{ background: 'white', borderRadius: '12px', padding: '24px', marginBottom: '24px', boxShadow: '0 2px 8px rgba(0,0,0,0.05)', border: '1px solid #eaeaea' }}>
         <h2 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '8px', color: '#0056D2' }}>
-          <User size={18} /> Personal Info
+          Personal Info
         </h2>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           <label style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '14px', fontWeight: '500', color: '#374151' }}>
@@ -106,7 +105,7 @@ export default function InstructorProfile() {
       {/* Payout Section */}
       <section style={{ background: 'white', borderRadius: '12px', padding: '24px', marginBottom: '24px', boxShadow: '0 2px 8px rgba(0,0,0,0.05)', border: '1px solid #eaeaea' }}>
         <h2 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '8px', color: '#0056D2' }}>
-          <CreditCard size={18} /> Payout Details
+          Payout Details
         </h2>
         <p style={{ fontSize: '13px', color: '#6b7280', marginBottom: '20px' }}>
           These details are used to process your earnings payouts. Please ensure the name matches your bank account exactly.
@@ -149,7 +148,6 @@ export default function InstructorProfile() {
             opacity: saving ? 0.7 : 1
           }}
         >
-          <Save size={16} />
           {saving ? 'Saving...' : 'Save Changes'}
         </button>
         {saved && (

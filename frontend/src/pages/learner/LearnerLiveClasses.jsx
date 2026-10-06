@@ -17,7 +17,6 @@ import JitsiRoomModal from '../../components/JitsiRoomModal';
 import VideoPlayer from '../../components/VideoPlayer';
 import Modal from '../../components/Modal';
 import keycloak from '../../auth/keycloak';
-import { Video, RefreshCw, GraduationCap, Calendar, BookOpen, Clock, Play } from 'lucide-react';
 import EmptyState from '../../components/EmptyState';
 
 function useCountdown(scheduledAt) {
@@ -90,17 +89,6 @@ function LiveClassCard({ lc, onJoin, onWatchRecording }) {
         </div>
       )}
 
-      {/* Icon */}
-      <div style={{
-        width: 48, height: 48, borderRadius: 'var(--radius-md)',
-        background: isLive ? '#dcfce7' : isEnded ? '#f1f5f9' : 'var(--color-bg-tertiary)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        color: isLive ? '#22c55e' : 'var(--color-text-muted)',
-        flexShrink: 0,
-      }}>
-        <Video size={24} />
-      </div>
-
       {/* Info */}
       <div style={{ flex: 1, minWidth: 0 }}>
         <h4 style={{ margin: 0, fontSize: 'var(--text-base)', fontWeight: 700, lineHeight: 1.4 }}>
@@ -111,12 +99,12 @@ function LiveClassCard({ lc, onJoin, onWatchRecording }) {
         </div>
         {!isLive && (
           <div style={{ fontSize: 'var(--text-xs)', color: '#0369a1', fontWeight: 600, marginTop: '0.3rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
-            <Clock size={12} /> {countdown}
+            {countdown}
           </div>
         )}
         {isEnded && (
           <div style={{ fontSize: 'var(--text-xs)', color: hasRecording ? '#15803d' : 'var(--color-text-muted)', fontWeight: 600, marginTop: '0.3rem' }}>
-            {hasRecording ? '✓ Recording Available' : 'Session ended'}
+            {hasRecording ? 'Recording Available' : 'Session ended'}
           </div>
         )}
       </div>
@@ -135,7 +123,7 @@ function LiveClassCard({ lc, onJoin, onWatchRecording }) {
           gap: '6px'
         }}
       >
-        {isLive && <Play size={14} />} {isLive ? 'Join Now' : 'Not Started'}
+        {isLive ? 'Join Now' : 'Not Started'}
       </button>
     </div>
   );
@@ -235,7 +223,7 @@ export default function LearnerLiveClasses() {
       <div className="page-wrapper">
         <div className="section-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
-            <h2 style={{ marginTop: '0.5rem', display: 'flex', alignItems: 'center', gap: '8px' }}><Video size={24} /> Live Classes</h2>
+            <h2 style={{ marginTop: '0.5rem', display: 'flex', alignItems: 'center', gap: '8px' }}>Live Classes</h2>
             <p>Join live sessions hosted by your instructors.</p>
           </div>
           <button
@@ -244,19 +232,17 @@ export default function LearnerLiveClasses() {
             onClick={fetchData}
             id="learner-refresh-live-classes-btn"
           >
-            <RefreshCw size={14} /> Refresh
+            Refresh
           </button>
         </div>
 
         {enrollments.length === 0 ? (
           <EmptyState 
-            icon={GraduationCap}
             title="No approved enrollments"
             message="You need an approved enrollment to view live classes."
           />
         ) : !hasAnyClasses ? (
           <EmptyState 
-            icon={Calendar}
             title="No upcoming live sessions"
             message="Your instructors haven't scheduled any live classes yet. Check back soon!"
           />
@@ -284,7 +270,7 @@ export default function LearnerLiveClasses() {
                         background: 'var(--color-bg-tertiary)',
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                         color: 'var(--color-text-muted)'
-                      }}><BookOpen size={20} /></div>
+                      }}></div>
                     )}
                     <h3 style={{ margin: 0, fontSize: 'var(--text-lg)', fontWeight: 700 }}>
                       {enrollment.course_title}

@@ -6,23 +6,20 @@
  */
 
 import { Link, useLocation } from 'react-router-dom';
-import {
-  LayoutDashboard, IndianRupee, CreditCard, Building2, FileText, BarChart2, RefreshCcw, Wallet, LifeBuoy, ClipboardCheck,
-} from 'lucide-react';
 import SupportBadgeLink from '../../components/SupportBadgeLink';
 import '../RoleDashboard.css';
 
 const SIDEBAR_ITEMS = [
-  { Icon: LayoutDashboard, label: 'Dashboard',           path: '/accounts' },
-  { Icon: Wallet,          label: 'Course Earnings',     path: '/accounts/course-earnings' },
-  { Icon: IndianRupee,      label: 'Transactions',        path: '/accounts/transactions' },
-  { Icon: CreditCard,      label: 'Payments & Refunds',  path: '/accounts/refunds' },
-  { Icon: Building2,       label: 'Instructor Payouts',  path: '/accounts/payouts' },
-  { Icon: FileText,        label: 'Invoices',            path: '/accounts/invoices' },
-  { Icon: BarChart2,       label: 'Financial Reports',   path: '/accounts/reports' },
-  { Icon: ClipboardCheck,  label: 'Learner Approvals',   path: '/accounts/enrollments' },
-  { Icon: RefreshCcw,      label: 'Reconciliation',      path: '/accounts/reconciliation', comingSoon: true },
-  { Icon: LifeBuoy,        label: 'Support',             path: '/accounts/support' },
+  { label: 'Dashboard',           path: '/accounts' },
+  { label: 'Course Earnings',     path: '/accounts/course-earnings' },
+  { label: 'Transactions',        path: '/accounts/transactions' },
+  { label: 'Payments & Refunds',  path: '/accounts/refunds' },
+  { label: 'Instructor Payouts',  path: '/accounts/payouts' },
+  { label: 'Invoices',            path: '/accounts/invoices' },
+  { label: 'Financial Reports',   path: '/accounts/reports' },
+  { label: 'Learner Approvals',   path: '/accounts/enrollments' },
+  { label: 'Reconciliation',      path: '/accounts/reconciliation', comingSoon: true },
+  { label: 'Support',             path: '/accounts/support' },
 ];
 
 export { SIDEBAR_ITEMS };
@@ -35,9 +32,7 @@ export default function AccountsSidebarLayout({ children }) {
       {/* ── Sidebar ────────────────────────────────────────────────── */}
       <aside className="role-sidebar">
         <div className="role-sidebar-header">
-          <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Wallet size={18} /> Accounts
-          </h3>
+          <h3>Accounts</h3>
           <p>Financial Operations</p>
         </div>
         <ul className="sidebar-nav">
@@ -46,7 +41,6 @@ export default function AccountsSidebarLayout({ children }) {
               return (
                 <SupportBadgeLink 
                   key={item.label}
-                  icon={<item.Icon size={16} />}
                   label={item.label}
                   path={item.path}
                   apiEndpoint="/accounts/support-tickets/unread-count"
@@ -56,7 +50,6 @@ export default function AccountsSidebarLayout({ children }) {
             return (
               <Link to={item.path} key={item.label} style={{ textDecoration: 'none' }}>
                 <li className={`sidebar-nav-item${location.pathname === item.path ? ' active' : ''}`}>
-                  <span className="sidebar-nav-icon"><item.Icon size={16} /></span>
                   {item.label}
                   {item.comingSoon && (
                     <span className="sidebar-coming-soon">Soon</span>

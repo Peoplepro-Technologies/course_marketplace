@@ -82,7 +82,7 @@ export default function EarningsChart() {
       {/* ── Header ─────────────────────────────────────────────────── */}
       <div className="section-header flex-between">
         <div>
-          <h2>💰 Earnings</h2>
+          <h2>Earnings</h2>
           <p>Track your revenue and upcoming payouts.</p>
         </div>
         <Link to="/instructor" className="btn btn-secondary">
@@ -93,7 +93,7 @@ export default function EarningsChart() {
       {/* ── Error State ──────────────────────────────────────────────── */}
       {error && (
         <div className="ec-error-banner">
-          <span>⚠️</span> {error}
+{error}
         </div>
       )}
 
@@ -132,7 +132,7 @@ export default function EarningsChart() {
         {/* Empty-state overlay — shown only when loaded and no data */}
         {!hasData && !loading && !error && (
           <div className="ec-chart-overlay">
-            <div className="ec-overlay-icon">📊</div>
+
             <h4>No earnings data yet</h4>
             <p>Your revenue chart will populate once you get your first enrollment on a paid course.</p>
           </div>

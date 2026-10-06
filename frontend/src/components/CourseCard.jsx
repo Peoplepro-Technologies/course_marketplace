@@ -15,7 +15,7 @@ export default function CourseCard({ course, showStatus = false }) {
           <img src={course.thumbnail_url.startsWith('/media/') ? `http://localhost:8000${course.thumbnail_url}` : course.thumbnail_url} alt={course.title} />
         ) : (
           <div className="course-card-thumb-placeholder">
-            <span>📚</span>
+
           </div>
         )}
         {showStatus && (

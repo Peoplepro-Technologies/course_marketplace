@@ -11,7 +11,7 @@ When a Sub Admin logs in, they access:
 - **Categories**: Managing the platform's course categories.
 - **Approvals**: Reviewing pending course submissions (similar to a Coordinator).
 - **Reviews & Moderation**: Moderating student reviews for compliance.
-- **Support**: (Coming Soon) Ticketing support system.
+- **Support**: Admin inbox for support tickets (`/sub-admin/support`).
 - **Reports**: Viewing platform analytics and KPIs.
 
 ---
@@ -75,4 +75,13 @@ When a Sub Admin logs in, they access:
 - **Backend API Endpoints**:
   - `GET /subadmin/reviews`
   - `PUT /subadmin/reviews/{reviewId}/moderate`
+  - **Role Restriction**: `sub_admin`
+
+### 7. Support Inbox
+- **Page**: `SubAdminSupportTickets.jsx`
+- **What it does**: View tickets, change status, reply and clear the unread badge.
+- **Backend API Endpoints**:
+  - `GET /subadmin/support-tickets`, `GET /subadmin/support-tickets/unread-count`
+  - `PUT /subadmin/support-tickets/{ticketId}` (status)
+  - `POST /subadmin/support-tickets/{ticketId}/reply`, `POST /subadmin/support-tickets/{ticketId}/read`
   - **Role Restriction**: `sub_admin`

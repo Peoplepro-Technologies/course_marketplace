@@ -126,7 +126,7 @@ export default function CourseCatalog() {
     <div className="page-wrapper container animate-fade-in">
       <div className="section-header flex-between" style={{ marginBottom: '1.5rem' }}>
         <div>
-          <h2>📚 Course Catalog</h2>
+          <h2>Course Catalog</h2>
           <p>View all courses and manage instructor assignments.</p>
         </div>
 
@@ -151,7 +151,7 @@ export default function CourseCatalog() {
       </div>
 
       {error ? (
-        <div className="alert alert-error">⚠️ {error}</div>
+        <div className="alert alert-error">{error}</div>
       ) : loading ? (
         <LoadingSpinner />
       ) : data.courses.length === 0 ? (
@@ -179,7 +179,7 @@ export default function CourseCatalog() {
                     <td><strong>{c.title}</strong></td>
                     <td>{c.category}</td>
                     <td style={{ textAlign: 'center' }}>{getStatusBadge(c.status)}</td>
-                    <td style={{ textAlign: 'center' }}>{c.avg_rating > 0 ? `⭐ ${c.avg_rating.toFixed(1)}` : '—'}</td>
+                    <td style={{ textAlign: 'center' }}>{c.avg_rating > 0 ? `${c.avg_rating.toFixed(1)}` : '—'}</td>
                     <td>{c.instructor?.name || 'Unknown'}</td>
                     <td style={{ textAlign: 'center' }}>
                       <button 
@@ -225,10 +225,11 @@ export default function CourseCatalog() {
           display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
         }}>
           <div style={{
-            background: 'var(--color-surface)', borderRadius: '16px', padding: '2rem',
-            width: '100%', maxWidth: '480px', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)'
+            background: '#ffffff', borderRadius: '16px', padding: '2rem',
+            width: '100%', maxWidth: '480px', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)',
+            color: '#1a1a2e'
           }}>
-            <h3 style={{ marginTop: 0, marginBottom: '0.5rem' }}>🔄 Reassign Course</h3>
+            <h3 style={{ marginTop: 0, marginBottom: '0.5rem' }}>Reassign Course</h3>
             <p style={{ color: 'var(--color-text-muted)', marginBottom: '1.5rem', fontWeight: 600 }}>
               {reassignCourse.title}
             </p>
@@ -301,7 +302,7 @@ export default function CourseCatalog() {
             borderRadius: '16px', padding: '2rem', width: '100%', maxWidth: '520px',
             boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)', maxHeight: '90vh', overflowY: 'auto'
           }}>
-            <h3 style={{ marginTop: 0 }}>📚 Add New Course</h3>
+            <h3 style={{ marginTop: 0 }}>Add New Course</h3>
 
             <div style={{ marginBottom: '1rem' }}>
               <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>Course Title *</label>

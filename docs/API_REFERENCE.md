@@ -11,14 +11,17 @@
 > - `/api/v1/public/...` — public.py
 > - `/api/v1/subadmin/...` — subadmin.py
 > - `/api/v1/superadmin/...` — superadmin.py
-> - `/support-tickets/...` — support.py
+> - `/api/v1/support-tickets/...` and `/api/v1/me` — support.py
 > - `/api/v1/transcripts/...` — transcripts.py
 
-**Total endpoints: 152** across 10 router files.
+**Total endpoints: 198** across 10 router files (accounts 21, admin 12, coordinator 23, instructor 40, learner 22, public 7, subadmin 21, superadmin 36, support 14, transcripts 2).
 
 ---
 
 ## Cross-Reference Notes
+
+### ⚠️ Router not registered
+`admin.py` (12 endpoints under `/api/v1/admin`) is **not** included in `main.py`. `app.include_router(...)` is only called for public, learner, instructor, coordinator, superadmin, accounts, subadmin, support, me_router and transcripts, so the admin endpoints are unreachable until the router is registered. The `superadmin.py` router provides the equivalent functionality the frontend actually uses.
 
 ### ⚠️ Orphaned / Unused Backend Endpoints (backend endpoint exists, no frontend caller found)
 | Endpoint | Router | Notes |
@@ -26,8 +29,7 @@
 | `POST /payouts/batches/run` | accounts.py | No frontend call found |
 | `GET /payouts/batches` | accounts.py | No frontend call found |
 | `PUT /payouts/batches/{id}/release` | accounts.py | No frontend call found |
-| `GET /admin/metrics` | admin.py | Separate from superadmin — no frontend call found |
-| `PUT /admin/courses/{id}/moderate` | admin.py | No frontend call found |
+| `GET /admin/metrics`, `PUT /admin/courses/{id}/moderate` | admin.py | Router not registered in `main.py` |
 | `POST /learner/refund-request` | learner.py | Duplicate — frontend uses `/transactions/{id}/request-refund` |
 | `GET /learner/lessons/{id}/video` | learner.py | Role = None; called internally by player |
 | `GET /instructor/students` | instructor.py | Lists all students across all courses |
@@ -36,8 +38,9 @@
 | Frontend Call | File | Status |
 |--------------|------|--------|
 | `GET /coordinator/stats` | CoordinatorDashboard.jsx | Maps to `GET /stats` in coordinator.py — OK if prefix is `/coordinator` |
-| `GET /superadmin/settings` | SASettings.jsx | Not found in `superadmin.py` — **possibly missing endpoint** |
-| `PUT /superadmin/settings` | SASettings.jsx | Not found in `superadmin.py` — **possibly missing endpoint** |
+| `GET /superadmin/settings` | SASettings.jsx | Not found in `superadmin.py` — **missing endpoint** |
+| `PUT /superadmin/settings` | SASettings.jsx | Not found in `superadmin.py` — **missing endpoint** |
+| `DELETE /superadmin/ticket-routing-rules/{id}` | SATicketRouting.jsx | Legacy delete route is used to remove v2 rules too (there is no `-v2` DELETE) |
 
 ---
 
@@ -52,14 +55,16 @@ Full prefix: `/api/v1/accounts`
 | GET | `/api/v1/accounts/refunds` | `list_refund_requests` | Pending refund queue |
 | PUT | `/api/v1/accounts/refunds/{refund_id}/approve` | `approve_refund` | Sets enrollment → `refunded` |
 | PUT | `/api/v1/accounts/refunds/{refund_id}/reject` | `reject_refund` | Enrollment unchanged |
-| GET | `/api/v1/accounts/payouts` | `list_instructor_payouts` | Estimated earnings (20% fee) |
-| POST | `/api/v1/accounts/payouts/{instructor_id}/mark-paid` | `mark_instructor_paid` | Creates payout snapshot row |
+| GET | `/api/v1/accounts/payouts` | `list_instructor_payouts` | Estimated earnings; uses the instructor's `instructor_payout_rate` if set, else the 80/20 default (returns `payout_rate_pct`, `custom_rate`) |
+| POST | `/api/v1/accounts/payouts/{instructor_id}/mark-paid` | `mark_instructor_paid` | Creates payout snapshot row (custom rate applied) |
 | POST | `/api/v1/accounts/payouts/batches/run` | `run_payout_batches` | ⚠️ No frontend caller |
 | GET | `/api/v1/accounts/payouts/batches` | `list_payout_batches` | ⚠️ No frontend caller |
 | PUT | `/api/v1/accounts/payouts/batches/{payout_id}/release` | `release_payout_batch` | ⚠️ No frontend caller |
 | GET | `/api/v1/accounts/invoices` | `list_invoices` | Paginated invoice archive |
-| GET | `/api/v1/accounts/support-tickets` | `accounts_get_support_tickets` | Admin ticket view |
+| GET | `/api/v1/accounts/support-tickets` | `accounts_get_support_tickets` | Tickets with legacy `assigned_team="accounts"` **or** a department whose name contains finance/accounts |
 | PUT | `/api/v1/accounts/support-tickets/{ticket_id}` | `accounts_update_support_ticket` | Update ticket status |
+| GET | `/api/v1/accounts/support-tickets/unread-count` | `accounts_get_unread_count` | Unread badge polling |
+| POST | `/api/v1/accounts/support-tickets/{ticket_id}/read` | `accounts_mark_ticket_read` | Clear unread status |
 | POST | `/api/v1/accounts/support-tickets/{ticket_id}/reply` | `accounts_reply_support_ticket` | Admin reply |
 | GET | `/api/v1/accounts/financial-reports` | `get_financial_reports` | Aggregated financial reports |
 | GET | `/api/v1/accounts/course-earnings` | `get_course_earnings` | Revenue per course |
@@ -110,6 +115,15 @@ Full prefix: `/api/v1/coordinator`
 | GET | `/api/v1/coordinator/reviews` | `list_all_reviews` | All reviews |
 | PUT | `/api/v1/coordinator/reviews/{review_id}/moderate` | `moderate_review` | Moderate review |
 | GET | `/api/v1/coordinator/reports` | `get_reports` | Platform reports |
+| POST | `/api/v1/coordinator/courses` | `coordinator_create_course` | Coordinator creates a draft course directly; `instructor_id` optional |
+| POST | `/api/v1/coordinator/instructors` | `create_instructor` | Provisions instructor in Keycloak + local DB; accepts `instructor_payout_rate`, `can_host_live_classes`, `can_upload_video`; returns credentials |
+| PUT | `/api/v1/coordinator/instructors/{instructor_id}` | `update_instructor` | Update name, payout rate, live-class / video-upload permissions |
+| PUT | `/api/v1/coordinator/instructors/{instructor_id}/deactivate` | `deactivate_instructor` | Sets `is_active=False`; course data kept |
+| PUT | `/api/v1/coordinator/instructors/{instructor_id}/reactivate` | `reactivate_instructor` | Restores instructor |
+| GET | `/api/v1/coordinator/instructors/{instructor_id}/courses` | `get_instructor_courses` | Courses owned by an instructor |
+| POST | `/api/v1/coordinator/courses/{course_id}/assign-instructor` | `assign_instructor_to_course` | Reassign a course (stores `previous_instructor_id`; content stays intact) |
+| GET | `/api/v1/coordinator/courses/{course_id}/assignment-detail` | `get_course_assignment_detail` | Current + previous instructor for a course |
+| GET | `/api/v1/coordinator/faculty-assignments-quizzes` | `get_faculty_assignments_quizzes` | Per-instructor / per-course assignment submission and quiz attempt stats |
 
 ---
 
@@ -133,7 +147,7 @@ Full prefix: `/api/v1/instructor`
 | PUT | `/api/v1/instructor/lessons/{lesson_id}` | `update_lesson` | Update lesson |
 | DELETE | `/api/v1/instructor/lessons/{lesson_id}` | `delete_lesson` | Remove lesson |
 | PUT | `/api/v1/instructor/lessons/{lesson_id}/toggle-preview` | `toggle_lesson_preview` | Free preview on/off |
-| POST | `/api/v1/instructor/lessons/{lesson_id}/upload-video` | `upload_lesson_video` | Triggers background transcode + transcription |
+| POST | `/api/v1/instructor/lessons/{lesson_id}/upload-video` | `upload_lesson_video` | Triggers background transcode + transcription. 403 if `can_upload_video=False` |
 | POST | `/api/v1/instructor/lessons/{lesson_id}/upload-thumbnail` | `upload_lesson_thumbnail` | Lesson thumbnail |
 | GET | `/api/v1/instructor/reviews` | `list_instructor_reviews` | All reviews on own courses |
 | PUT | `/api/v1/instructor/reviews/{review_id}/reply` | `reply_to_review` | Reply to a student review |
@@ -141,7 +155,7 @@ Full prefix: `/api/v1/instructor`
 | GET | `/api/v1/instructor/payouts` | `get_instructor_payouts` | Payout history |
 | GET | `/api/v1/instructor/students` | `list_all_students` | ⚠️ All students across all courses |
 | GET | `/api/v1/instructor/courses/{course_id}/students` | `list_course_students` | Students per course |
-| POST | `/api/v1/instructor/courses/{course_id}/live-classes` | `schedule_live_class` | Schedule session |
+| POST | `/api/v1/instructor/courses/{course_id}/live-classes` | `schedule_live_class` | Schedule session. Live-class create/start/end/delete return 403 if `can_host_live_classes=False` (Faculty mode) |
 | GET | `/api/v1/instructor/live-classes` | `list_instructor_live_classes` | All scheduled sessions |
 | PUT | `/api/v1/instructor/live-classes/{live_class_id}/start` | `start_live_class` | Mark started |
 | PUT | `/api/v1/instructor/live-classes/{live_class_id}/end` | `end_live_class` | Mark ended |
@@ -158,6 +172,7 @@ Full prefix: `/api/v1/instructor`
 | PUT | `/api/v1/instructor/profile` | `update_instructor_profile` | Update profile + payout info |
 | PUT | `/api/v1/instructor/enrollments/{enrollment_id}/approve` | `approve_enrollment` | Manual enrollment approval |
 | PUT | `/api/v1/instructor/enrollments/{enrollment_id}/reject` | `reject_enrollment` | Manual enrollment rejection |
+| GET | `/api/v1/instructor/my-assignments-quizzes` | `get_my_assignments_quizzes` | Own assignment submission + quiz attempt stats per course |
 
 ---
 
@@ -187,6 +202,8 @@ Full prefix: `/api/v1/learner`
 | GET | `/api/v1/learner/courses/{course_id}/detail` | `get_enrolled_course_detail` | Full course + section structure |
 | GET | `/api/v1/learner/my-reviews` | `get_my_reviews` | My submitted reviews |
 | GET | `/api/v1/learner/progress-overview` | `get_progress_overview` | Aggregate stats |
+| POST | `/api/v1/learner/assignments/{assignment_id}/submit` | `submit_assignment` | Submit / re-submit an assignment |
+| POST | `/api/v1/learner/quiz-questions/{question_id}/attempt` | `attempt_quiz_question` | Records `selected_option_index`, returns correctness |
 
 ---
 
@@ -266,21 +283,43 @@ Full prefix: `/api/v1/superadmin`
 | PUT | `/api/v1/superadmin/support-tickets/{ticket_id}` | `update_ticket_status` | Status change |
 | POST | `/api/v1/superadmin/support-tickets/{ticket_id}/reply` | `reply_support_ticket` | Superadmin reply |
 | POST | `/api/v1/superadmin/support-tickets/{ticket_id}/read` | `mark_ticket_read` | Clear unread status |
+| GET | `/api/v1/superadmin/departments` | `list_departments` | All departments with `user_count` |
+| POST | `/api/v1/superadmin/departments` | `create_department` | 409 if name exists |
+| PUT | `/api/v1/superadmin/departments/{dept_id}` | `update_department` | Rename / describe / activate / deactivate |
+| DELETE | `/api/v1/superadmin/departments/{dept_id}` | `delete_department` | 409 if users are still assigned |
+| PUT | `/api/v1/superadmin/users/{user_id}/department` | `assign_user_department` | Assign / unassign (`department_id: null`) a user's department |
+| GET | `/api/v1/superadmin/ticket-routing-rules-v2` | `list_routing_rules_v2` | Role → category → subcategory → department rules |
+| POST | `/api/v1/superadmin/ticket-routing-rules-v2` | `create_routing_rule_v2` | 409 on duplicate (role, category, subcategory) |
+| PUT | `/api/v1/superadmin/ticket-routing-rules-v2/{rule_id}` | `update_routing_rule_v2` | Change department / toggle `is_active` |
+| GET | `/api/v1/superadmin/ticket-routing-rules` | legacy | Legacy single-level rules (`category → assigned_role`) |
+| POST | `/api/v1/superadmin/ticket-routing-rules` | legacy | Legacy create |
+| PUT | `/api/v1/superadmin/ticket-routing-rules/{rule_id}` | legacy | Legacy update |
+| DELETE | `/api/v1/superadmin/ticket-routing-rules/{rule_id}` | legacy | Deletes any rule (also used for v2 rules) |
 
 ---
 
-## support.py — Role: Any authenticated user (`require_any_role(["learner", "instructor", "coursecoordinator"])`)
+## support.py — Mixed roles
 
-Full prefix: `/api/v1/support-tickets`
+Prefixes: `/api/v1/support-tickets` (router) and `/api/v1` (`me_router`). Most endpoints only require `get_current_user`; `POST /support-tickets` requires `learner`, `instructor` or `coursecoordinator`; `/analytics` requires `admin`.
 
 | Method | Full Path | Function | Notes |
 |--------|-----------|----------|-------|
+| GET | `/api/v1/me` | `get_me` | Profile incl. `role`, `department_id`, `department_name` (used by `AuthProvider` to detect staff) |
+| GET | `/api/v1/support-tickets/routing-options` | `get_routing_options` | No params → categories for the caller's role; `?category=X` → subcategories + department name |
 | GET | `/api/v1/support-tickets` | `get_my_tickets` | Own tickets only |
-| POST | `/api/v1/support-tickets` | `raise_ticket` | Creates with `status=open` |
-| GET | `/api/v1/support-tickets/unread-count` | `get_unread_count` | Unread badge polling |
+| POST | `/api/v1/support-tickets` | `raise_ticket` | Looks up (role, category, subcategory) → department; creates an `SRnnn` ticket with `status=open` |
+| GET | `/api/v1/support-tickets/unread-count` | `get_unread_count` | Unread badge polling (own tickets) |
+| GET | `/api/v1/support-tickets/department-queue` | `get_department_queue` | Tickets for the caller's `department_id`; filters `status`, `priority`, `category`; 403 if no department |
+| GET | `/api/v1/support-tickets/department-queue/{ticket_id}` | `get_dept_queue_ticket` | Ticket + replies (department-scoped) |
+| PUT | `/api/v1/support-tickets/department-queue/{ticket_id}` | `update_department_ticket` | Change `status` / `assigned_to_id` |
+| POST | `/api/v1/support-tickets/department-queue/{ticket_id}/reply` | `reply_department_ticket` | Reply; a resolved/closed ticket moves to `in_progress` |
+| POST | `/api/v1/support-tickets/department-queue/{ticket_id}/read` | `mark_dept_ticket_read` | Clear unread |
+| GET | `/api/v1/support-tickets/analytics` | `get_ticket_analytics` | Role `admin`. KPIs (total/open/in_progress/resolved/overdue) + filtered list. Filters: role, department_id, category, priority, status, date_from, date_to. SLA: high 72h, medium 120h, low 168h |
 | GET | `/api/v1/support-tickets/{ticket_id}` | `get_ticket` | Own ticket only (403 otherwise) |
+| POST | `/api/v1/support-tickets/{ticket_id}/read` | `mark_ticket_read` | Clear unread |
 | POST | `/api/v1/support-tickets/{ticket_id}/reply` | `reply_to_ticket` | Re-opens resolved tickets |
-| POST | `/api/v1/support-tickets/{ticket_id}/read` | `mark_ticket_read` | Clear unread status |
+
+> Route order matters: `/routing-options`, `/unread-count`, `/department-queue*` and `/analytics` are declared before `/{ticket_id}` so the path parameter does not capture them.
 
 ---
 
